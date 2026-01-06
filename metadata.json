@@ -1,0 +1,8 @@
+{
+  "name": "Paragon Hub",
+  "description": "Mission-critical internal operating system for high-end luxury concierge travel.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ]
+}

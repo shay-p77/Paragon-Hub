@@ -1,0 +1,146 @@
+
+export type Ownership = 'DIRECT' | 'AGENCY';
+
+export enum ElementStatus {
+  INQUIRY = 'INQUIRY',
+  REQUESTED = 'REQUESTED',
+  QUOTED = 'QUOTED',
+  BOOKED = 'BOOKED',
+  TICKETED = 'TICKETED',
+  CANCELLED = 'CANCELLED'
+}
+
+export enum TripStage {
+  INQUIRY = 'Inquiry',
+  PLANNING = 'Planning',
+  IN_PROGRESS = 'In Progress',
+  COMPLETED = 'Completed',
+  ARCHIVED = 'Archived'
+}
+
+export interface FlightElement {
+  id: string;
+  type: 'FLIGHT';
+  status: ElementStatus;
+  ownership: Ownership;
+  pnr: string;
+  airlinePnr?: string;
+  carrier: string;
+  segments: {
+    from: string;
+    to: string;
+    departure: string;
+    arrival: string;
+    flightNo: string;
+  }[];
+  passengers: string[];
+  cost: number;
+  markup: number;
+  commission: number;
+  ticketingStatus: string;
+  agentId?: string;
+}
+
+export interface HotelElement {
+  id: string;
+  type: 'HOTEL';
+  status: ElementStatus;
+  ownership: Ownership;
+  hotelName: string;
+  roomType: string;
+  checkIn: string;
+  checkOut: string;
+  guests: string[];
+  cost: number;
+  commission: number;
+  supplier: string;
+  agentId?: string;
+}
+
+export interface LogisticsElement {
+  id: string;
+  type: 'LOGISTICS';
+  status: ElementStatus;
+  ownership: Ownership;
+  serviceType: string;
+  details: string;
+  date: string;
+  cost: number;
+  markup: number;
+  agentId?: string;
+}
+
+export type TripElement = FlightElement | HotelElement | LogisticsElement;
+
+export interface ConciergeTrip {
+  id: string;
+  name: string;
+  stage: TripStage;
+  ownership: Ownership;
+  clientId: string;
+  agentId?: string;
+  elements: string[];
+  serviceFee: number;
+  startDate: string;
+  endDate: string;
+}
+
+export interface Transaction {
+  id: string;
+  date: string;
+  description: string;
+  amount: number;
+  type: 'DEBIT' | 'CREDIT';
+  status: 'PENDING' | 'REVIEWED' | 'POSTED';
+  elementId?: string;
+  tripId?: string;
+  category: string;
+}
+
+export type UserRole = 'ADMIN' | 'OPERATIONS' | 'SALES' | 'ACCOUNTING' | 'CLIENT';
+
+export interface User {
+  id: string;
+  name: string;
+  role: UserRole;
+  email: string;
+}
+
+export interface BookingRequest {
+  id: string;
+  agentId: string;
+  clientId: string;
+  type: 'FLIGHT' | 'HOTEL' | 'LOGISTICS' | 'GENERAL';
+  status: 'PENDING' | 'IN_REVIEW' | 'CONVERTED' | 'REJECTED';
+  priority: 'LOW' | 'NORMAL' | 'URGENT' | 'CRITICAL';
+  notes: string;
+  timestamp: string;
+  details?: any;
+}
+
+export interface Comment {
+  id: string;
+  authorId: string;
+  text: string;
+  timestamp: string;
+  parentId: string; // ID of the flight, hotel, trip, or request
+}
+
+export interface Notification {
+  id: string;
+  userId: string;
+  message: string;
+  type: 'TAG' | 'ASSIGN' | 'STATUS' | 'CHAT';
+  read: boolean;
+  timestamp: string;
+  link?: string;
+}
+
+export interface Announcement {
+  id: string;
+  title: string;
+  content: string;
+  priority: 'LOW' | 'NORMAL' | 'HIGH';
+  author: string;
+  date: string;
+}
