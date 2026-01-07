@@ -1,11 +1,17 @@
 
 import React, { useState, useEffect } from 'react';
 import { SectionHeader, Badge } from './Shared';
-import { MOCK_ANNOUNCEMENTS, MOCK_USERS } from '../constants';
-import { User } from '../types';
+import { MOCK_USERS } from '../constants';
+import { User, Comment, Announcement } from '../types';
 
 interface HomeProps {
   currentUser: User;
+  announcements: Announcement[];
+  comments?: Comment[];
+  onAddComment?: (text: string, parentId: string) => void;
+  onDeleteComment?: (commentId: string) => void;
+  onAddAnnouncement?: (announcement: Omit<Announcement, 'id' | 'date' | 'author'>) => void;
+  onDeleteAnnouncement?: (announcementId: string) => void;
 }
 
 const WorldClock: React.FC = () => {
@@ -15,11 +21,11 @@ const WorldClock: React.FC = () => {
     const update = () => {
       const now = new Date();
       setTimes({
-        'LONDON': now.toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        'LA': now.toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles', hour: '2-digit', minute: '2-digit', second: '2-digit' }),
         'NYC': now.toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-        'DUBAI': now.toLocaleTimeString('en-US', { timeZone: 'Asia/Dubai', hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-        'SINGAPORE': now.toLocaleTimeString('en-US', { timeZone: 'Asia/Singapore', hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-        'GVA': now.toLocaleTimeString('en-GB', { timeZone: 'Europe/Zurich', hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        'LONDON': now.toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        'TEL AVIV': now.toLocaleTimeString('en-US', { timeZone: 'Asia/Jerusalem', hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        'SYDNEY': now.toLocaleTimeString('en-US', { timeZone: 'Australia/Sydney', hour: '2-digit', minute: '2-digit', second: '2-digit' }),
       });
     };
     update();
@@ -39,12 +45,29 @@ const WorldClock: React.FC = () => {
   );
 };
 
-const Home: React.FC<HomeProps> = ({ currentUser }) => {
+const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], onAddComment, onDeleteComment, onAddAnnouncement, onDeleteAnnouncement }) => {
   const [chatMessage, setChatMessage] = useState('');
   const [messages, setMessages] = useState([
     { id: 1, user: 'Elena Vance', text: 'Anyone have a driver contact for Courchevel tonight?', time: '09:42' },
     { id: 2, user: 'James Sterling', text: 'Check the Knowledge Base under Alpine Logistics. High-End Gstaad team just expanded there.', time: '09:45' },
   ]);
+  const [expandedAnnouncement, setExpandedAnnouncement] = useState<string | null>(null);
+  const [commentText, setCommentText] = useState('');
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newPostTitle, setNewPostTitle] = useState('');
+  const [newPostContent, setNewPostContent] = useState('');
+  const [newPostPriority, setNewPostPriority] = useState<'HIGH' | 'NORMAL'>('NORMAL');
+
+  // Handle escape key to close modal
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showCreateModal) {
+        setShowCreateModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [showCreateModal]);
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,6 +79,22 @@ const Home: React.FC<HomeProps> = ({ currentUser }) => {
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     }]);
     setChatMessage('');
+  };
+
+  const handleCreatePost = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPostTitle.trim() || !newPostContent.trim()) return;
+    if (onAddAnnouncement) {
+      onAddAnnouncement({
+        title: newPostTitle,
+        content: newPostContent,
+        priority: newPostPriority
+      });
+    }
+    setNewPostTitle('');
+    setNewPostContent('');
+    setNewPostPriority('NORMAL');
+    setShowCreateModal(false);
   };
 
   return (
@@ -84,96 +123,269 @@ const Home: React.FC<HomeProps> = ({ currentUser }) => {
            <div className="bg-white border border-slate-200 p-8 rounded-sm shadow-sm">
               <div className="flex justify-between items-center mb-6">
                 <SectionHeader title="Bulletin Board" />
-                <button className="text-[10px] font-bold text-paragon hover:underline uppercase tracking-widest">Create Post +</button>
+                <button onClick={() => setShowCreateModal(true)} className="text-[10px] font-bold text-paragon hover:underline uppercase tracking-widest">Create Post +</button>
               </div>
               <div className="space-y-6">
-                {MOCK_ANNOUNCEMENTS.map(a => (
-                   <div key={a.id} className={`p-6 border-l-4 ${a.priority === 'HIGH' ? 'border-red-500 bg-red-50' : 'border-paragon bg-slate-50'} rounded-r-sm`}>
-                      <div className="flex justify-between items-start mb-2">
-                        <h3 className="text-sm font-bold text-slate-900">{a.title}</h3>
-                        <Badge color={a.priority === 'HIGH' ? 'red' : 'teal'}>{a.priority}</Badge>
-                      </div>
-                      <p className="text-xs text-slate-600 mb-4 leading-relaxed">{a.content}</p>
-                      <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                         <span>Posted by {a.author}</span>
-                         <span>{a.date}</span>
-                      </div>
-                   </div>
-                ))}
-              </div>
-           </div>
+                {announcements.map(a => {
+                  const announcementComments = comments.filter(c => c.parentId === a.id);
+                  const isExpanded = expandedAnnouncement === a.id;
 
-           <div className="grid grid-cols-2 gap-8">
-              <div className="bg-slate-900 text-white p-8 rounded-sm shadow-xl">
-                 <h3 className="font-cinzel text-lg font-bold mb-4 text-paragon-gold">ACTIVE INCIDENTS</h3>
-                 <div className="space-y-4">
-                    <div className="flex gap-4 items-center">
-                       <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center font-bold text-paragon-gold">!</div>
-                       <div>
-                          <p className="text-xs font-bold">Lufthansa Strike Warning</p>
-                          <p className="text-[10px] text-slate-400">Affecting FRA/MUC hubs on May 25th.</p>
-                       </div>
-                    </div>
-                    <div className="flex gap-4 items-center">
-                       <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center font-bold text-paragon-gold">!</div>
-                       <div>
-                          <p className="text-xs font-bold">Aspen Airport Closure</p>
-                          <p className="text-[10px] text-slate-400">Maintenance scheduled June 1-10. Reroute to EGE.</p>
-                       </div>
-                    </div>
-                 </div>
-              </div>
-              <div className="bg-white border border-slate-200 p-8 rounded-sm shadow-sm">
-                 <h3 className="font-cinzel text-sm font-bold mb-4 uppercase tracking-widest">QUICK ACTIONS</h3>
-                 <div className="grid grid-cols-2 gap-2">
-                    {['PNR Parse', 'Jet Quote', 'Hotel Book', 'Client Search'].map(action => (
-                       <button key={action} className="p-3 border border-slate-100 bg-slate-50 text-[10px] font-bold uppercase hover:bg-paragon hover:text-white transition-all rounded-sm">{action}</button>
-                    ))}
-                 </div>
+                  const isOwnPost = a.author === currentUser.name;
+
+                  return (
+                   <div key={a.id} className={`border-l-4 ${a.priority === 'HIGH' ? 'border-red-500 bg-red-50' : 'border-paragon bg-slate-50'} rounded-r-sm group`}>
+                      <div className="p-6">
+                        <div className="flex justify-between items-start mb-2">
+                          <h3 className="text-sm font-bold text-slate-900">{a.title}</h3>
+                          <div className="flex items-center gap-2">
+                            <Badge color={a.priority === 'HIGH' ? 'red' : 'teal'}>{a.priority}</Badge>
+                            {isOwnPost && onDeleteAnnouncement && (
+                              <button
+                                onClick={() => onDeleteAnnouncement(a.id)}
+                                className="text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                title="Delete post"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        <p className="text-xs text-slate-600 mb-4 leading-relaxed">{a.content}</p>
+                        <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                           <span>Posted by {a.author}</span>
+                           <div className="flex gap-4 items-center">
+                             <button
+                               onClick={() => setExpandedAnnouncement(isExpanded ? null : a.id)}
+                               className="text-paragon hover:underline flex items-center gap-1"
+                             >
+                               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                               </svg>
+                               {announcementComments.length} Comments
+                             </button>
+                             <span>{a.date}</span>
+                           </div>
+                        </div>
+                      </div>
+
+                      {isExpanded && (
+                        <div className="border-t border-slate-200 bg-white">
+                          <div className="p-4 space-y-3 max-h-60 overflow-auto">
+                            {announcementComments.length === 0 ? (
+                              <p className="text-[10px] text-slate-400 italic text-center py-2">No comments yet. Be the first to comment!</p>
+                            ) : (
+                              announcementComments.map(c => {
+                                const author = MOCK_USERS.find(u => u.id === c.authorId);
+                                const isOwnComment = c.authorId === currentUser.id;
+                                return (
+                                  <div key={c.id} className="flex gap-3 group">
+                                    <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[8px] font-bold flex-shrink-0">
+                                      {author?.name.charAt(0)}
+                                    </div>
+                                    <div className="flex-1">
+                                       <div className="flex gap-2 items-center mb-0.5">
+                                          <span className="text-[10px] font-bold text-slate-900">{author?.name}</span>
+                                          <span className="text-[9px] text-slate-400">{new Date(c.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                          {isOwnComment && onDeleteComment && (
+                                            <button
+                                              onClick={() => onDeleteComment(c.id)}
+                                              className="ml-auto text-[9px] text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                              title="Delete comment"
+                                            >
+                                              ✕
+                                            </button>
+                                          )}
+                                       </div>
+                                       <div className="text-[11px] text-slate-700 leading-normal">
+                                          {c.text}
+                                       </div>
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+
+                          {onAddComment && (
+                            <form
+                              onSubmit={(e) => {
+                                e.preventDefault();
+                                if (!commentText.trim()) return;
+                                onAddComment(commentText, a.id);
+                                setCommentText('');
+                              }}
+                              className="p-4 border-t border-slate-100"
+                            >
+                              <div className="flex gap-2">
+                                <input
+                                  type="text"
+                                  placeholder="Write a comment..."
+                                  value={commentText}
+                                  onChange={(e) => setCommentText(e.target.value)}
+                                  className="flex-1 p-2 text-xs border border-slate-200 outline-none focus:ring-1 focus:ring-paragon rounded-sm"
+                                />
+                                <button type="submit" className="px-4 py-2 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors">
+                                  Post
+                                </button>
+                              </div>
+                            </form>
+                          )}
+                        </div>
+                      )}
+                   </div>
+                  );
+                })}
               </div>
            </div>
         </div>
 
-        {/* Global Internal Chat */}
-        <div className="col-span-4 bg-white border border-slate-200 rounded-sm shadow-sm flex flex-col h-[600px]">
-           <div className="p-4 border-b border-slate-100 flex justify-between items-center">
-              <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Internal Comms</h3>
-              <span className="flex items-center gap-1">
-                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
-                 <span className="text-[9px] font-bold text-slate-400">GLOBAL CHANNEL</span>
-              </span>
-           </div>
-           
-           <div className="flex-1 overflow-auto p-4 space-y-4">
-              {messages.map(m => (
-                 <div key={m.id} className={`max-w-[85%] ${m.user === currentUser.name ? 'ml-auto text-right' : ''}`}>
-                    <div className="flex items-center gap-2 mb-1">
-                       {m.user !== currentUser.name && <span className="text-[10px] font-bold text-paragon">{m.user}</span>}
-                       <span className="text-[9px] text-slate-300 font-mono">{m.time}</span>
-                    </div>
-                    <div className={`p-3 text-xs rounded-lg ${m.user === currentUser.name ? 'bg-paragon text-white' : 'bg-slate-100 text-slate-700'}`}>
-                       {m.text}
-                    </div>
-                 </div>
-              ))}
+        {/* On Duty Now */}
+        <div className="col-span-4 bg-white border border-slate-200 rounded-sm shadow-sm p-8">
+           <div className="flex items-center gap-2 mb-6">
+              <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+              <h3 className="text-[11px] font-bold uppercase tracking-widest text-slate-900">On Duty Now</h3>
            </div>
 
-           <form onSubmit={handleSendMessage} className="p-4 border-t border-slate-100">
-              <div className="relative">
-                 <input 
-                    type="text" 
-                    placeholder="Type message... (use @ to tag)"
-                    value={chatMessage}
-                    onChange={(e) => setChatMessage(e.target.value)}
-                    className="w-full p-3 pr-12 text-xs border border-slate-200 rounded-sm focus:ring-1 focus:ring-paragon outline-none"
-                 />
-                 <button type="submit" className="absolute right-2 top-2 p-1.5 text-paragon hover:text-paragon-dark">
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"></path></svg>
-                 </button>
+           <div className="space-y-4">
+              {/* Jonathan Sterling */}
+              <div className="flex items-center gap-3">
+                 <div className="relative">
+                    <div className="w-12 h-12 rounded-full bg-red-500 flex items-center justify-center text-white font-bold text-sm">
+                       JS
+                    </div>
+                    <div className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white"></div>
+                 </div>
+                 <div className="flex-1">
+                    <div className="text-sm font-bold text-slate-900">Jonathan Sterling</div>
+                    <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Senior Concierge</div>
+                 </div>
               </div>
-           </form>
+
+              {/* Sarah Kensington */}
+              <div className="flex items-center gap-3">
+                 <div className="relative">
+                    <div className="w-12 h-12 rounded-full bg-purple-500 flex items-center justify-center text-white font-bold text-sm">
+                       SK
+                    </div>
+                    <div className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white"></div>
+                 </div>
+                 <div className="flex-1">
+                    <div className="text-sm font-bold text-slate-900">Sarah Kensington</div>
+                    <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Lifestyle Manager</div>
+                 </div>
+              </div>
+
+              {/* Elena Vance */}
+              <div className="flex items-center gap-3">
+                 <div className="relative">
+                    <div className="w-12 h-12 rounded-full bg-red-500 flex items-center justify-center text-white font-bold text-sm">
+                       EV
+                    </div>
+                    <div className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white"></div>
+                 </div>
+                 <div className="flex-1">
+                    <div className="text-sm font-bold text-slate-900">Elena Vance</div>
+                    <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Global Logistics</div>
+                 </div>
+              </div>
+           </div>
+
+           <button className="w-full mt-8 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-paragon transition-colors">
+              Launch Team Sync
+           </button>
         </div>
       </div>
+
+      {/* Create Post Modal */}
+      {showCreateModal && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-in fade-in duration-200"
+          onClick={() => setShowCreateModal(false)}
+        >
+          <div
+            className="bg-white rounded-sm shadow-2xl w-full max-w-lg mx-4 animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6 border-b border-slate-200">
+              <div className="flex justify-between items-center">
+                <h3 className="text-sm font-bold uppercase tracking-widest text-slate-900">Create Bulletin Post</h3>
+                <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-600 text-xl">&times;</button>
+              </div>
+            </div>
+
+            <form onSubmit={handleCreatePost} className="p-6 space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Title</label>
+                <input
+                  type="text"
+                  value={newPostTitle}
+                  onChange={(e) => setNewPostTitle(e.target.value)}
+                  className="w-full p-3 border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                  placeholder="Post title..."
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Content</label>
+                <textarea
+                  value={newPostContent}
+                  onChange={(e) => setNewPostContent(e.target.value)}
+                  className="w-full p-3 border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm h-32"
+                  placeholder="Post content..."
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Priority</label>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setNewPostPriority('NORMAL')}
+                    className={`flex-1 py-2 px-4 rounded-sm text-[10px] font-bold uppercase tracking-widest transition-all ${
+                      newPostPriority === 'NORMAL'
+                        ? 'bg-paragon text-white'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    Normal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewPostPriority('HIGH')}
+                    className={`flex-1 py-2 px-4 rounded-sm text-[10px] font-bold uppercase tracking-widest transition-all ${
+                      newPostPriority === 'HIGH'
+                        ? 'bg-red-600 text-white'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    High Priority
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  className="flex-1 py-3 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-3 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-sm"
+                >
+                  Create Post
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

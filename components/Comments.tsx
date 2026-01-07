@@ -8,9 +8,10 @@ interface CommentsProps {
   currentUser: User;
   comments: Comment[];
   onAddComment: (text: string) => void;
+  onDeleteComment?: (commentId: string) => void;
 }
 
-const Comments: React.FC<CommentsProps> = ({ parentId, currentUser, comments, onAddComment }) => {
+const Comments: React.FC<CommentsProps> = ({ parentId, currentUser, comments, onAddComment, onDeleteComment }) => {
   const [text, setText] = useState('');
   const elementComments = comments.filter(c => c.parentId === parentId);
 
@@ -46,15 +47,25 @@ const Comments: React.FC<CommentsProps> = ({ parentId, currentUser, comments, on
         ) : (
           elementComments.map(c => {
             const author = MOCK_USERS.find(u => u.id === c.authorId);
+            const isOwnComment = c.authorId === currentUser.id;
             return (
-              <div key={c.id} className="flex gap-3">
+              <div key={c.id} className="flex gap-3 group">
                 <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[8px] font-bold flex-shrink-0">
                   {author?.name.charAt(0)}
                 </div>
-                <div>
+                <div className="flex-1">
                    <div className="flex gap-2 items-center mb-0.5">
                       <span className="text-[10px] font-bold text-slate-900">{author?.name}</span>
                       <span className="text-[9px] text-slate-400">{new Date(c.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      {isOwnComment && onDeleteComment && (
+                        <button
+                          onClick={() => onDeleteComment(c.id)}
+                          className="ml-auto text-[9px] text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Delete comment"
+                        >
+                          ✕
+                        </button>
+                      )}
                    </div>
                    <div className="text-[11px] text-slate-700 leading-normal">
                       {renderText(c.text)}

@@ -11,9 +11,10 @@ interface CRMProps {
   onAddRequest: (req: Partial<BookingRequest>) => void;
   comments: Comment[];
   onAddComment: (text: string, parentId: string) => void;
+  onDeleteComment?: (commentId: string) => void;
 }
 
-const CRM: React.FC<CRMProps> = ({ currentUser, requests, onAddRequest, comments, onAddComment }) => {
+const CRM: React.FC<CRMProps> = ({ currentUser, requests, onAddRequest, comments, onAddComment, onDeleteComment }) => {
   const [activeSubTab, setActiveSubTab] = useState('customers');
   const [requestType, setRequestType] = useState<'QUICK' | 'DETAILED'>('QUICK');
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
@@ -168,7 +169,7 @@ const CRM: React.FC<CRMProps> = ({ currentUser, requests, onAddRequest, comments
                  <h3 className="text-xs font-bold uppercase tracking-widest text-paragon">Collaboration Panel</h3>
                  <button onClick={() => setSelectedElementId(null)} className="text-slate-400 hover:text-slate-600">&times;</button>
               </div>
-              <Comments parentId={selectedElementId} currentUser={currentUser} comments={comments} onAddComment={(text) => onAddComment(text, selectedElementId)} />
+              <Comments parentId={selectedElementId} currentUser={currentUser} comments={comments} onAddComment={(text) => onAddComment(text, selectedElementId)} onDeleteComment={onDeleteComment} />
             </div>
           </div>
         )}

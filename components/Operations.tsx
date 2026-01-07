@@ -10,9 +10,10 @@ interface OperationsProps {
   comments: Comment[];
   currentUser: User;
   onAddComment: (text: string, parentId: string) => void;
+  onDeleteComment?: (commentId: string) => void;
 }
 
-const Operations: React.FC<OperationsProps> = ({ requests, comments, currentUser, onAddComment }) => {
+const Operations: React.FC<OperationsProps> = ({ requests, comments, currentUser, onAddComment, onDeleteComment }) => {
   const [subTab, setSubTab] = useState('flights');
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
 
@@ -162,11 +163,12 @@ const Operations: React.FC<OperationsProps> = ({ requests, comments, currentUser
                 ID: {selectedElementId}
               </div>
               
-              <Comments 
-                parentId={selectedElementId} 
-                currentUser={currentUser} 
-                comments={comments} 
+              <Comments
+                parentId={selectedElementId}
+                currentUser={currentUser}
+                comments={comments}
                 onAddComment={(text) => onAddComment(text, selectedElementId)}
+                onDeleteComment={onDeleteComment}
               />
             </div>
           </div>

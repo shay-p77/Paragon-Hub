@@ -8,14 +8,15 @@ import KnowledgeBase from './components/KnowledgeBase';
 import ClientPortal from './components/ClientPortal';
 import Home from './components/Home';
 import NotificationCenter from './components/NotificationCenter';
-import { MOCK_USERS, INITIAL_REQUESTS, MOCK_COMMENTS } from './constants';
-import { User, BookingRequest, Comment, Notification } from './types';
+import { MOCK_USERS, INITIAL_REQUESTS, MOCK_COMMENTS, MOCK_ANNOUNCEMENTS } from './constants';
+import { User, BookingRequest, Comment, Notification, Announcement } from './types';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User>(MOCK_USERS[0]); // Default Admin
   const [activeTab, setActiveTab] = useState('home');
   const [requests, setRequests] = useState<BookingRequest[]>(INITIAL_REQUESTS);
   const [comments, setComments] = useState<Comment[]>(MOCK_COMMENTS);
+  const [announcements, setAnnouncements] = useState<Announcement[]>(MOCK_ANNOUNCEMENTS);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
 
@@ -51,6 +52,24 @@ const App: React.FC = () => {
         }
       });
     }
+  };
+
+  const handleDeleteComment = (commentId: string) => {
+    setComments(prev => prev.filter(c => c.id !== commentId));
+  };
+
+  const handleAddAnnouncement = (announcement: Omit<Announcement, 'id' | 'date' | 'author'>) => {
+    const newAnnouncement: Announcement = {
+      id: `a-${Date.now()}`,
+      ...announcement,
+      author: currentUser.name,
+      date: new Date().toISOString().split('T')[0] // YYYY-MM-DD format
+    };
+    setAnnouncements(prev => [newAnnouncement, ...prev]);
+  };
+
+  const handleDeleteAnnouncement = (announcementId: string) => {
+    setAnnouncements(prev => prev.filter(a => a.id !== announcementId));
   };
 
   const handleAddRequest = (req: Partial<BookingRequest>) => {
@@ -94,13 +113,13 @@ const App: React.FC = () => {
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'home': return <Home currentUser={currentUser} />;
-      case 'ops': return <Operations requests={requests} comments={comments} currentUser={currentUser} onAddComment={handleAddComment} />;
-      case 'sales': return <CRM currentUser={currentUser} requests={requests} onAddRequest={handleAddRequest} comments={comments} onAddComment={handleAddComment} />;
+      case 'home': return <Home currentUser={currentUser} announcements={announcements} comments={comments} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onAddAnnouncement={handleAddAnnouncement} onDeleteAnnouncement={handleDeleteAnnouncement} />;
+      case 'ops': return <Operations requests={requests} comments={comments} currentUser={currentUser} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} />;
+      case 'sales': return <CRM currentUser={currentUser} requests={requests} onAddRequest={handleAddRequest} comments={comments} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} />;
       case 'accounting': return <Accounting />;
       case 'knowledge': return <KnowledgeBase />;
       case 'portal': return <ClientPortal />;
-      default: return <Home currentUser={currentUser} />;
+      default: return <Home currentUser={currentUser} announcements={announcements} comments={comments} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onAddAnnouncement={handleAddAnnouncement} onDeleteAnnouncement={handleDeleteAnnouncement} />;
     }
   };
 
