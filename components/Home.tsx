@@ -69,17 +69,31 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
   const [detailTargetDate, setDetailTargetDate] = useState('');
   const [detailSpecs, setDetailSpecs] = useState('');
 
+  // Delete confirmation state
+  const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'post' | 'comment'; id: string } | null>(null);
+
   // Handle escape key to close modals
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         if (showCreateModal) setShowCreateModal(false);
         if (showQuickAdd) setShowQuickAdd(false);
+        if (deleteConfirm) setDeleteConfirm(null);
       }
     };
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
-  }, [showCreateModal, showQuickAdd]);
+  }, [showCreateModal, showQuickAdd, deleteConfirm]);
+
+  const handleConfirmDelete = () => {
+    if (!deleteConfirm) return;
+    if (deleteConfirm.type === 'post' && onDeleteAnnouncement) {
+      onDeleteAnnouncement(deleteConfirm.id);
+    } else if (deleteConfirm.type === 'comment' && onDeleteComment) {
+      onDeleteComment(deleteConfirm.id);
+    }
+    setDeleteConfirm(null);
+  };
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
@@ -294,7 +308,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                             <Badge color={a.priority === 'HIGH' ? 'red' : 'teal'}>{a.priority}</Badge>
                             {isOwnPost && onDeleteAnnouncement && (
                               <button
-                                onClick={() => onDeleteAnnouncement(a.id)}
+                                onClick={() => setDeleteConfirm({ type: 'post', id: a.id })}
                                 className="text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
                                 title="Delete post"
                               >
@@ -343,7 +357,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                                           <span className="text-[9px] text-slate-400">{new Date(c.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                           {isOwnComment && onDeleteComment && (
                                             <button
-                                              onClick={() => onDeleteComment(c.id)}
+                                              onClick={() => setDeleteConfirm({ type: 'comment', id: c.id })}
                                               className="ml-auto text-[9px] text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
                                               title="Delete comment"
                                             >
@@ -566,6 +580,50 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-in fade-in duration-200"
+          onClick={() => setDeleteConfirm(null)}
+        >
+          <div
+            className="bg-white rounded-sm shadow-2xl w-full max-w-sm mx-4 animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                  <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Delete {deleteConfirm.type === 'post' ? 'Post' : 'Comment'}</h3>
+                  <p className="text-xs text-slate-500">This action cannot be undone</p>
+                </div>
+              </div>
+              <p className="text-sm text-slate-600 mb-6">
+                Are you sure you want to delete this {deleteConfirm.type}? This will permanently remove it from the bulletin board.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDeleteConfirm(null)}
+                  className="flex-1 py-2.5 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmDelete}
+                  className="flex-1 py-2.5 bg-red-600 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-red-700 transition-colors rounded-sm"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
