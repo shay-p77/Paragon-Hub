@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Layout from './components/Layout';
 import Operations from './components/Operations';
 import CRM from './components/CRM';
@@ -8,10 +8,40 @@ import KnowledgeBase from './components/KnowledgeBase';
 import ClientPortal from './components/ClientPortal';
 import Home from './components/Home';
 import NotificationCenter from './components/NotificationCenter';
+import Login, { GoogleUser } from './components/Login';
 import { MOCK_USERS, INITIAL_REQUESTS, MOCK_COMMENTS, MOCK_ANNOUNCEMENTS } from './constants';
 import { User, BookingRequest, Comment, Notification, Announcement } from './types';
 
 const App: React.FC = () => {
+  // Auth state
+  const [googleUser, setGoogleUser] = useState<GoogleUser | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+
+  // Check for existing session on mount
+  useEffect(() => {
+    const storedUser = localStorage.getItem('paragon_user');
+    if (storedUser) {
+      try {
+        setGoogleUser(JSON.parse(storedUser));
+      } catch (e) {
+        localStorage.removeItem('paragon_user');
+      }
+    }
+    setIsAuthLoading(false);
+  }, []);
+
+  const handleLogin = (user: GoogleUser) => {
+    setGoogleUser(user);
+  };
+
+  const handleLogout = () => {
+    setGoogleUser(null);
+    localStorage.removeItem('paragon_user');
+    if (window.google?.accounts?.id) {
+      window.google.accounts.id.disableAutoSelect();
+    }
+  };
+
   const [currentUser, setCurrentUser] = useState<User>(MOCK_USERS[0]); // Default Admin
   const [activeTab, setActiveTab] = useState('home');
   const [requests, setRequests] = useState<BookingRequest[]>(INITIAL_REQUESTS);
@@ -19,6 +49,51 @@ const App: React.FC = () => {
   const [announcements, setAnnouncements] = useState<Announcement[]>(MOCK_ANNOUNCEMENTS);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+  // Ref for notification dropdown click-outside detection
+  const notificationRef = useRef<HTMLDivElement>(null);
+
+  // Close notification dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
+        setShowNotifications(false);
+      }
+    };
+
+    if (showNotifications) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showNotifications]);
+
+  // Generate a consistent color based on user's email
+  const getAvatarColor = (email: string) => {
+    const colors = [
+      'bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-purple-500',
+      'bg-pink-500', 'bg-indigo-500', 'bg-teal-500', 'bg-orange-500',
+      'bg-cyan-500', 'bg-amber-500', 'bg-emerald-500', 'bg-rose-500'
+    ];
+    let hash = 0;
+    for (let i = 0; i < email.length; i++) {
+      hash = email.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return colors[Math.abs(hash) % colors.length];
+  };
+
+  // Get initials from name
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(word => word[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
 
   // Logic to handle user tagging notifications
   const handleAddComment = (text: string, parentId: string) => {
@@ -72,6 +147,10 @@ const App: React.FC = () => {
     setAnnouncements(prev => prev.filter(a => a.id !== announcementId));
   };
 
+  const handleDeleteRequest = (requestId: string) => {
+    setRequests(prev => prev.filter(r => r.id !== requestId));
+  };
+
   const handleAddRequest = (req: Partial<BookingRequest>) => {
     const newReq: BookingRequest = {
       id: `req-${Date.now()}`,
@@ -113,20 +192,34 @@ const App: React.FC = () => {
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'home': return <Home currentUser={currentUser} announcements={announcements} comments={comments} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onAddAnnouncement={handleAddAnnouncement} onDeleteAnnouncement={handleDeleteAnnouncement} onAddRequest={handleAddRequest} requests={requests} />;
+      case 'home': return <Home currentUser={currentUser} announcements={announcements} comments={comments} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onAddAnnouncement={handleAddAnnouncement} onDeleteAnnouncement={handleDeleteAnnouncement} onAddRequest={handleAddRequest} onDeleteRequest={handleDeleteRequest} requests={requests} />;
       case 'ops': return <Operations requests={requests} comments={comments} currentUser={currentUser} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} />;
       case 'sales': return <CRM currentUser={currentUser} requests={requests} onAddRequest={handleAddRequest} comments={comments} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} />;
       case 'accounting': return <Accounting />;
       case 'knowledge': return <KnowledgeBase />;
       case 'portal': return <ClientPortal />;
-      default: return <Home currentUser={currentUser} announcements={announcements} comments={comments} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onAddAnnouncement={handleAddAnnouncement} onDeleteAnnouncement={handleDeleteAnnouncement} onAddRequest={handleAddRequest} requests={requests} />;
+      default: return <Home currentUser={currentUser} announcements={announcements} comments={comments} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onAddAnnouncement={handleAddAnnouncement} onDeleteAnnouncement={handleDeleteAnnouncement} onAddRequest={handleAddRequest} onDeleteRequest={handleDeleteRequest} requests={requests} />;
     }
   };
 
+  // Show loading spinner while checking auth
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-paragon-gold"></div>
+      </div>
+    );
+  }
+
+  // Show login screen if not authenticated
+  if (!googleUser) {
+    return <Login onLogin={handleLogin} />;
+  }
+
   return (
-    <Layout 
-      activeTab={activeTab} 
-      setActiveTab={setActiveTab} 
+    <Layout
+      activeTab={activeTab}
+      setActiveTab={setActiveTab}
       currentUser={currentUser}
     >
       <div className="flex-1 bg-slate-50 overflow-auto flex flex-col relative">
@@ -141,8 +234,8 @@ const App: React.FC = () => {
              <div className="text-[10px] font-bold text-slate-500 uppercase flex gap-3">
                 <span className="text-slate-300">Switch Role:</span>
                 {MOCK_USERS.map(u => (
-                   <button 
-                     key={u.id} 
+                   <button
+                     key={u.id}
                      onClick={() => {
                        setCurrentUser(u);
                        if (u.role === 'CLIENT') setActiveTab('portal');
@@ -156,8 +249,8 @@ const App: React.FC = () => {
                 ))}
              </div>
              <div className="h-8 w-[1px] bg-slate-200"></div>
-             <div className="relative">
-                <button 
+             <div className="relative" ref={notificationRef}>
+                <button
                   onClick={() => setShowNotifications(!showNotifications)}
                   className={`p-2 transition-colors relative ${unreadCount > 0 ? 'text-paragon' : 'text-slate-400 hover:text-paragon'}`}
                 >
@@ -169,12 +262,32 @@ const App: React.FC = () => {
                   )}
                 </button>
                 {showNotifications && (
-                   <NotificationCenter 
-                      notifications={userNotifications} 
-                      onMarkRead={markRead} 
+                   <NotificationCenter
+                      notifications={userNotifications}
+                      onMarkRead={markRead}
                       onClearAll={clearAll}
                    />
                 )}
+             </div>
+             <div className="h-8 w-[1px] bg-slate-200"></div>
+             {/* User Profile & Logout */}
+             <div className="flex items-center gap-3">
+                <div className={`w-8 h-8 rounded-full ${getAvatarColor(googleUser.email)} flex items-center justify-center text-white font-bold text-xs`}>
+                  {getInitials(googleUser.name)}
+                </div>
+                <div className="hidden sm:block">
+                  <div className="text-[10px] font-bold text-slate-900 truncate max-w-[120px]">{googleUser.name}</div>
+                  <div className="text-[9px] text-slate-400 truncate max-w-[120px]">{googleUser.email}</div>
+                </div>
+                <button
+                  onClick={() => setShowLogoutConfirm(true)}
+                  className="p-2 text-slate-400 hover:text-red-600 transition-colors"
+                  title="Sign out"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                </button>
              </div>
           </div>
         </div>
@@ -183,6 +296,39 @@ const App: React.FC = () => {
           {renderContent()}
         </div>
       </div>
+
+      {/* Logout Confirmation Modal */}
+      {showLogoutConfirm && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          onClick={() => setShowLogoutConfirm(false)}
+        >
+          <div
+            className="bg-white rounded-sm shadow-2xl w-full max-w-xs mx-4 p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-sm font-bold text-slate-900 mb-2">Sign Out</h3>
+            <p className="text-xs text-slate-500 mb-6">Are you sure you want to log out?</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowLogoutConfirm(false)}
+                className="flex-1 py-2 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-sm"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setShowLogoutConfirm(false);
+                  handleLogout();
+                }}
+                className="flex-1 py-2 bg-red-600 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-red-700 transition-colors rounded-sm"
+              >
+                Log Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 };

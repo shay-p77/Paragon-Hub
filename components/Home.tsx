@@ -13,6 +13,7 @@ interface HomeProps {
   onAddAnnouncement?: (announcement: Omit<Announcement, 'id' | 'date' | 'author'>) => void;
   onDeleteAnnouncement?: (announcementId: string) => void;
   onAddRequest?: (req: any) => void;
+  onDeleteRequest?: (requestId: string) => void;
   requests?: BookingRequest[];
 }
 
@@ -47,7 +48,7 @@ const WorldClock: React.FC = () => {
   );
 };
 
-const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], onAddComment, onDeleteComment, onAddAnnouncement, onDeleteAnnouncement, onAddRequest, requests = [] }) => {
+const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], onAddComment, onDeleteComment, onAddAnnouncement, onDeleteAnnouncement, onAddRequest, onDeleteRequest, requests = [] }) => {
   const [chatMessage, setChatMessage] = useState('');
   const [messages, setMessages] = useState([
     { id: 1, user: 'Elena Vance', text: 'Anyone have a driver contact for Courchevel tonight?', time: '09:42' },
@@ -68,9 +69,13 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
   const [detailClientName, setDetailClientName] = useState('');
   const [detailTargetDate, setDetailTargetDate] = useState('');
   const [detailSpecs, setDetailSpecs] = useState('');
+  const [requestPriority, setRequestPriority] = useState<'NORMAL' | 'URGENT'>('NORMAL');
 
   // Delete confirmation state
-  const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'post' | 'comment'; id: string } | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'post' | 'comment' | 'request'; id: string } | null>(null);
+
+  // On Duty expanded state
+  const [onDutyExpanded, setOnDutyExpanded] = useState(false);
 
   // Handle escape key to close modals
   useEffect(() => {
@@ -91,6 +96,8 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
       onDeleteAnnouncement(deleteConfirm.id);
     } else if (deleteConfirm.type === 'comment' && onDeleteComment) {
       onDeleteComment(deleteConfirm.id);
+    } else if (deleteConfirm.type === 'request' && onDeleteRequest) {
+      onDeleteRequest(deleteConfirm.id);
     }
     setDeleteConfirm(null);
   };
@@ -134,7 +141,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
         clientId: '',
         type: 'GENERAL',
         status: 'PENDING',
-        priority: 'NORMAL',
+        priority: requestPriority,
         notes: quickSnippet,
         timestamp: new Date().toISOString()
       });
@@ -146,7 +153,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
         clientId: '',
         type: detailServiceType,
         status: 'PENDING',
-        priority: 'NORMAL',
+        priority: requestPriority,
         notes: `Client: ${detailClientName}\nTarget Date: ${detailTargetDate}\nSpecs: ${detailSpecs}`,
         timestamp: new Date().toISOString()
       });
@@ -154,6 +161,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
       setDetailTargetDate('');
       setDetailSpecs('');
     }
+    setRequestPriority('NORMAL');
     setShowQuickAdd(false);
   };
 
@@ -177,12 +185,81 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
 
       <WorldClock />
 
+      {/* On Duty Now - Expandable Indicator */}
+      <div className="mb-8">
+        <button
+          onClick={() => setOnDutyExpanded(!onDutyExpanded)}
+          className="w-full bg-white border border-slate-200 rounded-sm shadow-sm p-4 flex items-center justify-between hover:border-paragon transition-colors"
+        >
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+              <span className="text-[11px] font-bold uppercase tracking-widest text-slate-900">On Duty Now</span>
+            </div>
+            <div className="flex -space-x-2">
+              <div className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center text-white font-bold text-[10px] border-2 border-white">JS</div>
+              <div className="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center text-white font-bold text-[10px] border-2 border-white">SK</div>
+              <div className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center text-white font-bold text-[10px] border-2 border-white">EV</div>
+            </div>
+            <span className="text-[10px] text-slate-400 font-semibold">3 team members online</span>
+          </div>
+          <svg className={`w-4 h-4 text-slate-400 transition-transform ${onDutyExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        {onDutyExpanded && (
+          <div className="bg-white border border-t-0 border-slate-200 rounded-b-sm shadow-sm p-6 animate-in slide-in-from-top-2 duration-200">
+            <div className="grid grid-cols-3 gap-6">
+              {/* Jonathan Sterling */}
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <div className="w-12 h-12 rounded-full bg-red-500 flex items-center justify-center text-white font-bold text-sm">JS</div>
+                  <div className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white"></div>
+                </div>
+                <div>
+                  <div className="text-sm font-bold text-slate-900">Jonathan Sterling</div>
+                  <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Senior Concierge</div>
+                </div>
+              </div>
+
+              {/* Sarah Kensington */}
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <div className="w-12 h-12 rounded-full bg-purple-500 flex items-center justify-center text-white font-bold text-sm">SK</div>
+                  <div className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white"></div>
+                </div>
+                <div>
+                  <div className="text-sm font-bold text-slate-900">Sarah Kensington</div>
+                  <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Lifestyle Manager</div>
+                </div>
+              </div>
+
+              {/* Elena Vance */}
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <div className="w-12 h-12 rounded-full bg-red-500 flex items-center justify-center text-white font-bold text-sm">EV</div>
+                  <div className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white"></div>
+                </div>
+                <div>
+                  <div className="text-sm font-bold text-slate-900">Elena Vance</div>
+                  <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Global Logistics</div>
+                </div>
+              </div>
+            </div>
+            <button className="w-full mt-6 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-paragon transition-colors border-t border-slate-100 pt-6">
+              Launch Team Sync
+            </button>
+          </div>
+        )}
+      </div>
+
       <div className="grid grid-cols-12 gap-8">
-        {/* Main Bulletin */}
-        <div className="col-span-8 space-y-8">
+        {/* Main Content - Operational Dispatch */}
+        <div className="col-span-8">
            {/* Quick Add Operational Dispatch */}
-           <div className="bg-white border-2 border-paragon rounded-sm shadow-sm">
-              <div className="bg-gradient-to-r from-paragon to-paragon-dark p-4 flex items-center justify-between">
+           <div className="bg-white border-2 border-paragon rounded-sm shadow-sm h-[400px] flex flex-col">
+              <div className="bg-gradient-to-r from-paragon to-paragon-dark p-4 flex items-center justify-between flex-shrink-0">
                 <div className="flex items-center gap-2">
                   <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
@@ -191,7 +268,13 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                 </div>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => setRequestMode('QUICK')}
+                    onClick={() => {
+                      setRequestMode('QUICK');
+                      // Clear detail fields when switching to quick
+                      setDetailClientName('');
+                      setDetailTargetDate('');
+                      setDetailSpecs('');
+                    }}
                     className={`px-4 py-2 text-[10px] font-bold uppercase tracking-widest transition-all ${
                       requestMode === 'QUICK'
                         ? 'bg-white text-paragon'
@@ -201,7 +284,11 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                     QUICK ADD
                   </button>
                   <button
-                    onClick={() => setRequestMode('DETAIL')}
+                    onClick={() => {
+                      setRequestMode('DETAIL');
+                      // Clear quick field when switching to detail
+                      setQuickSnippet('');
+                    }}
                     className={`px-4 py-2 text-[10px] font-bold uppercase tracking-widest transition-all ${
                       requestMode === 'DETAIL'
                         ? 'bg-white text-paragon'
@@ -213,26 +300,53 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                 </div>
               </div>
 
-              <form onSubmit={handleQuickAddSubmit} className="p-6">
+              <form onSubmit={handleQuickAddSubmit} className="p-6 flex-1 flex flex-col overflow-hidden">
                 {requestMode === 'QUICK' ? (
-                  <div>
+                  <div className="flex-1 flex flex-col">
                     <textarea
                       value={quickSnippet}
                       onChange={(e) => setQuickSnippet(e.target.value)}
                       placeholder="Paste a request snippet, PNR, or client note here..."
-                      className="w-full h-32 p-4 border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm resize-none"
+                      className="w-full flex-1 p-4 border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm resize-none"
                       required
                     />
+                    <div className="mt-4 flex-shrink-0">
+                      <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Priority</label>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setRequestPriority('NORMAL')}
+                          className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-sm ${
+                            requestPriority === 'NORMAL'
+                              ? 'bg-slate-700 text-white'
+                              : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                          }`}
+                        >
+                          Normal
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setRequestPriority('URGENT')}
+                          className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-sm ${
+                            requestPriority === 'URGENT'
+                              ? 'bg-red-600 text-white'
+                              : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                          }`}
+                        >
+                          Urgent
+                        </button>
+                      </div>
+                    </div>
                     <button
                       type="submit"
-                      className="mt-4 w-full bg-paragon text-white py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors"
+                      className="mt-4 w-full bg-paragon text-white py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors flex-shrink-0"
                     >
                       Confirm Quick Request
                     </button>
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-3 gap-4">
+                  <div className="flex-1 flex flex-col space-y-3">
+                    <div className="grid grid-cols-3 gap-4 flex-shrink-0">
                       <div>
                         <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Service Type</label>
                         <select
@@ -266,19 +380,46 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                         />
                       </div>
                     </div>
-                    <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Request Specifications</label>
+                    <div className="flex-1 flex flex-col min-h-0">
+                      <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex-shrink-0">Request Specifications</label>
                       <textarea
                         value={detailSpecs}
                         onChange={(e) => setDetailSpecs(e.target.value)}
                         placeholder="Enter detailed flight numbers, hotel preferences, or special instructions..."
-                        className="w-full h-24 p-3 border border-slate-200 text-xs outline-none focus:ring-2 focus:ring-paragon resize-none"
+                        className="w-full flex-1 p-3 border border-slate-200 text-xs outline-none focus:ring-2 focus:ring-paragon resize-none"
                         required
                       />
                     </div>
+                    <div className="flex-shrink-0">
+                      <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Priority</label>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setRequestPriority('NORMAL')}
+                          className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-sm ${
+                            requestPriority === 'NORMAL'
+                              ? 'bg-slate-700 text-white'
+                              : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                          }`}
+                        >
+                          Normal
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setRequestPriority('URGENT')}
+                          className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-sm ${
+                            requestPriority === 'URGENT'
+                              ? 'bg-red-600 text-white'
+                              : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                          }`}
+                        >
+                          Urgent
+                        </button>
+                      </div>
+                    </div>
                     <button
                       type="submit"
-                      className="w-full bg-paragon text-white py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors"
+                      className="w-full bg-paragon text-white py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors flex-shrink-0"
                     >
                       Confirm Detailed Request
                     </button>
@@ -286,13 +427,16 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                 )}
               </form>
            </div>
+        </div>
 
-           <div className="bg-white border border-slate-200 p-8 rounded-sm shadow-sm">
-              <div className="flex justify-between items-center mb-6">
+        {/* Bulletin Board - Sidebar */}
+        <div className="col-span-4">
+           <div className="bg-white border border-slate-200 p-6 rounded-sm shadow-sm h-[400px] flex flex-col">
+              <div className="flex justify-between items-center mb-4 flex-shrink-0">
                 <SectionHeader title="Bulletin Board" />
-                <button onClick={() => setShowCreateModal(true)} className="text-[10px] font-bold text-paragon hover:underline uppercase tracking-widest">Create Post +</button>
+                <button onClick={() => setShowCreateModal(true)} className="text-[10px] font-bold text-paragon hover:underline uppercase tracking-widest">+ Post</button>
               </div>
-              <div className="space-y-6">
+              <div className="space-y-4 flex-1 overflow-y-auto pr-2">
                 {announcements.map(a => {
                   const announcementComments = comments.filter(c => c.parentId === a.id);
                   const isExpanded = expandedAnnouncement === a.id;
@@ -300,11 +444,11 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                   const isOwnPost = a.author === currentUser.name;
 
                   return (
-                   <div key={a.id} className={`border-l-4 ${a.priority === 'HIGH' ? 'border-red-500 bg-red-50' : 'border-paragon bg-slate-50'} rounded-r-sm group`}>
-                      <div className="p-6">
-                        <div className="flex justify-between items-start mb-2">
-                          <h3 className="text-sm font-bold text-slate-900">{a.title}</h3>
-                          <div className="flex items-center gap-2">
+                   <div key={a.id} className={`border-l-2 ${a.priority === 'HIGH' ? 'border-red-500 bg-red-50' : 'border-paragon bg-slate-50'} rounded-r-sm group`}>
+                      <div className="p-4">
+                        <div className="flex justify-between items-start mb-1">
+                          <h3 className="text-xs font-bold text-slate-900 leading-tight">{a.title}</h3>
+                          <div className="flex items-center gap-1 flex-shrink-0 ml-2">
                             <Badge color={a.priority === 'HIGH' ? 'red' : 'teal'}>{a.priority}</Badge>
                             {isOwnPost && onDeleteAnnouncement && (
                               <button
@@ -312,60 +456,56 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                                 className="text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
                                 title="Delete post"
                               >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                 </svg>
                               </button>
                             )}
                           </div>
                         </div>
-                        <p className="text-xs text-slate-600 mb-4 leading-relaxed">{a.content}</p>
-                        <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                           <span>Posted by {a.author}</span>
-                           <div className="flex gap-4 items-center">
-                             <button
-                               onClick={() => setExpandedAnnouncement(isExpanded ? null : a.id)}
-                               className="text-paragon hover:underline flex items-center gap-1"
-                             >
-                               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
-                               </svg>
-                               {announcementComments.length} Comments
-                             </button>
-                             <span>{a.date}</span>
-                           </div>
+                        <p className="text-[11px] text-slate-600 mb-3 leading-relaxed line-clamp-2">{a.content}</p>
+                        <div className="flex justify-between items-center text-[9px] text-slate-400 font-bold uppercase tracking-wider">
+                           <span>{a.author}</span>
+                           <button
+                             onClick={() => setExpandedAnnouncement(isExpanded ? null : a.id)}
+                             className="text-paragon hover:underline flex items-center gap-1"
+                           >
+                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                             </svg>
+                             {announcementComments.length}
+                           </button>
                         </div>
                       </div>
 
                       {isExpanded && (
                         <div className="border-t border-slate-200 bg-white">
-                          <div className="p-4 space-y-3 max-h-60 overflow-auto">
+                          <div className="p-3 space-y-2 max-h-40 overflow-auto">
                             {announcementComments.length === 0 ? (
-                              <p className="text-[10px] text-slate-400 italic text-center py-2">No comments yet. Be the first to comment!</p>
+                              <p className="text-[9px] text-slate-400 italic text-center py-2">No comments yet</p>
                             ) : (
                               announcementComments.map(c => {
                                 const author = MOCK_USERS.find(u => u.id === c.authorId);
                                 const isOwnComment = c.authorId === currentUser.id;
                                 return (
-                                  <div key={c.id} className="flex gap-3 group">
-                                    <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[8px] font-bold flex-shrink-0">
+                                  <div key={c.id} className="flex gap-2 group">
+                                    <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[7px] font-bold flex-shrink-0">
                                       {author?.name.charAt(0)}
                                     </div>
-                                    <div className="flex-1">
-                                       <div className="flex gap-2 items-center mb-0.5">
-                                          <span className="text-[10px] font-bold text-slate-900">{author?.name}</span>
-                                          <span className="text-[9px] text-slate-400">{new Date(c.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                    <div className="flex-1 min-w-0">
+                                       <div className="flex gap-1 items-center mb-0.5">
+                                          <span className="text-[9px] font-bold text-slate-900 truncate">{author?.name}</span>
                                           {isOwnComment && onDeleteComment && (
                                             <button
                                               onClick={() => setDeleteConfirm({ type: 'comment', id: c.id })}
-                                              className="ml-auto text-[9px] text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                              className="ml-auto text-[8px] text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
                                               title="Delete comment"
                                             >
                                               ✕
                                             </button>
                                           )}
                                        </div>
-                                       <div className="text-[11px] text-slate-700 leading-normal">
+                                       <div className="text-[10px] text-slate-700 leading-snug">
                                           {c.text}
                                        </div>
                                     </div>
@@ -383,17 +523,17 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                                 onAddComment(commentText, a.id);
                                 setCommentText('');
                               }}
-                              className="p-4 border-t border-slate-100"
+                              className="p-3 border-t border-slate-100"
                             >
                               <div className="flex gap-2">
                                 <input
                                   type="text"
-                                  placeholder="Write a comment..."
+                                  placeholder="Comment..."
                                   value={commentText}
                                   onChange={(e) => setCommentText(e.target.value)}
-                                  className="flex-1 p-2 text-xs border border-slate-200 outline-none focus:ring-1 focus:ring-paragon rounded-sm"
+                                  className="flex-1 p-1.5 text-[10px] border border-slate-200 outline-none focus:ring-1 focus:ring-paragon rounded-sm"
                                 />
-                                <button type="submit" className="px-4 py-2 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors">
+                                <button type="submit" className="px-2 py-1.5 bg-paragon text-white text-[9px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors">
                                   Post
                                 </button>
                               </div>
@@ -407,90 +547,59 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
               </div>
            </div>
         </div>
-
-        {/* On Duty Now */}
-        <div className="col-span-4 bg-white border border-slate-200 rounded-sm shadow-sm p-8">
-           <div className="flex items-center gap-2 mb-6">
-              <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-              <h3 className="text-[11px] font-bold uppercase tracking-widest text-slate-900">On Duty Now</h3>
-           </div>
-
-           <div className="space-y-4">
-              {/* Jonathan Sterling */}
-              <div className="flex items-center gap-3">
-                 <div className="relative">
-                    <div className="w-12 h-12 rounded-full bg-red-500 flex items-center justify-center text-white font-bold text-sm">
-                       JS
-                    </div>
-                    <div className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white"></div>
-                 </div>
-                 <div className="flex-1">
-                    <div className="text-sm font-bold text-slate-900">Jonathan Sterling</div>
-                    <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Senior Concierge</div>
-                 </div>
-              </div>
-
-              {/* Sarah Kensington */}
-              <div className="flex items-center gap-3">
-                 <div className="relative">
-                    <div className="w-12 h-12 rounded-full bg-purple-500 flex items-center justify-center text-white font-bold text-sm">
-                       SK
-                    </div>
-                    <div className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white"></div>
-                 </div>
-                 <div className="flex-1">
-                    <div className="text-sm font-bold text-slate-900">Sarah Kensington</div>
-                    <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Lifestyle Manager</div>
-                 </div>
-              </div>
-
-              {/* Elena Vance */}
-              <div className="flex items-center gap-3">
-                 <div className="relative">
-                    <div className="w-12 h-12 rounded-full bg-red-500 flex items-center justify-center text-white font-bold text-sm">
-                       EV
-                    </div>
-                    <div className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white"></div>
-                 </div>
-                 <div className="flex-1">
-                    <div className="text-sm font-bold text-slate-900">Elena Vance</div>
-                    <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Global Logistics</div>
-                 </div>
-              </div>
-           </div>
-
-           <button className="w-full mt-8 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-paragon transition-colors">
-              Launch Team Sync
-           </button>
-        </div>
       </div>
 
-      {/* Inbound Queue (Recent Requests) */}
-      {requests && requests.length > 0 && (
+      {/* Inbound Queue (All Pending Requests) */}
+      {requests && requests.filter(r => r.status === 'PENDING').length > 0 && (
         <div className="mt-8 bg-white border border-slate-200 rounded-sm shadow-sm p-6">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center mb-4">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-amber-500"></div>
               <h3 className="text-[11px] font-bold uppercase tracking-widest text-slate-900">Inbound Queue ({requests.filter(r => r.status === 'PENDING').length})</h3>
             </div>
-            <button className="text-[9px] font-bold text-paragon hover:underline uppercase tracking-widest">View All →</button>
           </div>
           <div className="space-y-2">
-            {requests.filter(r => r.status === 'PENDING').slice(0, 2).map(r => (
-              <div key={r.id} className="bg-slate-50 border border-slate-200 p-3 rounded-sm hover:border-paragon transition-colors cursor-pointer">
-                <div className="flex justify-between items-start mb-1">
-                  <div className="flex items-center gap-2">
-                    <Badge color={r.type === 'FLIGHT' ? 'red' : r.type === 'HOTEL' ? 'gold' : 'slate'}>{r.type}</Badge>
-                    <span className="text-[10px] text-slate-400">{new Date(r.timestamp).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+            {requests
+              .filter(r => r.status === 'PENDING')
+              .sort((a, b) => {
+                // URGENT/CRITICAL items first
+                const aUrgent = a.priority === 'URGENT' || a.priority === 'CRITICAL';
+                const bUrgent = b.priority === 'URGENT' || b.priority === 'CRITICAL';
+                if (aUrgent && !bUrgent) return -1;
+                if (!aUrgent && bUrgent) return 1;
+                // Then by timestamp (newest first)
+                return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+              })
+              .map(r => {
+                const isOwnRequest = r.agentId === currentUser.id;
+                return (
+                  <div key={r.id} className={`bg-slate-50 border ${r.priority === 'URGENT' || r.priority === 'CRITICAL' ? 'border-red-300 bg-red-50' : 'border-slate-200'} p-3 rounded-sm hover:border-paragon transition-colors group`}>
+                    <div className="flex justify-between items-start mb-1">
+                      <div className="flex items-center gap-2">
+                        <Badge color={r.type === 'FLIGHT' ? 'red' : r.type === 'HOTEL' ? 'gold' : 'slate'}>{r.type}</Badge>
+                        <span className="text-[10px] text-slate-400">{new Date(r.timestamp).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge color={r.priority === 'URGENT' || r.priority === 'CRITICAL' ? 'red' : 'slate'}>{r.priority}</Badge>
+                        <div className="w-4">
+                          {isOwnRequest && onDeleteRequest && (
+                            <button
+                              onClick={() => setDeleteConfirm({ type: 'request' as any, id: r.id })}
+                              className="text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                              title="Delete request"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-slate-700 truncate">{r.notes}</p>
                   </div>
-                  <Badge color={r.priority === 'URGENT' || r.priority === 'CRITICAL' ? 'red' : 'slate'}>{r.priority}</Badge>
-                </div>
-                <p className="text-[11px] text-slate-700 truncate">{r.notes}</p>
-              </div>
-            ))}
-            {requests.filter(r => r.status === 'PENDING').length === 0 && (
-              <p className="text-[10px] text-slate-400 italic text-center py-4">All requests processed. Great work!</p>
-            )}
+                );
+              })}
           </div>
         </div>
       )}
@@ -602,12 +711,12 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                   </svg>
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900">Delete {deleteConfirm.type === 'post' ? 'Post' : 'Comment'}</h3>
+                  <h3 className="text-sm font-bold text-slate-900">Delete {deleteConfirm.type === 'post' ? 'Post' : deleteConfirm.type === 'comment' ? 'Comment' : 'Request'}</h3>
                   <p className="text-xs text-slate-500">This action cannot be undone</p>
                 </div>
               </div>
               <p className="text-sm text-slate-600 mb-6">
-                Are you sure you want to delete this {deleteConfirm.type}? This will permanently remove it from the bulletin board.
+                Are you sure you want to delete this {deleteConfirm.type}? This will permanently remove it{deleteConfirm.type === 'request' ? ' from the queue' : ' from the bulletin board'}.
               </p>
               <div className="flex gap-3">
                 <button
