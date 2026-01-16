@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { SectionHeader, DataTable, Badge } from './Shared';
 import { MOCK_USERS, MOCK_FLIGHTS, MOCK_HOTELS } from '../constants';
 import { User, BookingRequest, Comment } from '../types';
@@ -8,50 +8,51 @@ import Comments from './Comments';
 interface CRMProps {
   currentUser: User;
   requests: BookingRequest[];
-  onAddRequest: (req: Partial<BookingRequest>) => void;
   comments: Comment[];
   onAddComment: (text: string, parentId: string) => void;
   onDeleteComment?: (commentId: string) => void;
 }
 
-const CRM: React.FC<CRMProps> = ({ currentUser, requests, onAddRequest, comments, onAddComment, onDeleteComment }) => {
+const CRM: React.FC<CRMProps> = ({ currentUser, requests, comments, onAddComment, onDeleteComment }) => {
   const [activeSubTab, setActiveSubTab] = useState('customers');
-  const [requestType, setRequestType] = useState<'QUICK' | 'DETAILED'>('QUICK');
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const [filters, setFilters] = useState({
+    spend: { under50k: false, fiftyTo100k: false, over100k: false },
+    status: { vip: false, active: false, prospect: false, inactive: false },
+    activity: { lastMonth: false, lastQuarter: false, lastYear: false }
+  });
 
-  const [detailedType, setDetailedType] = useState<'FLIGHT' | 'HOTEL' | 'LOGISTICS'>('FLIGHT');
-  const [selectedClient, setSelectedClient] = useState(MOCK_USERS.find(u => u.role === 'CLIENT')?.id || '');
-  const [notes, setNotes] = useState('');
-  const [priority, setPriority] = useState<'LOW' | 'NORMAL' | 'URGENT' | 'CRITICAL'>('NORMAL');
+  const filterDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close filter dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (filterDropdownRef.current && !filterDropdownRef.current.contains(event.target as Node)) {
+        setShowFilterDropdown(false);
+      }
+    };
+
+    if (showFilterDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showFilterDropdown]);
 
   const myRequests = requests.filter(r => r.agentId === currentUser.id);
   const myFlights = MOCK_FLIGHTS.filter(f => f.agentId === currentUser.id);
   const myHotels = MOCK_HOTELS.filter(h => h.agentId === currentUser.id);
   const clients = MOCK_USERS.filter(u => u.role === 'CLIENT');
 
-  const handleQuickAdd = (e: React.FormEvent) => {
-    e.preventDefault();
-    const formData = new FormData(e.target as HTMLFormElement);
-    const snippet = formData.get('snippet') as string;
-    if (!snippet) return;
-    onAddRequest({ agentId: currentUser.id, clientId: selectedClient, type: 'GENERAL', status: 'PENDING', priority: 'NORMAL', notes: snippet, timestamp: new Date().toISOString() });
-    (e.target as HTMLFormElement).reset();
-  };
-
-  const handleDetailedAdd = (e: React.FormEvent) => {
-    e.preventDefault();
-    onAddRequest({ agentId: currentUser.id, clientId: selectedClient, type: detailedType as any, status: 'PENDING', priority, notes, timestamp: new Date().toISOString() });
-    setNotes('');
-    setActiveSubTab('my-requests');
-  };
-
   return (
     <div className="p-8">
       <div className="flex justify-between items-end mb-8 border-b border-slate-200">
         <div className="flex gap-8">
           {[
-            { id: 'customers', label: 'CUSTOMERS' },
-            { id: 'new-request', label: 'NEW REQUEST' },
+            { id: 'customers', label: 'MY CLIENTS' },
             { id: 'my-requests', label: 'MY REQUESTS' },
             { id: 'my-bookings', label: 'MY BOOKINGS' },
           ].map(t => (
@@ -65,23 +66,113 @@ const CRM: React.FC<CRMProps> = ({ currentUser, requests, onAddRequest, comments
       <div className="grid grid-cols-12 gap-8">
         <div className={selectedElementId ? 'col-span-8' : 'col-span-12'}>
           {activeSubTab === 'customers' && (
-            <div className="grid grid-cols-12 gap-8">
-              <div className="col-span-3 space-y-6">
-                <div className="bg-white p-6 border border-slate-200 rounded-sm">
-                  <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-4">Pipeline Filters</h4>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-[10px] font-bold mb-2">Total Spend {'>'}</label>
-                      <input type="range" className="w-full accent-paragon" />
+            <div>
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-sm font-bold text-slate-700">Customer Pipeline</h3>
+                <div className="relative" ref={filterDropdownRef}>
+                  <button
+                    onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                    className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-sm text-[10px] font-bold uppercase tracking-widest hover:bg-slate-50 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                    </svg>
+                    Filters
+                    {(Object.values(filters.spend).some(v => v) || Object.values(filters.status).some(v => v) || Object.values(filters.activity).some(v => v)) && (
+                      <span className="w-2 h-2 bg-paragon rounded-full"></span>
+                    )}
+                  </button>
+
+                  {showFilterDropdown && (
+                    <div className="absolute right-0 top-full mt-2 w-72 bg-white border border-slate-200 rounded-sm shadow-lg z-50">
+                      <div className="p-4 space-y-4">
+                        {/* Spend Filters */}
+                        <div>
+                          <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Spend</h4>
+                          <div className="space-y-2">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input type="checkbox" checked={filters.spend.under50k} onChange={() => setFilters({...filters, spend: {...filters.spend, under50k: !filters.spend.under50k}})} className="accent-paragon" />
+                              <span className="text-xs">Under $50,000</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input type="checkbox" checked={filters.spend.fiftyTo100k} onChange={() => setFilters({...filters, spend: {...filters.spend, fiftyTo100k: !filters.spend.fiftyTo100k}})} className="accent-paragon" />
+                              <span className="text-xs">$50,000 - $100,000</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input type="checkbox" checked={filters.spend.over100k} onChange={() => setFilters({...filters, spend: {...filters.spend, over100k: !filters.spend.over100k}})} className="accent-paragon" />
+                              <span className="text-xs">Over $100,000</span>
+                            </label>
+                          </div>
+                        </div>
+
+                        {/* Status Filters */}
+                        <div className="border-t border-slate-100 pt-4">
+                          <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Status</h4>
+                          <div className="space-y-2">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input type="checkbox" checked={filters.status.vip} onChange={() => setFilters({...filters, status: {...filters.status, vip: !filters.status.vip}})} className="accent-paragon" />
+                              <span className="text-xs">VIP</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input type="checkbox" checked={filters.status.active} onChange={() => setFilters({...filters, status: {...filters.status, active: !filters.status.active}})} className="accent-paragon" />
+                              <span className="text-xs">Active</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input type="checkbox" checked={filters.status.prospect} onChange={() => setFilters({...filters, status: {...filters.status, prospect: !filters.status.prospect}})} className="accent-paragon" />
+                              <span className="text-xs">Prospect</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input type="checkbox" checked={filters.status.inactive} onChange={() => setFilters({...filters, status: {...filters.status, inactive: !filters.status.inactive}})} className="accent-paragon" />
+                              <span className="text-xs">Inactive</span>
+                            </label>
+                          </div>
+                        </div>
+
+                        {/* Activity Filters */}
+                        <div className="border-t border-slate-100 pt-4">
+                          <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Activity</h4>
+                          <div className="space-y-2">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input type="checkbox" checked={filters.activity.lastMonth} onChange={() => setFilters({...filters, activity: {...filters.activity, lastMonth: !filters.activity.lastMonth}})} className="accent-paragon" />
+                              <span className="text-xs">Booked in last month</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input type="checkbox" checked={filters.activity.lastQuarter} onChange={() => setFilters({...filters, activity: {...filters.activity, lastQuarter: !filters.activity.lastQuarter}})} className="accent-paragon" />
+                              <span className="text-xs">Booked in last quarter</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input type="checkbox" checked={filters.activity.lastYear} onChange={() => setFilters({...filters, activity: {...filters.activity, lastYear: !filters.activity.lastYear}})} className="accent-paragon" />
+                              <span className="text-xs">Booked in last year</span>
+                            </label>
+                          </div>
+                        </div>
+
+                        {/* Clear Filters */}
+                        <div className="border-t border-slate-100 pt-4 flex gap-2">
+                          <button
+                            onClick={() => setFilters({
+                              spend: { under50k: false, fiftyTo100k: false, over100k: false },
+                              status: { vip: false, active: false, prospect: false, inactive: false },
+                              activity: { lastMonth: false, lastQuarter: false, lastYear: false }
+                            })}
+                            className="flex-1 text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-slate-600 py-2"
+                          >
+                            Clear All
+                          </button>
+                          <button
+                            onClick={() => setShowFilterDropdown(false)}
+                            className="flex-1 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest py-2 rounded-sm hover:bg-paragon-dark transition-colors"
+                          >
+                            Apply
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                    <div className="pt-4">
-                      <button className="w-full bg-slate-900 text-white text-[10px] py-2 font-bold uppercase tracking-widest">Apply Filter</button>
-                    </div>
-                  </div>
+                  )}
                 </div>
               </div>
-              <div className="col-span-9">
-                <DataTable headers={['Customer Name', 'Status', 'Account Type', 'Spend YTD', 'Action']}>
+
+              <DataTable headers={['Customer Name', 'Status', 'Account Type', 'Spend YTD', 'Action']}>
                   <tr className="hover:bg-slate-50 cursor-pointer" onClick={() => setSelectedElementId('max-power-profile')}>
                     <td className="px-4 py-3 font-bold">Max Power</td>
                     <td className="px-4 py-3"><Badge color="teal">VIP GOLD</Badge></td>
@@ -90,7 +181,6 @@ const CRM: React.FC<CRMProps> = ({ currentUser, requests, onAddRequest, comments
                     <td className="px-4 py-3 text-right"><button className="text-[10px] font-bold text-paragon">VIEW</button></td>
                   </tr>
                 </DataTable>
-              </div>
             </div>
           )}
 
@@ -127,39 +217,6 @@ const CRM: React.FC<CRMProps> = ({ currentUser, requests, onAddRequest, comments
             </div>
           )}
 
-          {activeSubTab === 'new-request' && (
-            <div className="max-w-xl mx-auto py-8">
-              <SectionHeader title="Booking Request" />
-              <div className="flex gap-4 p-1 bg-slate-100 rounded-sm mb-6">
-                <button onClick={() => setRequestType('QUICK')} className={`flex-1 py-2 text-[10px] font-bold uppercase ${requestType === 'QUICK' ? 'bg-white text-paragon shadow-sm' : 'text-slate-400'}`}>Quick</button>
-                <button onClick={() => setRequestType('DETAILED')} className={`flex-1 py-2 text-[10px] font-bold uppercase ${requestType === 'DETAILED' ? 'bg-white text-paragon shadow-sm' : 'text-slate-400'}`}>Detailed</button>
-              </div>
-              <div className="bg-white border border-slate-200 p-8 shadow-sm">
-                {requestType === 'QUICK' ? (
-                   <form onSubmit={handleQuickAdd} className="space-y-4">
-                      <select value={selectedClient} onChange={(e) => setSelectedClient(e.target.value)} className="w-full p-2 border border-slate-200 text-xs">
-                        {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                      </select>
-                      <textarea name="snippet" placeholder="Paste PNR or Email..." className="w-full h-32 p-3 border border-slate-200 text-xs" required />
-                      <button type="submit" className="w-full bg-slate-900 text-white py-3 text-[10px] font-bold uppercase">Submit</button>
-                   </form>
-                ) : (
-                  <form onSubmit={handleDetailedAdd} className="space-y-4">
-                      <select value={selectedClient} onChange={(e) => setSelectedClient(e.target.value)} className="w-full p-2 border border-slate-200 text-xs">
-                        {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                      </select>
-                      <select value={detailedType} onChange={(e) => setDetailedType(e.target.value as any)} className="w-full p-2 border border-slate-200 text-xs">
-                         <option value="FLIGHT">Flight</option>
-                         <option value="HOTEL">Hotel</option>
-                         <option value="LOGISTICS">Logistics</option>
-                      </select>
-                      <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Details..." className="w-full h-32 p-3 border border-slate-200 text-xs" required />
-                      <button type="submit" className="w-full bg-paragon text-white py-3 text-[10px] font-bold uppercase">Send to Ops</button>
-                  </form>
-                )}
-              </div>
-            </div>
-          )}
         </div>
 
         {selectedElementId && (

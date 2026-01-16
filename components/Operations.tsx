@@ -29,6 +29,7 @@ interface OperationsProps {
   onAddPipelineTrip: (trip: PipelineTrip) => void;
   onUpdatePipelineTrip: (id: string, updates: Partial<PipelineTrip>) => void;
   onDeletePipelineTrip: (id: string) => void;
+  onAddRequest?: (req: Partial<BookingRequest>) => void;
 }
 
 const Operations: React.FC<OperationsProps> = ({
@@ -37,7 +38,8 @@ const Operations: React.FC<OperationsProps> = ({
   onConvertToFlight, onConvertToHotel, onConvertToLogistics,
   onUpdateFlight, onUpdateHotel, onUpdateLogistics,
   onDeleteFlight, onDeleteHotel, onDeleteLogistics,
-  pipelineTrips, onAddPipelineTrip, onUpdatePipelineTrip, onDeletePipelineTrip
+  pipelineTrips, onAddPipelineTrip, onUpdatePipelineTrip, onDeletePipelineTrip,
+  onAddRequest
 }) => {
   const [subTab, setSubTab] = useState('flights');
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
@@ -89,6 +91,9 @@ const Operations: React.FC<OperationsProps> = ({
   // Pipeline/Kanban state
   const [showPipelineModal, setShowPipelineModal] = useState(false);
   const [editingTrip, setEditingTrip] = useState<PipelineTrip | null>(null);
+  const [viewingTrip, setViewingTrip] = useState<PipelineTrip | null>(null);
+  const [draggingTripId, setDraggingTripId] = useState<string | null>(null);
+  const [dragOverStage, setDragOverStage] = useState<PipelineStage | null>(null);
   const [tripName, setTripName] = useState('');
   const [tripClientName, setTripClientName] = useState('');
   const [tripStage, setTripStage] = useState<PipelineStage>('NEW');
@@ -102,6 +107,66 @@ const Operations: React.FC<OperationsProps> = ({
   const [tripNotes, setTripNotes] = useState('');
   const [tripTasks, setTripTasks] = useState<PipelineTask[]>([]);
   const [newTaskText, setNewTaskText] = useState('');
+
+  // Dispatch modal state (for NEW ELEMENT button)
+  const [showDispatchModal, setShowDispatchModal] = useState(false);
+  const [dispatchMode, setDispatchMode] = useState<'QUICK' | 'DETAIL'>('QUICK');
+  const [dispatchSnippet, setDispatchSnippet] = useState('');
+  const [dispatchServiceType, setDispatchServiceType] = useState<'FLIGHT' | 'HOTEL' | 'LOGISTICS'>('FLIGHT');
+  const [dispatchClientName, setDispatchClientName] = useState('');
+  const [dispatchTargetDate, setDispatchTargetDate] = useState('');
+  const [dispatchSpecs, setDispatchSpecs] = useState('');
+  const [dispatchPriority, setDispatchPriority] = useState<'NORMAL' | 'URGENT'>('NORMAL');
+
+  const closeDispatchModal = () => {
+    setShowDispatchModal(false);
+    setDispatchMode('QUICK');
+    setDispatchSnippet('');
+    setDispatchServiceType('FLIGHT');
+    setDispatchClientName('');
+    setDispatchTargetDate('');
+    setDispatchSpecs('');
+    setDispatchPriority('NORMAL');
+  };
+
+  const handleDispatchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!onAddRequest) return;
+
+    const agentId = googleUser?.id || currentUser.id;
+    const agentName = googleUser?.name || currentUser.name;
+
+    if (dispatchMode === 'QUICK') {
+      if (!dispatchSnippet.trim()) return;
+      onAddRequest({
+        agentId,
+        clientId: '',
+        type: 'GENERAL',
+        status: 'PENDING',
+        priority: dispatchPriority,
+        notes: dispatchSnippet,
+        timestamp: new Date().toISOString(),
+        details: { agentName }
+      });
+    } else {
+      if (!dispatchClientName.trim() || !dispatchSpecs.trim()) return;
+      onAddRequest({
+        agentId,
+        clientId: '',
+        type: dispatchServiceType,
+        status: 'PENDING',
+        priority: dispatchPriority,
+        notes: dispatchSpecs,
+        timestamp: new Date().toISOString(),
+        details: {
+          clientName: dispatchClientName,
+          targetDate: dispatchTargetDate,
+          agentName
+        }
+      });
+    }
+    closeDispatchModal();
+  };
 
   const openConvertModal = (request: BookingRequest) => {
     setConvertingRequest(request);
@@ -407,6 +472,43 @@ const Operations: React.FC<OperationsProps> = ({
     onUpdatePipelineTrip(tripId, { stage: newStage });
   };
 
+  // Drag and drop handlers
+  const handleDragStart = (e: React.DragEvent, tripId: string) => {
+    setDraggingTripId(tripId);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', tripId);
+  };
+
+  const handleDragEnd = () => {
+    setDraggingTripId(null);
+    setDragOverStage(null);
+  };
+
+  const handleDragOver = (e: React.DragEvent, stageId: PipelineStage) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverStage !== stageId) {
+      setDragOverStage(stageId);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    // Only clear if leaving the column entirely
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setDragOverStage(null);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent, stageId: PipelineStage) => {
+    e.preventDefault();
+    const tripId = e.dataTransfer.getData('text/plain');
+    if (tripId && draggingTripId) {
+      handleMoveTrip(tripId, stageId);
+    }
+    setDraggingTripId(null);
+    setDragOverStage(null);
+  };
+
   const handleQuickToggleTask = (tripId: string, taskId: string) => {
     const trip = pipelineTrips.find(t => t.id === tripId);
     if (!trip) return;
@@ -455,7 +557,10 @@ const Operations: React.FC<OperationsProps> = ({
                 PENDING REQS
               </button>
            </div>
-           <button className="bg-paragon text-white text-[10px] px-4 py-2 font-bold tracking-widest hover:bg-paragon-dark transition-colors">
+           <button
+             onClick={() => setShowDispatchModal(true)}
+             className="bg-paragon text-white text-[10px] px-4 py-2 font-bold tracking-widest hover:bg-paragon-dark transition-colors"
+           >
              NEW ELEMENT +
            </button>
         </div>
@@ -734,7 +839,13 @@ const Operations: React.FC<OperationsProps> = ({
                 {pipelineStages.map(stage => {
                   const stageTrips = pipelineTrips.filter(t => t.stage === stage.id);
                   return (
-                    <div key={stage.id} className={`bg-slate-100 p-4 border-t-4 ${stage.color} rounded-sm min-h-[500px]`}>
+                    <div
+                      key={stage.id}
+                      className={`bg-slate-100 p-4 border-t-4 ${stage.color} rounded-sm min-h-[500px] transition-colors ${dragOverStage === stage.id ? 'bg-slate-200 ring-2 ring-paragon ring-opacity-50' : ''}`}
+                      onDragOver={(e) => handleDragOver(e, stage.id)}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(e, stage.id)}
+                    >
                       <div className="flex justify-between items-center mb-4">
                         <h4 className="text-[10px] font-bold tracking-widest text-slate-500 uppercase">{stage.label}</h4>
                         <span className="text-[10px] bg-white px-2 py-0.5 rounded-full border border-slate-200 font-bold">{stageTrips.length}</span>
@@ -745,8 +856,11 @@ const Operations: React.FC<OperationsProps> = ({
                         {stageTrips.map(trip => (
                           <div
                             key={trip.id}
-                            onClick={() => setSelectedElementId(trip.id)}
-                            className={`bg-white p-4 border border-slate-200 shadow-sm rounded-sm cursor-pointer hover:border-paragon transition-all ${selectedElementId === trip.id ? 'ring-2 ring-paragon border-transparent' : ''}`}
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, trip.id)}
+                            onDragEnd={handleDragEnd}
+                            onClick={() => setViewingTrip(trip)}
+                            className={`bg-white p-4 border border-slate-200 shadow-sm rounded-sm cursor-grab hover:border-paragon transition-all ${selectedElementId === trip.id ? 'ring-2 ring-paragon border-transparent' : ''} ${draggingTripId === trip.id ? 'opacity-50 cursor-grabbing' : ''}`}
                           >
                             {/* Card Header */}
                             <div className="flex justify-between items-start mb-2">
@@ -811,39 +925,6 @@ const Operations: React.FC<OperationsProps> = ({
                               </div>
                             )}
 
-                            {/* Card Footer - Move Actions */}
-                            <div className="flex justify-between items-center mt-3 pt-2 border-t border-slate-100">
-                              <div className="flex gap-1">
-                                {stage.id !== 'NEW' && (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      const currentIdx = pipelineStages.findIndex(s => s.id === stage.id);
-                                      if (currentIdx > 0) handleMoveTrip(trip.id, pipelineStages[currentIdx - 1].id);
-                                    }}
-                                    className="text-[8px] text-slate-400 hover:text-paragon px-1"
-                                    title="Move back"
-                                  >
-                                    ← Back
-                                  </button>
-                                )}
-                              </div>
-                              <div className="flex gap-1">
-                                {stage.id !== 'FINALIZING' && (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      const currentIdx = pipelineStages.findIndex(s => s.id === stage.id);
-                                      if (currentIdx < pipelineStages.length - 1) handleMoveTrip(trip.id, pipelineStages[currentIdx + 1].id);
-                                    }}
-                                    className="text-[8px] text-slate-400 hover:text-paragon px-1"
-                                    title="Move forward"
-                                  >
-                                    Next →
-                                  </button>
-                                )}
-                              </div>
-                            </div>
                           </div>
                         ))}
 
@@ -1891,6 +1972,349 @@ const Operations: React.FC<OperationsProps> = ({
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* View Trip Modal */}
+      {viewingTrip && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          onClick={() => setViewingTrip(null)}
+        >
+          <div
+            className="bg-white rounded-sm shadow-2xl w-full max-w-xl mx-4 max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="p-6 border-b border-slate-200">
+              <div className="flex justify-between items-start">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h2 className="text-lg font-bold text-slate-900">{viewingTrip.name}</h2>
+                    {viewingTrip.isUrgent && (
+                      <span className="px-2 py-0.5 bg-red-100 text-red-700 text-[9px] font-bold uppercase rounded">Urgent</span>
+                    )}
+                  </div>
+                  <p className="text-sm text-slate-500">{viewingTrip.clientName}</p>
+                </div>
+                <button onClick={() => setViewingTrip(null)} className="text-slate-400 hover:text-slate-600 text-xl ml-4">&times;</button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-5">
+              {/* Stage & Agent */}
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Stage</label>
+                  <span className={`inline-block px-3 py-1 text-xs font-bold rounded-sm ${
+                    viewingTrip.stage === 'NEW' ? 'bg-slate-100 text-slate-600' :
+                    viewingTrip.stage === 'PLANNING' ? 'bg-amber-100 text-amber-700' :
+                    viewingTrip.stage === 'IN_PROGRESS' ? 'bg-paragon/10 text-paragon' :
+                    'bg-emerald-100 text-emerald-700'
+                  }`}>
+                    {viewingTrip.stage === 'NEW' ? 'New' :
+                     viewingTrip.stage === 'PLANNING' ? 'Planning' :
+                     viewingTrip.stage === 'IN_PROGRESS' ? 'In Progress' : 'Finalizing'}
+                  </span>
+                </div>
+                <div className="flex-1">
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Agent</label>
+                  <p className="text-sm text-slate-900 font-medium">{viewingTrip.agent}</p>
+                </div>
+              </div>
+
+              {/* Dates */}
+              {(viewingTrip.startDate || viewingTrip.endDate) && (
+                <div className="flex gap-4">
+                  {viewingTrip.startDate && (
+                    <div className="flex-1">
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Start Date</label>
+                      <p className="text-sm text-slate-900">{new Date(viewingTrip.startDate).toLocaleDateString()}</p>
+                    </div>
+                  )}
+                  {viewingTrip.endDate && (
+                    <div className="flex-1">
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">End Date</label>
+                      <p className="text-sm text-slate-900">{new Date(viewingTrip.endDate).toLocaleDateString()}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Services */}
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Services</label>
+                <div className="flex gap-3">
+                  {viewingTrip.hasFlights && (
+                    <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-sm">
+                      <svg className="w-4 h-4 text-paragon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                      </svg>
+                      <span className="text-xs font-semibold text-slate-700">Flights</span>
+                    </div>
+                  )}
+                  {viewingTrip.hasHotels && (
+                    <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-sm">
+                      <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                      </svg>
+                      <span className="text-xs font-semibold text-slate-700">Hotels</span>
+                    </div>
+                  )}
+                  {viewingTrip.hasLogistics && (
+                    <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-sm">
+                      <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                      </svg>
+                      <span className="text-xs font-semibold text-slate-700">Logistics</span>
+                    </div>
+                  )}
+                  {!viewingTrip.hasFlights && !viewingTrip.hasHotels && !viewingTrip.hasLogistics && (
+                    <p className="text-xs text-slate-400 italic">No services selected</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Notes */}
+              {viewingTrip.notes && (
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Notes</label>
+                  <p className="text-sm text-slate-700 bg-slate-50 p-3 rounded-sm">{viewingTrip.notes}</p>
+                </div>
+              )}
+
+              {/* Tasks */}
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
+                  Tasks ({viewingTrip.tasks.filter(t => t.completed).length}/{viewingTrip.tasks.length} completed)
+                </label>
+                {viewingTrip.tasks.length > 0 ? (
+                  <div className="space-y-2 bg-slate-50 p-3 rounded-sm">
+                    {viewingTrip.tasks.map(task => (
+                      <div
+                        key={task.id}
+                        onClick={() => handleQuickToggleTask(viewingTrip.id, task.id)}
+                        className="flex items-center gap-3 cursor-pointer group"
+                      >
+                        <div className={`w-4 h-4 rounded-sm border-2 flex-shrink-0 flex items-center justify-center transition-colors ${task.completed ? 'bg-paragon border-paragon' : 'border-slate-300 group-hover:border-paragon'}`}>
+                          {task.completed && (
+                            <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </div>
+                        <span className={`text-sm ${task.completed ? 'text-slate-400 line-through' : 'text-slate-700'}`}>{task.text}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-400 italic">No tasks added</p>
+                )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 border-t border-slate-200 flex gap-3 justify-between">
+              <button
+                onClick={() => { onDeletePipelineTrip(viewingTrip.id); setViewingTrip(null); }}
+                className="px-4 py-2 text-red-600 text-[10px] font-bold uppercase tracking-widest hover:bg-red-50 transition-colors rounded-sm"
+              >
+                Delete
+              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setViewingTrip(null)}
+                  className="px-6 py-2 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-sm"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={() => { openPipelineModal(viewingTrip); setViewingTrip(null); }}
+                  className="px-6 py-2 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-sm"
+                >
+                  Edit Trip
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dispatch Modal (NEW ELEMENT) */}
+      {showDispatchModal && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          onClick={closeDispatchModal}
+        >
+          <div
+            className="bg-white rounded-sm shadow-2xl w-full max-w-2xl mx-4 max-h-[85vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6 border-b border-slate-200 flex-shrink-0">
+              <div className="flex justify-between items-center">
+                <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Operational Dispatch</h2>
+                <button onClick={closeDispatchModal} className="text-slate-400 hover:text-slate-600 text-xl">&times;</button>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">Submit a new request to the inbound queue</p>
+            </div>
+
+            {/* Mode Toggle */}
+            <div className="px-6 pt-4 flex-shrink-0">
+              <div className="flex border border-slate-200 rounded-sm overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setDispatchMode('QUICK')}
+                  className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest transition-all ${
+                    dispatchMode === 'QUICK'
+                      ? 'bg-paragon text-white'
+                      : 'bg-white text-slate-500 hover:bg-slate-50'
+                  }`}
+                >
+                  Quick Snippet
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDispatchMode('DETAIL')}
+                  className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest transition-all ${
+                    dispatchMode === 'DETAIL'
+                      ? 'bg-paragon text-white'
+                      : 'bg-white text-slate-500 hover:bg-slate-50'
+                  }`}
+                >
+                  Detailed Request
+                </button>
+              </div>
+            </div>
+
+            <form onSubmit={handleDispatchSubmit} className="p-6 flex-1 flex flex-col overflow-hidden">
+              {dispatchMode === 'QUICK' ? (
+                <div className="flex-1 flex flex-col">
+                  <textarea
+                    value={dispatchSnippet}
+                    onChange={(e) => setDispatchSnippet(e.target.value)}
+                    placeholder="Paste a request snippet, PNR, or client note here..."
+                    className="w-full flex-1 p-4 bg-white border border-slate-300 text-sm text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon rounded-sm resize-none min-h-[150px]"
+                    required
+                  />
+                  <div className="mt-4 flex-shrink-0">
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Priority</label>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setDispatchPriority('NORMAL')}
+                        className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-sm ${
+                          dispatchPriority === 'NORMAL'
+                            ? 'bg-paragon-gold text-slate-900'
+                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                        }`}
+                      >
+                        Normal
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDispatchPriority('URGENT')}
+                        className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-sm ${
+                          dispatchPriority === 'URGENT'
+                            ? 'bg-red-600 text-white'
+                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                        }`}
+                      >
+                        Urgent
+                      </button>
+                    </div>
+                  </div>
+                  <button
+                    type="submit"
+                    className="mt-4 w-full py-3 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-sm"
+                  >
+                    Submit Request
+                  </button>
+                </div>
+              ) : (
+                <div className="flex-1 flex flex-col space-y-3">
+                  <div className="grid grid-cols-3 gap-4 flex-shrink-0">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Service Type</label>
+                      <select
+                        value={dispatchServiceType}
+                        onChange={(e) => setDispatchServiceType(e.target.value as any)}
+                        className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                      >
+                        <option value="FLIGHT">Aviation (Flight)</option>
+                        <option value="HOTEL">Hotel</option>
+                        <option value="LOGISTICS">Logistics</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Client Name</label>
+                      <input
+                        type="text"
+                        value={dispatchClientName}
+                        onChange={(e) => setDispatchClientName(e.target.value)}
+                        placeholder="e.g. Alice Johnson"
+                        className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Target Date</label>
+                      <input
+                        type="date"
+                        value={dispatchTargetDate}
+                        onChange={(e) => setDispatchTargetDate(e.target.value)}
+                        min={new Date().toISOString().split('T')[0]}
+                        className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex-1 flex flex-col min-h-0">
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2 flex-shrink-0">Request Specifications</label>
+                    <textarea
+                      value={dispatchSpecs}
+                      onChange={(e) => setDispatchSpecs(e.target.value)}
+                      placeholder="Enter detailed flight numbers, hotel preferences, or special instructions..."
+                      className="w-full flex-1 p-3 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon resize-none rounded-sm min-h-[100px]"
+                      required
+                    />
+                  </div>
+                  <div className="flex-shrink-0">
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Priority</label>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setDispatchPriority('NORMAL')}
+                        className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-sm ${
+                          dispatchPriority === 'NORMAL'
+                            ? 'bg-paragon-gold text-slate-900'
+                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                        }`}
+                      >
+                        Normal
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDispatchPriority('URGENT')}
+                        className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-sm ${
+                          dispatchPriority === 'URGENT'
+                            ? 'bg-red-600 text-white'
+                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                        }`}
+                      >
+                        Urgent
+                      </button>
+                    </div>
+                  </div>
+                  <button
+                    type="submit"
+                    className="w-full py-3 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-sm"
+                  >
+                    Submit Detailed Request
+                  </button>
+                </div>
+              )}
+            </form>
           </div>
         </div>
       )}
