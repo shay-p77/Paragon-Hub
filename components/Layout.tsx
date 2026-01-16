@@ -1,15 +1,19 @@
 
 import React from 'react';
 import { User, UserRole } from '../types';
+import { GoogleUser } from './Login';
 
 interface LayoutProps {
   children: React.ReactNode;
   activeTab: string;
   setActiveTab: (tab: string) => void;
   currentUser: User;
+  googleUser?: GoogleUser | null;
+  avatarColor?: string;
+  pendingRequestCount?: number;
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, currentUser }) => {
+const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, currentUser, googleUser, avatarColor, pendingRequestCount = 0 }) => {
   const tabs = [
     { id: 'home', label: 'COMMAND CENTER', roles: ['ADMIN', 'OPERATIONS', 'SALES', 'ACCOUNTING'] },
     { id: 'ops', label: 'OPERATIONS', roles: ['ADMIN', 'OPERATIONS', 'ACCOUNTING'] },
@@ -37,8 +41,8 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`w-full text-left px-6 py-4 text-xs font-semibold tracking-widest transition-all relative ${
-                activeTab === tab.id 
-                  ? 'bg-paragon text-white border-r-4 border-paragon-gold shadow-inner' 
+                activeTab === tab.id
+                  ? 'bg-paragon text-white border-r-4 border-paragon-gold shadow-inner'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800'
               }`}
             >
@@ -46,18 +50,23 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
               {tab.id === 'home' && (
                 <span className="absolute right-4 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
               )}
+              {tab.id === 'ops' && pendingRequestCount > 0 && (
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 bg-red-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                  {pendingRequestCount}
+                </span>
+              )}
             </button>
           ))}
         </nav>
 
         <div className="p-6 border-t border-slate-800 bg-slate-950">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-paragon-gold flex items-center justify-center text-slate-900 font-bold text-xs shadow-lg">
-              {currentUser.name.charAt(0)}
+            <div className={`w-8 h-8 rounded-full ${avatarColor || 'bg-paragon-gold'} flex items-center justify-center text-white font-bold text-xs shadow-lg`}>
+              {googleUser ? googleUser.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) : currentUser.name.charAt(0)}
             </div>
             <div>
-              <p className="text-xs font-bold truncate w-32">{currentUser.name}</p>
-              <p className="text-[10px] text-slate-400 uppercase tracking-tighter">{currentUser.role}</p>
+              <p className="text-xs font-bold truncate w-32">{googleUser ? googleUser.name : currentUser.name}</p>
+              <p className="text-[10px] text-slate-400 truncate w-32">{googleUser ? googleUser.email : currentUser.role}</p>
             </div>
           </div>
         </div>

@@ -10,7 +10,7 @@ import Home from './components/Home';
 import NotificationCenter from './components/NotificationCenter';
 import Login, { GoogleUser } from './components/Login';
 import { MOCK_USERS, INITIAL_REQUESTS, MOCK_COMMENTS, MOCK_ANNOUNCEMENTS } from './constants';
-import { User, BookingRequest, Comment, Notification, Announcement } from './types';
+import { User, BookingRequest, Comment, Notification, Announcement, ConvertedFlight, ConvertedHotel, ConvertedLogistics } from './types';
 
 const App: React.FC = () => {
   // Auth state
@@ -48,6 +48,9 @@ const App: React.FC = () => {
   const [comments, setComments] = useState<Comment[]>(MOCK_COMMENTS);
   const [announcements, setAnnouncements] = useState<Announcement[]>(MOCK_ANNOUNCEMENTS);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [convertedFlights, setConvertedFlights] = useState<ConvertedFlight[]>([]);
+  const [convertedHotels, setConvertedHotels] = useState<ConvertedHotel[]>([]);
+  const [convertedLogistics, setConvertedLogistics] = useState<ConvertedLogistics[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
@@ -99,7 +102,7 @@ const App: React.FC = () => {
   const handleAddComment = (text: string, parentId: string) => {
     const newComment: Comment = {
       id: `c-${Date.now()}`,
-      authorId: currentUser.id,
+      authorId: googleUser?.id || currentUser.id,
       text,
       timestamp: new Date().toISOString(),
       parentId
@@ -109,15 +112,18 @@ const App: React.FC = () => {
     // Check for tags
     const tags = text.match(/@u\d+/g);
     if (tags) {
+      const senderName = googleUser?.name || currentUser.name;
+      const senderId = googleUser?.id || currentUser.id;
       tags.forEach(tag => {
         const userId = tag.substring(1);
-        if (userId !== currentUser.id) {
+        // Don't notify the sender (check both mock user ID and Google user ID)
+        if (userId !== currentUser.id && userId !== senderId) {
           const targetUser = MOCK_USERS.find(u => u.id === userId);
           if (targetUser) {
             setNotifications(prev => [{
               id: `n-${Date.now()}`,
               userId,
-              message: `${currentUser.name} tagged you in a comment.`,
+              message: `${senderName} tagged you in a comment.`,
               type: 'TAG',
               read: false,
               timestamp: new Date().toISOString(),
@@ -137,7 +143,7 @@ const App: React.FC = () => {
     const newAnnouncement: Announcement = {
       id: `a-${Date.now()}`,
       ...announcement,
-      author: currentUser.name,
+      author: googleUser?.name || currentUser.name,
       date: new Date().toISOString().split('T')[0] // YYYY-MM-DD format
     };
     setAnnouncements(prev => [newAnnouncement, ...prev]);
@@ -151,34 +157,78 @@ const App: React.FC = () => {
     setRequests(prev => prev.filter(r => r.id !== requestId));
   };
 
+  const handleConvertToFlight = (flight: ConvertedFlight, requestId: string) => {
+    setConvertedFlights(prev => [flight, ...prev]);
+    setRequests(prev => prev.filter(r => r.id !== requestId));
+  };
+
+  const handleConvertToHotel = (hotel: ConvertedHotel, requestId: string) => {
+    setConvertedHotels(prev => [hotel, ...prev]);
+    setRequests(prev => prev.filter(r => r.id !== requestId));
+  };
+
+  const handleConvertToLogistics = (logistics: ConvertedLogistics, requestId: string) => {
+    setConvertedLogistics(prev => [logistics, ...prev]);
+    setRequests(prev => prev.filter(r => r.id !== requestId));
+  };
+
+  const handleUpdateFlight = (id: string, updates: Partial<ConvertedFlight>) => {
+    setConvertedFlights(prev => prev.map(f => f.id === id ? { ...f, ...updates } : f));
+  };
+
+  const handleUpdateHotel = (id: string, updates: Partial<ConvertedHotel>) => {
+    setConvertedHotels(prev => prev.map(h => h.id === id ? { ...h, ...updates } : h));
+  };
+
+  const handleUpdateLogistics = (id: string, updates: Partial<ConvertedLogistics>) => {
+    setConvertedLogistics(prev => prev.map(l => l.id === id ? { ...l, ...updates } : l));
+  };
+
+  const handleDeleteFlight = (id: string) => {
+    setConvertedFlights(prev => prev.filter(f => f.id !== id));
+  };
+
+  const handleDeleteHotel = (id: string) => {
+    setConvertedHotels(prev => prev.filter(h => h.id !== id));
+  };
+
+  const handleDeleteLogistics = (id: string) => {
+    setConvertedLogistics(prev => prev.filter(l => l.id !== id));
+  };
+
   const handleAddRequest = (req: Partial<BookingRequest>) => {
     const newReq: BookingRequest = {
       id: `req-${Date.now()}`,
-      agentId: req.agentId || currentUser.id,
+      agentId: req.agentId || googleUser?.id || currentUser.id,
       clientId: req.clientId || '',
       type: req.type || 'GENERAL',
       status: req.status || 'PENDING',
       priority: req.priority || 'NORMAL',
       notes: req.notes || '',
       timestamp: req.timestamp || new Date().toISOString(),
+      details: req.details,
     };
     setRequests(prev => [newReq, ...prev]);
 
-    // Notify Ops if Admin/Sales adds a request
-    if (currentUser.role !== 'OPERATIONS') {
-      const opsUsers = MOCK_USERS.filter(u => u.role === 'OPERATIONS' || u.role === 'ADMIN');
-      opsUsers.forEach(u => {
+    // Notify all users except the author when a new request is created
+    const senderName = googleUser?.name || currentUser.name;
+    const senderId = googleUser?.id || currentUser.id;
+    const priorityText = newReq.priority === 'URGENT' || newReq.priority === 'CRITICAL' ? ' (URGENT)' : '';
+
+    MOCK_USERS.forEach(u => {
+      // Don't notify the sender (check both mock user ID and Google user ID)
+      if (u.id !== currentUser.id && u.id !== senderId) {
         setNotifications(prev => [{
-          id: `n-${Date.now()}`,
+          id: `n-${Date.now()}-${u.id}`,
           userId: u.id,
-          message: `New booking request from ${currentUser.name}.`,
+          message: `New ${newReq.type.toLowerCase()} request from ${senderName}${priorityText}`,
           type: 'ASSIGN',
           read: false,
           timestamp: new Date().toISOString(),
           link: newReq.id
         }, ...prev]);
-      });
-    }
+      }
+    });
   };
 
   const markRead = (id: string) => {
@@ -192,13 +242,13 @@ const App: React.FC = () => {
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'home': return <Home currentUser={currentUser} announcements={announcements} comments={comments} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onAddAnnouncement={handleAddAnnouncement} onDeleteAnnouncement={handleDeleteAnnouncement} onAddRequest={handleAddRequest} onDeleteRequest={handleDeleteRequest} requests={requests} />;
-      case 'ops': return <Operations requests={requests} comments={comments} currentUser={currentUser} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} />;
+      case 'home': return <Home currentUser={currentUser} announcements={announcements} comments={comments} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onAddAnnouncement={handleAddAnnouncement} onDeleteAnnouncement={handleDeleteAnnouncement} onAddRequest={handleAddRequest} onDeleteRequest={handleDeleteRequest} requests={requests} googleUser={googleUser} />;
+      case 'ops': return <Operations requests={requests} comments={comments} currentUser={currentUser} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} googleUser={googleUser} convertedFlights={convertedFlights} convertedHotels={convertedHotels} convertedLogistics={convertedLogistics} onConvertToFlight={handleConvertToFlight} onConvertToHotel={handleConvertToHotel} onConvertToLogistics={handleConvertToLogistics} onUpdateFlight={handleUpdateFlight} onUpdateHotel={handleUpdateHotel} onUpdateLogistics={handleUpdateLogistics} onDeleteFlight={handleDeleteFlight} onDeleteHotel={handleDeleteHotel} onDeleteLogistics={handleDeleteLogistics} />;
       case 'sales': return <CRM currentUser={currentUser} requests={requests} onAddRequest={handleAddRequest} comments={comments} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} />;
       case 'accounting': return <Accounting />;
       case 'knowledge': return <KnowledgeBase />;
       case 'portal': return <ClientPortal />;
-      default: return <Home currentUser={currentUser} announcements={announcements} comments={comments} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onAddAnnouncement={handleAddAnnouncement} onDeleteAnnouncement={handleDeleteAnnouncement} onAddRequest={handleAddRequest} onDeleteRequest={handleDeleteRequest} requests={requests} />;
+      default: return <Home currentUser={currentUser} announcements={announcements} comments={comments} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onAddAnnouncement={handleAddAnnouncement} onDeleteAnnouncement={handleDeleteAnnouncement} onAddRequest={handleAddRequest} onDeleteRequest={handleDeleteRequest} requests={requests} googleUser={googleUser} />;
     }
   };
 
@@ -216,11 +266,16 @@ const App: React.FC = () => {
     return <Login onLogin={handleLogin} />;
   }
 
+  const pendingRequestCount = requests.filter(r => r.status === 'PENDING').length;
+
   return (
     <Layout
       activeTab={activeTab}
       setActiveTab={setActiveTab}
       currentUser={currentUser}
+      googleUser={googleUser}
+      avatarColor={googleUser ? getAvatarColor(googleUser.email) : undefined}
+      pendingRequestCount={pendingRequestCount}
     >
       <div className="flex-1 bg-slate-50 overflow-auto flex flex-col relative">
         {/* Top Header/Breadcrumb */}

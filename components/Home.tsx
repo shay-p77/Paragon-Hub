@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { SectionHeader, Badge } from './Shared';
 import { MOCK_USERS } from '../constants';
 import { User, Comment, Announcement, BookingRequest } from '../types';
+import { GoogleUser } from './Login';
 
 interface HomeProps {
   currentUser: User;
@@ -15,6 +16,7 @@ interface HomeProps {
   onAddRequest?: (req: any) => void;
   onDeleteRequest?: (requestId: string) => void;
   requests?: BookingRequest[];
+  googleUser?: GoogleUser | null;
 }
 
 const WorldClock: React.FC = () => {
@@ -48,7 +50,7 @@ const WorldClock: React.FC = () => {
   );
 };
 
-const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], onAddComment, onDeleteComment, onAddAnnouncement, onDeleteAnnouncement, onAddRequest, onDeleteRequest, requests = [] }) => {
+const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], onAddComment, onDeleteComment, onAddAnnouncement, onDeleteAnnouncement, onAddRequest, onDeleteRequest, requests = [], googleUser }) => {
   const [chatMessage, setChatMessage] = useState('');
   const [messages, setMessages] = useState([
     { id: 1, user: 'Elena Vance', text: 'Anyone have a driver contact for Courchevel tonight?', time: '09:42' },
@@ -76,6 +78,10 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
 
   // On Duty expanded state
   const [onDutyExpanded, setOnDutyExpanded] = useState(false);
+
+  // Expanded content state for long posts and comments
+  const [expandedPostContent, setExpandedPostContent] = useState<string | null>(null);
+  const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
 
   // Handle escape key to close modals
   useEffect(() => {
@@ -134,28 +140,39 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
     e.preventDefault();
     if (!onAddRequest) return;
 
+    const agentId = googleUser?.id || currentUser.id;
+    const agentName = googleUser?.name || currentUser.name;
+
     if (requestMode === 'QUICK') {
       if (!quickSnippet.trim()) return;
       onAddRequest({
-        agentId: currentUser.id,
+        agentId,
         clientId: '',
         type: 'GENERAL',
         status: 'PENDING',
         priority: requestPriority,
         notes: quickSnippet,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        details: {
+          agentName
+        }
       });
       setQuickSnippet('');
     } else {
       if (!detailClientName.trim() || !detailSpecs.trim()) return;
       onAddRequest({
-        agentId: currentUser.id,
+        agentId,
         clientId: '',
         type: detailServiceType,
         status: 'PENDING',
         priority: requestPriority,
-        notes: `Client: ${detailClientName}\nTarget Date: ${detailTargetDate}\nSpecs: ${detailSpecs}`,
-        timestamp: new Date().toISOString()
+        notes: detailSpecs,
+        timestamp: new Date().toISOString(),
+        details: {
+          clientName: detailClientName,
+          targetDate: detailTargetDate,
+          agentName
+        }
       });
       setDetailClientName('');
       setDetailTargetDate('');
@@ -247,9 +264,9 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                 </div>
               </div>
             </div>
-            <button className="w-full mt-6 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-paragon transition-colors border-t border-slate-100 pt-6">
+            {/* <button className="w-full mt-6 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-paragon transition-colors border-t border-slate-100 pt-6">
               Launch Team Sync
-            </button>
+            </button> */}
           </div>
         )}
       </div>
@@ -258,13 +275,13 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
         {/* Main Content - Operational Dispatch */}
         <div className="col-span-8">
            {/* Quick Add Operational Dispatch */}
-           <div className="bg-white border-2 border-paragon rounded-sm shadow-sm h-[400px] flex flex-col">
-              <div className="bg-gradient-to-r from-paragon to-paragon-dark p-4 flex items-center justify-between flex-shrink-0">
+           <div className="bg-white border border-slate-200 rounded-sm shadow-sm h-[400px] flex flex-col">
+              <div className="bg-slate-900 p-4 flex items-center justify-between flex-shrink-0">
                 <div className="flex items-center gap-2">
-                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 text-paragon-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
                   </svg>
-                  <h3 className="text-xs font-bold uppercase tracking-widest text-white">Operational Dispatch</h3>
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-paragon-gold">Operational Dispatch</h3>
                 </div>
                 <div className="flex gap-2">
                   <button
@@ -275,10 +292,10 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                       setDetailTargetDate('');
                       setDetailSpecs('');
                     }}
-                    className={`px-4 py-2 text-[10px] font-bold uppercase tracking-widest transition-all ${
+                    className={`px-4 py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-sm ${
                       requestMode === 'QUICK'
-                        ? 'bg-white text-paragon'
-                        : 'bg-paragon-dark/50 text-white/70 hover:text-white'
+                        ? 'bg-paragon-gold text-slate-900'
+                        : 'bg-slate-700 text-slate-400 hover:text-white hover:bg-slate-600'
                     }`}
                   >
                     QUICK ADD
@@ -289,10 +306,10 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                       // Clear quick field when switching to detail
                       setQuickSnippet('');
                     }}
-                    className={`px-4 py-2 text-[10px] font-bold uppercase tracking-widest transition-all ${
+                    className={`px-4 py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-sm ${
                       requestMode === 'DETAIL'
-                        ? 'bg-white text-paragon'
-                        : 'bg-paragon-dark/50 text-white/70 hover:text-white'
+                        ? 'bg-paragon-gold text-slate-900'
+                        : 'bg-slate-700 text-slate-400 hover:text-white hover:bg-slate-600'
                     }`}
                   >
                     DETAIL ADD
@@ -307,18 +324,18 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                       value={quickSnippet}
                       onChange={(e) => setQuickSnippet(e.target.value)}
                       placeholder="Paste a request snippet, PNR, or client note here..."
-                      className="w-full flex-1 p-4 border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm resize-none"
+                      className="w-full flex-1 p-4 bg-white border border-slate-300 text-sm text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon-gold rounded-sm resize-none"
                       required
                     />
                     <div className="mt-4 flex-shrink-0">
-                      <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Priority</label>
+                      <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Priority</label>
                       <div className="flex gap-2">
                         <button
                           type="button"
                           onClick={() => setRequestPriority('NORMAL')}
                           className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-sm ${
                             requestPriority === 'NORMAL'
-                              ? 'bg-slate-700 text-white'
+                              ? 'bg-paragon-gold text-slate-900'
                               : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
                           }`}
                         >
@@ -339,7 +356,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                     </div>
                     <button
                       type="submit"
-                      className="mt-4 w-full bg-paragon text-white py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors flex-shrink-0"
+                      className="mt-4 w-full bg-paragon-gold text-slate-900 py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-amber-500 transition-colors flex-shrink-0 rounded-sm"
                     >
                       Confirm Quick Request
                     </button>
@@ -348,11 +365,11 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                   <div className="flex-1 flex flex-col space-y-3">
                     <div className="grid grid-cols-3 gap-4 flex-shrink-0">
                       <div>
-                        <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Service Type</label>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Service Type</label>
                         <select
                           value={detailServiceType}
                           onChange={(e) => setDetailServiceType(e.target.value as any)}
-                          className="w-full p-2 border border-slate-200 text-xs outline-none focus:ring-2 focus:ring-paragon"
+                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon-gold rounded-sm"
                         >
                           <option value="FLIGHT">Aviation (Flight)</option>
                           <option value="HOTEL">Hotel</option>
@@ -360,45 +377,46 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                         </select>
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Client Name</label>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Client Name</label>
                         <input
                           type="text"
                           value={detailClientName}
                           onChange={(e) => setDetailClientName(e.target.value)}
                           placeholder="e.g. Alice Johnson"
-                          className="w-full p-2 border border-slate-200 text-xs outline-none focus:ring-2 focus:ring-paragon"
+                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon-gold rounded-sm"
                           required
                         />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Target Date</label>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Target Date</label>
                         <input
                           type="date"
                           value={detailTargetDate}
                           onChange={(e) => setDetailTargetDate(e.target.value)}
-                          className="w-full p-2 border border-slate-200 text-xs outline-none focus:ring-2 focus:ring-paragon"
+                          min={new Date().toISOString().split('T')[0]}
+                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon-gold rounded-sm"
                         />
                       </div>
                     </div>
                     <div className="flex-1 flex flex-col min-h-0">
-                      <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex-shrink-0">Request Specifications</label>
+                      <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2 flex-shrink-0">Request Specifications</label>
                       <textarea
                         value={detailSpecs}
                         onChange={(e) => setDetailSpecs(e.target.value)}
                         placeholder="Enter detailed flight numbers, hotel preferences, or special instructions..."
-                        className="w-full flex-1 p-3 border border-slate-200 text-xs outline-none focus:ring-2 focus:ring-paragon resize-none"
+                        className="w-full flex-1 p-3 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon-gold resize-none rounded-sm"
                         required
                       />
                     </div>
                     <div className="flex-shrink-0">
-                      <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Priority</label>
+                      <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Priority</label>
                       <div className="flex gap-2">
                         <button
                           type="button"
                           onClick={() => setRequestPriority('NORMAL')}
                           className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-sm ${
                             requestPriority === 'NORMAL'
-                              ? 'bg-slate-700 text-white'
+                              ? 'bg-paragon-gold text-slate-900'
                               : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
                           }`}
                         >
@@ -419,7 +437,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                     </div>
                     <button
                       type="submit"
-                      className="w-full bg-paragon text-white py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors flex-shrink-0"
+                      className="w-full bg-paragon-gold text-slate-900 py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-amber-500 transition-colors flex-shrink-0 rounded-sm"
                     >
                       Confirm Detailed Request
                     </button>
@@ -441,7 +459,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                   const announcementComments = comments.filter(c => c.parentId === a.id);
                   const isExpanded = expandedAnnouncement === a.id;
 
-                  const isOwnPost = a.author === currentUser.name;
+                  const isOwnPost = googleUser ? a.author === googleUser.name : a.author === currentUser.name;
 
                   return (
                    <div key={a.id} className={`border-l-2 ${a.priority === 'HIGH' ? 'border-red-500 bg-red-50' : 'border-paragon bg-slate-50'} rounded-r-sm group`}>
@@ -463,7 +481,20 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                             )}
                           </div>
                         </div>
-                        <p className="text-[11px] text-slate-600 mb-3 leading-relaxed line-clamp-2">{a.content}</p>
+                        <div className="mb-3">
+                          <p className={`text-[11px] text-slate-600 leading-relaxed ${expandedPostContent === a.id ? '' : 'line-clamp-2'}`}>
+                            {a.content}
+                          </p>
+                          <button
+                            onClick={() => setExpandedPostContent(expandedPostContent === a.id ? null : a.id)}
+                            className="text-[9px] text-paragon hover:underline font-semibold mt-1 flex items-center gap-0.5"
+                          >
+                            {expandedPostContent === a.id ? 'Show less' : 'Show more'}
+                            <svg className={`w-3 h-3 transition-transform ${expandedPostContent === a.id ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </button>
+                        </div>
                         <div className="flex justify-between items-center text-[9px] text-slate-400 font-bold uppercase tracking-wider">
                            <span>{a.author}</span>
                            <button
@@ -485,16 +516,19 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                               <p className="text-[9px] text-slate-400 italic text-center py-2">No comments yet</p>
                             ) : (
                               announcementComments.map(c => {
-                                const author = MOCK_USERS.find(u => u.id === c.authorId);
-                                const isOwnComment = c.authorId === currentUser.id;
+                                const mockAuthor = MOCK_USERS.find(u => u.id === c.authorId);
+                                const isOwnComment = googleUser ? c.authorId === googleUser.id : c.authorId === currentUser.id;
+                                // If it's the current google user's comment, show their name; otherwise try mock user or show "Unknown"
+                                const authorName = (googleUser && c.authorId === googleUser.id) ? googleUser.name : (mockAuthor?.name || 'Unknown');
+                                const authorInitial = authorName.charAt(0);
                                 return (
                                   <div key={c.id} className="flex gap-2 group">
                                     <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[7px] font-bold flex-shrink-0">
-                                      {author?.name.charAt(0)}
+                                      {authorInitial}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                        <div className="flex gap-1 items-center mb-0.5">
-                                          <span className="text-[9px] font-bold text-slate-900 truncate">{author?.name}</span>
+                                          <span className="text-[9px] font-bold text-slate-900 truncate">{authorName}</span>
                                           {isOwnComment && onDeleteComment && (
                                             <button
                                               onClick={() => setDeleteConfirm({ type: 'comment', id: c.id })}
@@ -506,7 +540,26 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                                           )}
                                        </div>
                                        <div className="text-[10px] text-slate-700 leading-snug">
-                                          {c.text}
+                                          <span className={expandedComments.has(c.id) ? '' : 'line-clamp-2'}>
+                                            {c.text}
+                                          </span>
+                                          <button
+                                            onClick={() => {
+                                              const newSet = new Set(expandedComments);
+                                              if (newSet.has(c.id)) {
+                                                newSet.delete(c.id);
+                                              } else {
+                                                newSet.add(c.id);
+                                              }
+                                              setExpandedComments(newSet);
+                                            }}
+                                            className="text-[8px] text-paragon hover:underline font-semibold ml-1 inline-flex items-center gap-0.5"
+                                          >
+                                            {expandedComments.has(c.id) ? 'less' : 'more'}
+                                            <svg className={`w-2 h-2 transition-transform ${expandedComments.has(c.id) ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                          </button>
                                        </div>
                                     </div>
                                   </div>
@@ -571,7 +624,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                 return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
               })
               .map(r => {
-                const isOwnRequest = r.agentId === currentUser.id;
+                const isOwnRequest = googleUser ? r.agentId === googleUser.id : r.agentId === currentUser.id;
                 return (
                   <div key={r.id} className={`bg-slate-50 border ${r.priority === 'URGENT' || r.priority === 'CRITICAL' ? 'border-red-300 bg-red-50' : 'border-slate-200'} p-3 rounded-sm hover:border-paragon transition-colors group`}>
                     <div className="flex justify-between items-start mb-1">
@@ -646,7 +699,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Priority</label>
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Priority</label>
                 <div className="flex gap-3">
                   <button
                     type="button"

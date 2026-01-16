@@ -144,3 +144,52 @@ export interface Announcement {
   author: string;
   date: string;
 }
+
+// Converted element types (after completing a request)
+export interface ConvertedFlight {
+  id: string;
+  description: string; // LastName-FlightNumber format
+  airline: string;
+  paymentStatus: 'PAID' | 'UNPAID';
+  pnr: string;
+  flights: string; // e.g., "JFK-LAX, LAX-SFO"
+  passengerCount: number;
+  dates: string;
+  agent: string; // Text field - agent who did the booking
+  profitLoss: number;
+  status: 'PENDING' | 'CONFIRMED' | 'TICKETED' | 'CANCELLED';
+  createdAt: string;
+  originalRequestId?: string;
+}
+
+export interface ConvertedHotel {
+  id: string;
+  description: string; // LastName-HotelName format
+  hotelName: string;
+  paymentStatus: 'PAID' | 'UNPAID';
+  confirmationNumber: string;
+  roomType: string;
+  guestCount: number;
+  checkIn: string;
+  checkOut: string;
+  agent: string;
+  profitLoss: number;
+  status: 'PENDING' | 'CONFIRMED' | 'CANCELLED';
+  createdAt: string;
+  originalRequestId?: string;
+}
+
+export interface ConvertedLogistics {
+  id: string;
+  description: string;
+  serviceType: string; // Car service, Transfer, etc.
+  paymentStatus: 'PAID' | 'UNPAID';
+  confirmationNumber: string;
+  details: string;
+  date: string;
+  agent: string;
+  profitLoss: number;
+  status: 'PENDING' | 'CONFIRMED' | 'CANCELLED';
+  createdAt: string;
+  originalRequestId?: string;
+}
