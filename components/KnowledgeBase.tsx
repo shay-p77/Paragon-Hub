@@ -241,6 +241,12 @@ const KnowledgeBase: React.FC = () => {
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<KnowledgeEntry | ContactEntry | NoteEntry | null>(null);
 
+  // Data state - initialized with mock data
+  const [procedures, setProcedures] = useState<KnowledgeEntry[]>(MOCK_PROCEDURES);
+  const [locations, setLocations] = useState<KnowledgeEntry[]>(MOCK_LOCATIONS);
+  const [contacts, setContacts] = useState<ContactEntry[]>(MOCK_CONTACTS);
+  const [notes, setNotes] = useState<NoteEntry[]>(MOCK_NOTES);
+
   // Quick add form state - now category is selected first
   const [quickAddCategory, setQuickAddCategory] = useState<'PROCEDURE' | 'LOCATION' | 'CONTACT' | 'NOTE' | null>(null);
 
@@ -325,34 +331,92 @@ const KnowledgeBase: React.FC = () => {
 
   const handleQuickAddSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // In the future, this would save to backend
-    console.log('Quick add submitted:', { category: quickAddCategory });
+    const now = new Date().toISOString();
+
+    if (quickAddCategory === 'PROCEDURE') {
+      const newProc: KnowledgeEntry = {
+        id: `proc-${Date.now()}`,
+        title: procTitle,
+        content: procContent,
+        category: 'PROCEDURE',
+        subcategory: procSubcategory || undefined,
+        tags: procTags.split(',').map(t => t.trim()).filter(t => t),
+        createdBy: 'Current User',
+        createdAt: now,
+        updatedAt: now
+      };
+      setProcedures(prev => [newProc, ...prev]);
+      setActiveTab('procedures');
+    } else if (quickAddCategory === 'LOCATION') {
+      const newLoc: KnowledgeEntry = {
+        id: `loc-${Date.now()}`,
+        title: locTitle,
+        content: locContent,
+        category: 'LOCATION',
+        location: locLocation,
+        tags: locTags.split(',').map(t => t.trim()).filter(t => t),
+        createdBy: 'Current User',
+        createdAt: now,
+        updatedAt: now
+      };
+      setLocations(prev => [newLoc, ...prev]);
+      setActiveTab('locations');
+    } else if (quickAddCategory === 'CONTACT') {
+      const newContact: ContactEntry = {
+        id: `contact-${Date.now()}`,
+        name: contactName,
+        role: contactRole,
+        company: contactCompany,
+        location: contactLocation,
+        phone: contactPhone || undefined,
+        email: contactEmail || undefined,
+        notes: contactNotes || undefined,
+        tags: [],
+        createdBy: 'Current User',
+        createdAt: now
+      };
+      setContacts(prev => [newContact, ...prev]);
+      setActiveTab('contacts');
+    } else if (quickAddCategory === 'NOTE') {
+      const newNote: NoteEntry = {
+        id: `note-${Date.now()}`,
+        title: noteTitle,
+        content: noteContent,
+        tags: noteTags.split(',').map(t => t.trim()).filter(t => t),
+        createdBy: 'Current User',
+        createdAt: now,
+        updatedAt: now
+      };
+      setNotes(prev => [newNote, ...prev]);
+      setActiveTab('notes');
+    }
+
     setShowQuickAdd(false);
     resetQuickAddForm();
   };
 
   // Filter entries based on search
-  const filteredProcedures = MOCK_PROCEDURES.filter(p =>
+  const filteredProcedures = procedures.filter(p =>
     p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     p.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
     p.tags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  const filteredLocations = MOCK_LOCATIONS.filter(l =>
+  const filteredLocations = locations.filter(l =>
     l.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     l.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
     l.location?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     l.tags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  const filteredContacts = MOCK_CONTACTS.filter(c =>
+  const filteredContacts = contacts.filter(c =>
     c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     c.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
     c.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
     c.tags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  const filteredNotes = MOCK_NOTES.filter(n =>
+  const filteredNotes = notes.filter(n =>
     n.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     n.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
     n.tags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()))
