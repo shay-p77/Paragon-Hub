@@ -193,3 +193,31 @@ export interface ConvertedLogistics {
   createdAt: string;
   originalRequestId?: string;
 }
+
+// Pipeline stages for Kanban board
+export type PipelineStage = 'NEW' | 'PLANNING' | 'IN_PROGRESS' | 'FINALIZING';
+
+// Task within a pipeline trip
+export interface PipelineTask {
+  id: string;
+  text: string;
+  completed: boolean;
+}
+
+// Pipeline trip for Kanban board
+export interface PipelineTrip {
+  id: string;
+  name: string;
+  clientName: string;
+  stage: PipelineStage;
+  hasFlights: boolean;
+  hasHotels: boolean;
+  hasLogistics: boolean;
+  isUrgent: boolean;
+  tasks: PipelineTask[];
+  startDate?: string;
+  endDate?: string;
+  agent: string;
+  notes?: string;
+  createdAt: string;
+}

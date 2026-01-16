@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { SectionHeader, DataTable, Badge } from './Shared';
 import { MOCK_FLIGHTS, MOCK_HOTELS, MOCK_TRIPS, MOCK_USERS } from '../constants';
-import { ElementStatus, BookingRequest, Comment, User, ConvertedFlight, ConvertedHotel, ConvertedLogistics } from '../types';
+import { ElementStatus, BookingRequest, Comment, User, ConvertedFlight, ConvertedHotel, ConvertedLogistics, PipelineTrip, PipelineStage, PipelineTask } from '../types';
 import Comments from './Comments';
 import { GoogleUser } from './Login';
 
@@ -25,6 +25,10 @@ interface OperationsProps {
   onDeleteFlight: (id: string) => void;
   onDeleteHotel: (id: string) => void;
   onDeleteLogistics: (id: string) => void;
+  pipelineTrips: PipelineTrip[];
+  onAddPipelineTrip: (trip: PipelineTrip) => void;
+  onUpdatePipelineTrip: (id: string, updates: Partial<PipelineTrip>) => void;
+  onDeletePipelineTrip: (id: string) => void;
 }
 
 const Operations: React.FC<OperationsProps> = ({
@@ -32,7 +36,8 @@ const Operations: React.FC<OperationsProps> = ({
   convertedFlights, convertedHotels, convertedLogistics,
   onConvertToFlight, onConvertToHotel, onConvertToLogistics,
   onUpdateFlight, onUpdateHotel, onUpdateLogistics,
-  onDeleteFlight, onDeleteHotel, onDeleteLogistics
+  onDeleteFlight, onDeleteHotel, onDeleteLogistics,
+  pipelineTrips, onAddPipelineTrip, onUpdatePipelineTrip, onDeletePipelineTrip
 }) => {
   const [subTab, setSubTab] = useState('flights');
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
@@ -80,6 +85,23 @@ const Operations: React.FC<OperationsProps> = ({
   // Edit modal state
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingItem, setEditingItem] = useState<{ type: 'flight' | 'hotel' | 'logistics', id: string } | null>(null);
+
+  // Pipeline/Kanban state
+  const [showPipelineModal, setShowPipelineModal] = useState(false);
+  const [editingTrip, setEditingTrip] = useState<PipelineTrip | null>(null);
+  const [tripName, setTripName] = useState('');
+  const [tripClientName, setTripClientName] = useState('');
+  const [tripStage, setTripStage] = useState<PipelineStage>('NEW');
+  const [tripHasFlights, setTripHasFlights] = useState(false);
+  const [tripHasHotels, setTripHasHotels] = useState(false);
+  const [tripHasLogistics, setTripHasLogistics] = useState(false);
+  const [tripIsUrgent, setTripIsUrgent] = useState(false);
+  const [tripStartDate, setTripStartDate] = useState('');
+  const [tripEndDate, setTripEndDate] = useState('');
+  const [tripAgent, setTripAgent] = useState('');
+  const [tripNotes, setTripNotes] = useState('');
+  const [tripTasks, setTripTasks] = useState<PipelineTask[]>([]);
+  const [newTaskText, setNewTaskText] = useState('');
 
   const openConvertModal = (request: BookingRequest) => {
     setConvertingRequest(request);
@@ -280,6 +302,126 @@ const Operations: React.FC<OperationsProps> = ({
     }
     closeEditModal();
   };
+
+  // Pipeline modal functions
+  const openPipelineModal = (trip?: PipelineTrip, stage?: PipelineStage) => {
+    if (trip) {
+      setEditingTrip(trip);
+      setTripName(trip.name);
+      setTripClientName(trip.clientName);
+      setTripStage(trip.stage);
+      setTripHasFlights(trip.hasFlights);
+      setTripHasHotels(trip.hasHotels);
+      setTripHasLogistics(trip.hasLogistics);
+      setTripIsUrgent(trip.isUrgent);
+      setTripStartDate(trip.startDate || '');
+      setTripEndDate(trip.endDate || '');
+      setTripAgent(trip.agent);
+      setTripNotes(trip.notes || '');
+      setTripTasks([...trip.tasks]);
+    } else {
+      setEditingTrip(null);
+      setTripName('');
+      setTripClientName('');
+      setTripStage(stage || 'NEW');
+      setTripHasFlights(false);
+      setTripHasHotels(false);
+      setTripHasLogistics(false);
+      setTripIsUrgent(false);
+      setTripStartDate('');
+      setTripEndDate('');
+      setTripAgent(googleUser?.name || currentUser.name);
+      setTripNotes('');
+      setTripTasks([]);
+    }
+    setNewTaskText('');
+    setShowPipelineModal(true);
+  };
+
+  const closePipelineModal = () => {
+    setShowPipelineModal(false);
+    setEditingTrip(null);
+  };
+
+  const handleAddTask = () => {
+    if (!newTaskText.trim()) return;
+    setTripTasks(prev => [...prev, {
+      id: `task-${Date.now()}`,
+      text: newTaskText.trim(),
+      completed: false
+    }]);
+    setNewTaskText('');
+  };
+
+  const handleToggleTask = (taskId: string) => {
+    setTripTasks(prev => prev.map(t =>
+      t.id === taskId ? { ...t, completed: !t.completed } : t
+    ));
+  };
+
+  const handleDeleteTask = (taskId: string) => {
+    setTripTasks(prev => prev.filter(t => t.id !== taskId));
+  };
+
+  const handleSubmitPipelineTrip = () => {
+    if (!tripName.trim() || !tripClientName.trim()) return;
+
+    if (editingTrip) {
+      onUpdatePipelineTrip(editingTrip.id, {
+        name: tripName,
+        clientName: tripClientName,
+        stage: tripStage,
+        hasFlights: tripHasFlights,
+        hasHotels: tripHasHotels,
+        hasLogistics: tripHasLogistics,
+        isUrgent: tripIsUrgent,
+        startDate: tripStartDate || undefined,
+        endDate: tripEndDate || undefined,
+        agent: tripAgent,
+        notes: tripNotes || undefined,
+        tasks: tripTasks
+      });
+    } else {
+      const newTrip: PipelineTrip = {
+        id: `pt-${Date.now()}`,
+        name: tripName,
+        clientName: tripClientName,
+        stage: tripStage,
+        hasFlights: tripHasFlights,
+        hasHotels: tripHasHotels,
+        hasLogistics: tripHasLogistics,
+        isUrgent: tripIsUrgent,
+        startDate: tripStartDate || undefined,
+        endDate: tripEndDate || undefined,
+        agent: tripAgent,
+        notes: tripNotes || undefined,
+        tasks: tripTasks,
+        createdAt: new Date().toISOString()
+      };
+      onAddPipelineTrip(newTrip);
+    }
+    closePipelineModal();
+  };
+
+  const handleMoveTrip = (tripId: string, newStage: PipelineStage) => {
+    onUpdatePipelineTrip(tripId, { stage: newStage });
+  };
+
+  const handleQuickToggleTask = (tripId: string, taskId: string) => {
+    const trip = pipelineTrips.find(t => t.id === tripId);
+    if (!trip) return;
+    const updatedTasks = trip.tasks.map(t =>
+      t.id === taskId ? { ...t, completed: !t.completed } : t
+    );
+    onUpdatePipelineTrip(tripId, { tasks: updatedTasks });
+  };
+
+  const pipelineStages: { id: PipelineStage; label: string; color: string }[] = [
+    { id: 'NEW', label: 'New', color: 'border-slate-400' },
+    { id: 'PLANNING', label: 'Planning', color: 'border-amber-500' },
+    { id: 'IN_PROGRESS', label: 'In Progress', color: 'border-paragon' },
+    { id: 'FINALIZING', label: 'Finalizing', color: 'border-emerald-500' }
+  ];
 
   const tabs = [
     { id: 'flights', label: 'FLIGHTS' },
@@ -564,27 +706,159 @@ const Operations: React.FC<OperationsProps> = ({
           )}
           
           {subTab === 'trips' && (
-            <div className="grid grid-cols-4 gap-4">
-               {['Inquiry', 'Planning', 'Active', 'Post-Trip'].map((col, idx) => (
-                <div key={idx} className="bg-slate-100 p-4 border-t-2 border-slate-300">
-                  <div className="flex justify-between items-center mb-4">
-                    <h4 className="text-[10px] font-bold tracking-widest text-slate-500 uppercase">{col}</h4>
-                    <span className="text-[10px] bg-white px-2 rounded-full border border-slate-200">{idx === 1 ? MOCK_TRIPS.length : 0}</span>
-                  </div>
-                  {idx === 1 && MOCK_TRIPS.map(t => (
-                    <div key={t.id} 
-                      onClick={() => setSelectedElementId(t.id)}
-                      className={`bg-white p-4 border border-slate-200 shadow-sm mb-3 rounded-sm cursor-pointer hover:border-paragon transition-colors ${selectedElementId === t.id ? 'ring-2 ring-paragon border-transparent' : ''}`}
-                    >
-                      <h5 className="font-cinzel text-xs font-bold mb-2">{t.name}</h5>
-                      <div className="flex justify-between text-[10px] text-slate-500">
-                        <span>{t.startDate}</span>
-                        <Badge color="teal">{t.ownership}</Badge>
+            <div>
+              {/* Header */}
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h2 className="font-cinzel text-xl font-bold text-slate-900 tracking-wide">Concierge Command</h2>
+                  <p className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold mt-1">Unified Operational Control</p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => openPipelineModal()}
+                    className="bg-paragon text-white text-[10px] px-5 py-2.5 font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-sm"
+                  >
+                    Request New Booking
+                  </button>
+                  <button className="bg-slate-800 text-white text-[10px] px-4 py-2.5 font-bold uppercase tracking-widest hover:bg-slate-700 transition-colors rounded-sm">
+                    Pipeline
+                  </button>
+                  <button className="bg-slate-100 text-slate-500 text-[10px] px-4 py-2.5 font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-sm">
+                    External Sync
+                  </button>
+                </div>
+              </div>
+
+              {/* Kanban Board */}
+              <div className="grid grid-cols-4 gap-4">
+                {pipelineStages.map(stage => {
+                  const stageTrips = pipelineTrips.filter(t => t.stage === stage.id);
+                  return (
+                    <div key={stage.id} className={`bg-slate-100 p-4 border-t-4 ${stage.color} rounded-sm min-h-[500px]`}>
+                      <div className="flex justify-between items-center mb-4">
+                        <h4 className="text-[10px] font-bold tracking-widest text-slate-500 uppercase">{stage.label}</h4>
+                        <span className="text-[10px] bg-white px-2 py-0.5 rounded-full border border-slate-200 font-bold">{stageTrips.length}</span>
+                      </div>
+
+                      {/* Trip Cards */}
+                      <div className="space-y-3">
+                        {stageTrips.map(trip => (
+                          <div
+                            key={trip.id}
+                            onClick={() => setSelectedElementId(trip.id)}
+                            className={`bg-white p-4 border border-slate-200 shadow-sm rounded-sm cursor-pointer hover:border-paragon transition-all ${selectedElementId === trip.id ? 'ring-2 ring-paragon border-transparent' : ''}`}
+                          >
+                            {/* Card Header */}
+                            <div className="flex justify-between items-start mb-2">
+                              <h5 className="font-semibold text-xs text-slate-900 leading-tight pr-2">{trip.name}</h5>
+                              {trip.isUrgent && (
+                                <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0 mt-1"></span>
+                              )}
+                            </div>
+
+                            {/* Client Name */}
+                            <p className="text-[10px] text-slate-500 mb-3">{trip.clientName}</p>
+
+                            {/* Service Icons */}
+                            <div className="flex gap-2 mb-3">
+                              {trip.hasFlights && (
+                                <span className="w-6 h-6 rounded bg-slate-100 flex items-center justify-center" title="Flights">
+                                  <svg className="w-3.5 h-3.5 text-paragon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                                  </svg>
+                                </span>
+                              )}
+                              {trip.hasHotels && (
+                                <span className="w-6 h-6 rounded bg-slate-100 flex items-center justify-center" title="Hotels">
+                                  <svg className="w-3.5 h-3.5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                  </svg>
+                                </span>
+                              )}
+                              {trip.hasLogistics && (
+                                <span className="w-6 h-6 rounded bg-slate-100 flex items-center justify-center" title="Logistics">
+                                  <svg className="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                                  </svg>
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Tasks Preview */}
+                            {trip.tasks.length > 0 && (
+                              <div className="border-t border-slate-100 pt-2 mt-2">
+                                <div className="space-y-1">
+                                  {trip.tasks.slice(0, 3).map(task => (
+                                    <div
+                                      key={task.id}
+                                      onClick={(e) => { e.stopPropagation(); handleQuickToggleTask(trip.id, task.id); }}
+                                      className="flex items-center gap-2 group"
+                                    >
+                                      <div className={`w-3 h-3 rounded-sm border flex-shrink-0 flex items-center justify-center cursor-pointer ${task.completed ? 'bg-paragon border-paragon' : 'border-slate-300 hover:border-paragon'}`}>
+                                        {task.completed && (
+                                          <svg className="w-2 h-2 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                                          </svg>
+                                        )}
+                                      </div>
+                                      <span className={`text-[9px] ${task.completed ? 'text-slate-400 line-through' : 'text-slate-600'}`}>{task.text}</span>
+                                    </div>
+                                  ))}
+                                  {trip.tasks.length > 3 && (
+                                    <p className="text-[8px] text-slate-400 pl-5">+{trip.tasks.length - 3} more tasks</p>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Card Footer - Move Actions */}
+                            <div className="flex justify-between items-center mt-3 pt-2 border-t border-slate-100">
+                              <div className="flex gap-1">
+                                {stage.id !== 'NEW' && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const currentIdx = pipelineStages.findIndex(s => s.id === stage.id);
+                                      if (currentIdx > 0) handleMoveTrip(trip.id, pipelineStages[currentIdx - 1].id);
+                                    }}
+                                    className="text-[8px] text-slate-400 hover:text-paragon px-1"
+                                    title="Move back"
+                                  >
+                                    ← Back
+                                  </button>
+                                )}
+                              </div>
+                              <div className="flex gap-1">
+                                {stage.id !== 'FINALIZING' && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const currentIdx = pipelineStages.findIndex(s => s.id === stage.id);
+                                      if (currentIdx < pipelineStages.length - 1) handleMoveTrip(trip.id, pipelineStages[currentIdx + 1].id);
+                                    }}
+                                    className="text-[8px] text-slate-400 hover:text-paragon px-1"
+                                    title="Move forward"
+                                  >
+                                    Next →
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+
+                        {/* Add New Card Button */}
+                        <button
+                          onClick={() => openPipelineModal(undefined, stage.id)}
+                          className="w-full py-3 border-2 border-dashed border-slate-300 rounded-sm text-[10px] text-slate-400 font-bold uppercase tracking-widest hover:border-paragon hover:text-paragon transition-colors"
+                        >
+                          + Add
+                        </button>
                       </div>
                     </div>
-                  ))}
-                </div>
-              ))}
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
@@ -1383,6 +1657,239 @@ const Operations: React.FC<OperationsProps> = ({
               >
                 Save Changes
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pipeline Trip Modal */}
+      {showPipelineModal && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          onClick={closePipelineModal}
+        >
+          <div
+            className="bg-white rounded-sm shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6 border-b border-slate-200">
+              <div className="flex justify-between items-center">
+                <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest">
+                  {editingTrip ? 'Edit Trip' : 'New Booking Request'}
+                </h2>
+                <button onClick={closePipelineModal} className="text-slate-400 hover:text-slate-600 text-xl">&times;</button>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                {editingTrip ? 'Update the trip details below' : 'Create a new prospect or trip in the pipeline'}
+              </p>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* Basic Info */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Trip Name *</label>
+                  <input
+                    type="text"
+                    value={tripName}
+                    onChange={(e) => setTripName(e.target.value)}
+                    placeholder="e.g. Paris Anniversary Trip"
+                    className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Client Name *</label>
+                  <input
+                    type="text"
+                    value={tripClientName}
+                    onChange={(e) => setTripClientName(e.target.value)}
+                    placeholder="e.g. Alice Johnson"
+                    className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Stage</label>
+                  <select
+                    value={tripStage}
+                    onChange={(e) => setTripStage(e.target.value as PipelineStage)}
+                    className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                  >
+                    <option value="NEW">New</option>
+                    <option value="PLANNING">Planning</option>
+                    <option value="IN_PROGRESS">In Progress</option>
+                    <option value="FINALIZING">Finalizing</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Agent</label>
+                  <input
+                    type="text"
+                    value={tripAgent}
+                    onChange={(e) => setTripAgent(e.target.value)}
+                    placeholder="Agent name"
+                    className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                  />
+                </div>
+              </div>
+
+              {/* Dates */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Start Date</label>
+                  <input
+                    type="date"
+                    value={tripStartDate}
+                    onChange={(e) => setTripStartDate(e.target.value)}
+                    className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">End Date</label>
+                  <input
+                    type="date"
+                    value={tripEndDate}
+                    onChange={(e) => setTripEndDate(e.target.value)}
+                    min={tripStartDate}
+                    className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                  />
+                </div>
+              </div>
+
+              {/* Services & Priority */}
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Services Required</label>
+                <div className="flex flex-wrap gap-3">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={tripHasFlights}
+                      onChange={(e) => setTripHasFlights(e.target.checked)}
+                      className="w-4 h-4 rounded border-slate-300 text-paragon focus:ring-paragon"
+                    />
+                    <span className="text-xs text-slate-600">Flights</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={tripHasHotels}
+                      onChange={(e) => setTripHasHotels(e.target.checked)}
+                      className="w-4 h-4 rounded border-slate-300 text-paragon focus:ring-paragon"
+                    />
+                    <span className="text-xs text-slate-600">Hotels</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={tripHasLogistics}
+                      onChange={(e) => setTripHasLogistics(e.target.checked)}
+                      className="w-4 h-4 rounded border-slate-300 text-paragon focus:ring-paragon"
+                    />
+                    <span className="text-xs text-slate-600">Logistics / Transfers</span>
+                  </label>
+                  <div className="w-px bg-slate-200 mx-2"></div>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={tripIsUrgent}
+                      onChange={(e) => setTripIsUrgent(e.target.checked)}
+                      className="w-4 h-4 rounded border-red-300 text-red-600 focus:ring-red-500"
+                    />
+                    <span className="text-xs text-red-600 font-semibold">Urgent</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Notes</label>
+                <textarea
+                  value={tripNotes}
+                  onChange={(e) => setTripNotes(e.target.value)}
+                  placeholder="Additional details, preferences, or requirements..."
+                  rows={3}
+                  className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon resize-none"
+                />
+              </div>
+
+              {/* Tasks */}
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Tasks</label>
+                <div className="space-y-2 mb-3">
+                  {tripTasks.map(task => (
+                    <div key={task.id} className="flex items-center gap-2 group">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleTask(task.id)}
+                        className={`w-4 h-4 rounded-sm border flex-shrink-0 flex items-center justify-center ${task.completed ? 'bg-paragon border-paragon' : 'border-slate-300 hover:border-paragon'}`}
+                      >
+                        {task.completed && (
+                          <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </button>
+                      <span className={`text-xs flex-1 ${task.completed ? 'text-slate-400 line-through' : 'text-slate-700'}`}>{task.text}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteTask(task.id)}
+                        className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newTaskText}
+                    onChange={(e) => setNewTaskText(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTask())}
+                    placeholder="Add a task..."
+                    className="flex-1 p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddTask}
+                    className="px-3 py-2 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-sm"
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-slate-200 flex gap-3 justify-between">
+              <div>
+                {editingTrip && (
+                  <button
+                    onClick={() => { onDeletePipelineTrip(editingTrip.id); closePipelineModal(); }}
+                    className="px-4 py-2 text-red-600 text-[10px] font-bold uppercase tracking-widest hover:bg-red-50 transition-colors rounded-sm"
+                  >
+                    Delete Trip
+                  </button>
+                )}
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={closePipelineModal}
+                  className="px-6 py-2 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmitPipelineTrip}
+                  disabled={!tripName.trim() || !tripClientName.trim()}
+                  className="px-6 py-2 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {editingTrip ? 'Save Changes' : 'Create Trip'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

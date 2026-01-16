@@ -10,7 +10,7 @@ import Home from './components/Home';
 import NotificationCenter from './components/NotificationCenter';
 import Login, { GoogleUser } from './components/Login';
 import { MOCK_USERS, INITIAL_REQUESTS, MOCK_COMMENTS, MOCK_ANNOUNCEMENTS } from './constants';
-import { User, BookingRequest, Comment, Notification, Announcement, ConvertedFlight, ConvertedHotel, ConvertedLogistics } from './types';
+import { User, BookingRequest, Comment, Notification, Announcement, ConvertedFlight, ConvertedHotel, ConvertedLogistics, PipelineTrip } from './types';
 
 const App: React.FC = () => {
   // Auth state
@@ -51,6 +51,54 @@ const App: React.FC = () => {
   const [convertedFlights, setConvertedFlights] = useState<ConvertedFlight[]>([]);
   const [convertedHotels, setConvertedHotels] = useState<ConvertedHotel[]>([]);
   const [convertedLogistics, setConvertedLogistics] = useState<ConvertedLogistics[]>([]);
+  const [pipelineTrips, setPipelineTrips] = useState<PipelineTrip[]>([
+    // Sample data matching the screenshot
+    {
+      id: 'pt-1',
+      name: 'Aman Tokyo Anniversary...',
+      clientName: 'Alice Johnson',
+      stage: 'NEW',
+      hasFlights: false,
+      hasHotels: false,
+      hasLogistics: false,
+      isUrgent: false,
+      tasks: [],
+      agent: 'Elena Vance',
+      createdAt: new Date().toISOString()
+    },
+    {
+      id: 'pt-2',
+      name: 'Formula 1 Paddock Club -...',
+      clientName: 'Charlie Davis',
+      stage: 'PLANNING',
+      hasFlights: true,
+      hasHotels: false,
+      hasLogistics: false,
+      isUrgent: true,
+      tasks: [
+        { id: 'task-1', text: 'Confirm paddock access', completed: false },
+        { id: 'task-2', text: 'Book hospitality suite', completed: false }
+      ],
+      agent: 'Elena Vance',
+      createdAt: new Date().toISOString()
+    },
+    {
+      id: 'pt-3',
+      name: 'New York Spring Business...',
+      clientName: 'Alice Johnson',
+      stage: 'IN_PROGRESS',
+      hasFlights: true,
+      hasHotels: true,
+      hasLogistics: false,
+      isUrgent: true,
+      tasks: [
+        { id: 'task-3', text: 'Finalize meeting schedule', completed: true },
+        { id: 'task-4', text: 'Arrange airport transfer', completed: false }
+      ],
+      agent: 'James Sterling',
+      createdAt: new Date().toISOString()
+    }
+  ]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
@@ -196,6 +244,18 @@ const App: React.FC = () => {
     setConvertedLogistics(prev => prev.filter(l => l.id !== id));
   };
 
+  const handleAddPipelineTrip = (trip: PipelineTrip) => {
+    setPipelineTrips(prev => [trip, ...prev]);
+  };
+
+  const handleUpdatePipelineTrip = (id: string, updates: Partial<PipelineTrip>) => {
+    setPipelineTrips(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+  };
+
+  const handleDeletePipelineTrip = (id: string) => {
+    setPipelineTrips(prev => prev.filter(t => t.id !== id));
+  };
+
   const handleAddRequest = (req: Partial<BookingRequest>) => {
     const newReq: BookingRequest = {
       id: `req-${Date.now()}`,
@@ -243,7 +303,7 @@ const App: React.FC = () => {
   const renderContent = () => {
     switch (activeTab) {
       case 'home': return <Home currentUser={currentUser} announcements={announcements} comments={comments} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onAddAnnouncement={handleAddAnnouncement} onDeleteAnnouncement={handleDeleteAnnouncement} onAddRequest={handleAddRequest} onDeleteRequest={handleDeleteRequest} requests={requests} googleUser={googleUser} />;
-      case 'ops': return <Operations requests={requests} comments={comments} currentUser={currentUser} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} googleUser={googleUser} convertedFlights={convertedFlights} convertedHotels={convertedHotels} convertedLogistics={convertedLogistics} onConvertToFlight={handleConvertToFlight} onConvertToHotel={handleConvertToHotel} onConvertToLogistics={handleConvertToLogistics} onUpdateFlight={handleUpdateFlight} onUpdateHotel={handleUpdateHotel} onUpdateLogistics={handleUpdateLogistics} onDeleteFlight={handleDeleteFlight} onDeleteHotel={handleDeleteHotel} onDeleteLogistics={handleDeleteLogistics} />;
+      case 'ops': return <Operations requests={requests} comments={comments} currentUser={currentUser} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} googleUser={googleUser} convertedFlights={convertedFlights} convertedHotels={convertedHotels} convertedLogistics={convertedLogistics} onConvertToFlight={handleConvertToFlight} onConvertToHotel={handleConvertToHotel} onConvertToLogistics={handleConvertToLogistics} onUpdateFlight={handleUpdateFlight} onUpdateHotel={handleUpdateHotel} onUpdateLogistics={handleUpdateLogistics} onDeleteFlight={handleDeleteFlight} onDeleteHotel={handleDeleteHotel} onDeleteLogistics={handleDeleteLogistics} pipelineTrips={pipelineTrips} onAddPipelineTrip={handleAddPipelineTrip} onUpdatePipelineTrip={handleUpdatePipelineTrip} onDeletePipelineTrip={handleDeletePipelineTrip} />;
       case 'sales': return <CRM currentUser={currentUser} requests={requests} onAddRequest={handleAddRequest} comments={comments} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} />;
       case 'accounting': return <Accounting />;
       case 'knowledge': return <KnowledgeBase />;
