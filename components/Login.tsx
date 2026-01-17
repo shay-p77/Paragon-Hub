@@ -95,31 +95,36 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-paragon-dark flex items-center justify-center p-4">
-      {/* Background pattern */}
-      <div className="absolute inset-0 opacity-5">
-        <div className="absolute inset-0" style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-        }} />
-      </div>
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 relative">
+      {/* Background pattern image */}
+      <div
+        className="absolute inset-0"
+        style={{
+          backgroundImage: `url("/paragon-hub-pattern.svg")`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          opacity: 0.3,
+        }}
+      />
 
       <div className="relative z-10 w-full max-w-md">
         {/* Logo and Title */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-white/10 backdrop-blur-sm rounded-full mb-6 border border-white/20">
-            <svg className="w-10 h-10 text-paragon-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-            </svg>
-          </div>
+          <img
+            src="/paragon-login-page-logo.svg"
+            alt="Paragon Logo"
+            className="w-32 h-32 mb-3 mx-auto"
+          />
           <h1 className="font-cinzel text-4xl font-bold text-white tracking-wider mb-2">PARAGON</h1>
           <p className="text-paragon-gold text-sm font-semibold tracking-[0.3em] uppercase">Enterprise Concierge OS</p>
         </div>
 
         {/* Login Card */}
-        <div className="bg-white/10 backdrop-blur-md rounded-lg border border-white/20 p-8 shadow-2xl">
+        <div className="bg-slate-800/80 backdrop-blur-md rounded-lg border border-slate-700 p-8 shadow-2xl">
           <div className="text-center mb-8">
-            <h2 className="text-xl font-bold text-white mb-2">Welcome Back</h2>
-            <p className="text-slate-300 text-sm">Sign in to access your command center</p>
+            <h2 className="text-xl font-bold text-white mb-2">Welcome</h2>
+            <p className="text-slate-400 text-sm">Sign in to access your command center</p>
           </div>
 
           {/* Google Sign-In Button */}
@@ -148,6 +153,9 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           </p>
         </div>
       </div>
+
+      {/* Subtle gradient overlay for depth */}
+      <div className="absolute inset-0 bg-gradient-to-br from-paragon/5 via-transparent to-slate-900/50 pointer-events-none" />
     </div>
   );
 };

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { SectionHeader, Badge } from './Shared';
 import { MOCK_USERS } from '../constants';
 import { User, Comment, Announcement, BookingRequest } from '../types';
@@ -79,9 +79,99 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
   // On Duty expanded state
   const [onDutyExpanded, setOnDutyExpanded] = useState(false);
 
+  // User status state
+  const [userStatus, setUserStatus] = useState<'AVAILABLE' | 'BUSY' | 'AWAY' | 'OFFLINE'>('AVAILABLE');
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const statusDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close status dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (statusDropdownRef.current && !statusDropdownRef.current.contains(e.target as Node)) {
+        setShowStatusDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   // Expanded content state for long posts and comments
   const [expandedPostContent, setExpandedPostContent] = useState<string | null>(null);
   const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
+
+  // Track which posts/comments are actually truncated (overflow detection)
+  const [truncatedPosts, setTruncatedPosts] = useState<Set<string>>(new Set());
+  const [truncatedComments, setTruncatedComments] = useState<Set<string>>(new Set());
+
+  // Refs to measure text overflow
+  const postRefs = useRef<Map<string, HTMLParagraphElement>>(new Map());
+  const commentRefs = useRef<Map<string, HTMLSpanElement>>(new Map());
+
+  // Check if elements are truncated (works with line-clamp)
+  const checkTruncation = useCallback(() => {
+    const newTruncatedPosts = new Set<string>();
+    postRefs.current.forEach((el, id) => {
+      if (el) {
+        // Check for horizontal overflow (text wider than container)
+        if (el.scrollWidth > el.clientWidth) {
+          newTruncatedPosts.add(id);
+          return;
+        }
+        // For line-clamp, we need to temporarily remove it to measure true height
+        const originalStyle = el.style.cssText;
+        const originalClass = el.className;
+        el.style.webkitLineClamp = 'unset';
+        el.style.display = 'block';
+        el.style.overflow = 'visible';
+        el.className = el.className.replace('line-clamp-2', '');
+        const fullHeight = el.scrollHeight;
+        el.style.cssText = originalStyle;
+        el.className = originalClass;
+        const clampedHeight = el.clientHeight;
+        if (fullHeight > clampedHeight + 1) {
+          newTruncatedPosts.add(id);
+        }
+      }
+    });
+    setTruncatedPosts(newTruncatedPosts);
+
+    const newTruncatedComments = new Set<string>();
+    commentRefs.current.forEach((el, id) => {
+      if (el) {
+        // Check for horizontal overflow
+        if (el.scrollWidth > el.clientWidth) {
+          newTruncatedComments.add(id);
+          return;
+        }
+        // Same approach for comments
+        const originalStyle = el.style.cssText;
+        const originalClass = el.className;
+        el.style.webkitLineClamp = 'unset';
+        el.style.display = 'block';
+        el.style.overflow = 'visible';
+        el.className = el.className.replace('line-clamp-2', '');
+        const fullHeight = el.scrollHeight;
+        el.style.cssText = originalStyle;
+        el.className = originalClass;
+        const clampedHeight = el.clientHeight;
+        if (fullHeight > clampedHeight + 1) {
+          newTruncatedComments.add(id);
+        }
+      }
+    });
+    setTruncatedComments(newTruncatedComments);
+  }, []);
+
+  // Check truncation on mount and when content changes
+  useEffect(() => {
+    // Small delay to let DOM render and measure correctly
+    const timeoutId = setTimeout(checkTruncation, 50);
+    window.addEventListener('resize', checkTruncation);
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener('resize', checkTruncation);
+    };
+  }, [announcements, comments, checkTruncation]);
 
   // Handle escape key to close modals
   useEffect(() => {
@@ -190,12 +280,60 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
           <p className="text-xs text-slate-500 mt-1 uppercase tracking-tight">System Status: <span className="text-emerald-500 font-bold">OPERATIONAL</span> / Active Agents: 14</p>
         </div>
         <div className="flex gap-4">
-          <div className="bg-white border border-slate-200 p-4 rounded-sm shadow-sm flex items-center gap-4">
-             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-             <div>
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">On-Call Lead</div>
-                <div className="text-xs font-bold text-slate-900">James Sterling</div>
-             </div>
+          <div className="relative" ref={statusDropdownRef}>
+            <button
+              onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+              className="bg-white border border-slate-200 p-4 rounded-sm shadow-sm flex items-center gap-4 hover:border-paragon transition-colors"
+            >
+               <div className={`w-2 h-2 rounded-full ${
+                 userStatus === 'AVAILABLE' ? 'bg-emerald-500 animate-pulse' :
+                 userStatus === 'BUSY' ? 'bg-red-500' :
+                 userStatus === 'AWAY' ? 'bg-amber-500' :
+                 'bg-slate-400'
+               }`}></div>
+               <div className="text-left">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{userStatus}</div>
+                  <div className="text-xs font-bold text-slate-900">{googleUser?.name || currentUser.name}</div>
+               </div>
+               <svg className={`w-4 h-4 text-slate-400 transition-transform ${showStatusDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+               </svg>
+            </button>
+
+            {showStatusDropdown && (
+              <div className="absolute right-0 mt-2 w-48 bg-white border border-slate-200 rounded-sm shadow-lg z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="py-1">
+                  <button
+                    onClick={() => { setUserStatus('AVAILABLE'); setShowStatusDropdown(false); }}
+                    className={`w-full px-4 py-2 text-left flex items-center gap-3 hover:bg-slate-50 ${userStatus === 'AVAILABLE' ? 'bg-slate-50' : ''}`}
+                  >
+                    <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                    <span className="text-xs font-semibold text-slate-700">Available</span>
+                  </button>
+                  <button
+                    onClick={() => { setUserStatus('BUSY'); setShowStatusDropdown(false); }}
+                    className={`w-full px-4 py-2 text-left flex items-center gap-3 hover:bg-slate-50 ${userStatus === 'BUSY' ? 'bg-slate-50' : ''}`}
+                  >
+                    <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                    <span className="text-xs font-semibold text-slate-700">Busy</span>
+                  </button>
+                  <button
+                    onClick={() => { setUserStatus('AWAY'); setShowStatusDropdown(false); }}
+                    className={`w-full px-4 py-2 text-left flex items-center gap-3 hover:bg-slate-50 ${userStatus === 'AWAY' ? 'bg-slate-50' : ''}`}
+                  >
+                    <div className="w-2 h-2 rounded-full bg-amber-500"></div>
+                    <span className="text-xs font-semibold text-slate-700">Away</span>
+                  </button>
+                  <button
+                    onClick={() => { setUserStatus('OFFLINE'); setShowStatusDropdown(false); }}
+                    className={`w-full px-4 py-2 text-left flex items-center gap-3 hover:bg-slate-50 ${userStatus === 'OFFLINE' ? 'bg-slate-50' : ''}`}
+                  >
+                    <div className="w-2 h-2 rounded-full bg-slate-400"></div>
+                    <span className="text-xs font-semibold text-slate-700">Offline</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -482,18 +620,26 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                           </div>
                         </div>
                         <div className="mb-3">
-                          <p className={`text-[11px] text-slate-600 leading-relaxed ${expandedPostContent === a.id ? '' : 'line-clamp-2'}`}>
+                          <p
+                            ref={(el) => {
+                              if (el) postRefs.current.set(a.id, el);
+                              else postRefs.current.delete(a.id);
+                            }}
+                            className={`text-[11px] text-slate-600 leading-relaxed break-words ${expandedPostContent === a.id ? '' : 'line-clamp-2'}`}
+                          >
                             {a.content}
                           </p>
-                          <button
-                            onClick={() => setExpandedPostContent(expandedPostContent === a.id ? null : a.id)}
-                            className="text-[9px] text-paragon hover:underline font-semibold mt-1 flex items-center gap-0.5"
-                          >
-                            {expandedPostContent === a.id ? 'Show less' : 'Show more'}
-                            <svg className={`w-3 h-3 transition-transform ${expandedPostContent === a.id ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </button>
+                          {(truncatedPosts.has(a.id) || expandedPostContent === a.id) && (
+                            <button
+                              onClick={() => setExpandedPostContent(expandedPostContent === a.id ? null : a.id)}
+                              className="text-[9px] text-paragon hover:underline font-semibold mt-1 flex items-center gap-0.5"
+                            >
+                              {expandedPostContent === a.id ? 'Show less' : 'Show more'}
+                              <svg className={`w-3 h-3 transition-transform ${expandedPostContent === a.id ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </button>
+                          )}
                         </div>
                         <div className="flex justify-between items-center text-[9px] text-slate-400 font-bold uppercase tracking-wider">
                            <span>{a.author}</span>
@@ -540,26 +686,34 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                                           )}
                                        </div>
                                        <div className="text-[10px] text-slate-700 leading-snug">
-                                          <span className={expandedComments.has(c.id) ? '' : 'line-clamp-2'}>
+                                          <span
+                                            ref={(el) => {
+                                              if (el) commentRefs.current.set(c.id, el);
+                                              else commentRefs.current.delete(c.id);
+                                            }}
+                                            className={`break-words ${expandedComments.has(c.id) ? '' : 'line-clamp-2'}`}
+                                          >
                                             {c.text}
                                           </span>
-                                          <button
-                                            onClick={() => {
-                                              const newSet = new Set(expandedComments);
-                                              if (newSet.has(c.id)) {
-                                                newSet.delete(c.id);
-                                              } else {
-                                                newSet.add(c.id);
-                                              }
-                                              setExpandedComments(newSet);
-                                            }}
-                                            className="text-[8px] text-paragon hover:underline font-semibold ml-1 inline-flex items-center gap-0.5"
-                                          >
-                                            {expandedComments.has(c.id) ? 'less' : 'more'}
-                                            <svg className={`w-2 h-2 transition-transform ${expandedComments.has(c.id) ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                                            </svg>
-                                          </button>
+                                          {(truncatedComments.has(c.id) || expandedComments.has(c.id)) && (
+                                            <button
+                                              onClick={() => {
+                                                const newSet = new Set(expandedComments);
+                                                if (newSet.has(c.id)) {
+                                                  newSet.delete(c.id);
+                                                } else {
+                                                  newSet.add(c.id);
+                                                }
+                                                setExpandedComments(newSet);
+                                              }}
+                                              className="text-[8px] text-paragon hover:underline font-semibold ml-1 inline-flex items-center gap-0.5"
+                                            >
+                                              {expandedComments.has(c.id) ? 'less' : 'more'}
+                                              <svg className={`w-2 h-2 transition-transform ${expandedComments.has(c.id) ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                                              </svg>
+                                            </button>
+                                          )}
                                        </div>
                                     </div>
                                   </div>
