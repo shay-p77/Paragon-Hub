@@ -79,10 +79,72 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
   // On Duty expanded state
   const [onDutyExpanded, setOnDutyExpanded] = useState(false);
 
-  // User status state
-  const [userStatus, setUserStatus] = useState<'AVAILABLE' | 'BUSY' | 'AWAY' | 'OFFLINE'>('AVAILABLE');
+  // Real users from backend for On Duty section
+  const [allUsers, setAllUsers] = useState<Array<{
+    googleId: string;
+    name: string;
+    email: string;
+    avatarColor: string;
+    role: string;
+    status: string;
+  }>>([]);
+
+  // Fetch all users on mount
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const res = await fetch('http://localhost:3001/api/auth/users');
+        if (res.ok) {
+          const users = await res.json();
+          setAllUsers(users);
+        }
+      } catch (error) {
+        console.error('Failed to fetch users:', error);
+      }
+    };
+    fetchUsers();
+    // Refresh every 30 seconds to see status changes
+    const interval = setInterval(fetchUsers, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // User status state - initialize from googleUser's stored status
+  const [userStatus, setUserStatus] = useState<'AVAILABLE' | 'BUSY' | 'AWAY' | 'OFFLINE'>(
+    (googleUser?.status as 'AVAILABLE' | 'BUSY' | 'AWAY' | 'OFFLINE') || 'AVAILABLE'
+  );
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const statusDropdownRef = useRef<HTMLDivElement>(null);
+
+  // API URL for backend calls
+  const API_URL = 'http://localhost:3001';
+
+  // Function to update status in backend and localStorage
+  const updateUserStatus = async (newStatus: 'AVAILABLE' | 'BUSY' | 'AWAY' | 'OFFLINE') => {
+    setUserStatus(newStatus);
+    setShowStatusDropdown(false);
+
+    if (googleUser) {
+      try {
+        // Update backend
+        await fetch(`${API_URL}/api/auth/status`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ googleId: googleUser.googleId, status: newStatus }),
+        });
+
+        // Update localStorage
+        const updatedUser = { ...googleUser, status: newStatus };
+        localStorage.setItem('paragon_user', JSON.stringify(updatedUser));
+
+        // Update allUsers state immediately so On Duty section reflects the change
+        setAllUsers(prev => prev.map(u =>
+          u.googleId === googleUser.googleId ? { ...u, status: newStatus } : u
+        ));
+      } catch (error) {
+        console.error('Failed to update status:', error);
+      }
+    }
+  };
 
   // Close status dropdown when clicking outside
   useEffect(() => {
@@ -285,12 +347,20 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
               onClick={() => setShowStatusDropdown(!showStatusDropdown)}
               className="bg-white border border-slate-200 p-4 rounded-sm shadow-sm flex items-center gap-4 hover:border-paragon transition-colors"
             >
-               <div className={`w-2 h-2 rounded-full ${
-                 userStatus === 'AVAILABLE' ? 'bg-emerald-500 animate-pulse' :
-                 userStatus === 'BUSY' ? 'bg-red-500' :
-                 userStatus === 'AWAY' ? 'bg-amber-500' :
-                 'bg-slate-400'
-               }`}></div>
+               <div className="relative">
+                 <div
+                   className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-[10px]"
+                   style={{ backgroundColor: googleUser?.avatarColor || '#3B82F6' }}
+                 >
+                   {(googleUser?.name || currentUser.name).split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                 </div>
+                 <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-white ${
+                   userStatus === 'AVAILABLE' ? 'bg-emerald-500' :
+                   userStatus === 'BUSY' ? 'bg-red-500' :
+                   userStatus === 'AWAY' ? 'bg-amber-500' :
+                   'bg-slate-400'
+                 }`}></div>
+               </div>
                <div className="text-left">
                   <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{userStatus}</div>
                   <div className="text-xs font-bold text-slate-900">{googleUser?.name || currentUser.name}</div>
@@ -304,28 +374,28 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
               <div className="absolute right-0 mt-2 w-48 bg-white border border-slate-200 rounded-sm shadow-lg z-50 animate-in fade-in slide-in-from-top-2 duration-200">
                 <div className="py-1">
                   <button
-                    onClick={() => { setUserStatus('AVAILABLE'); setShowStatusDropdown(false); }}
+                    onClick={() => updateUserStatus('AVAILABLE')}
                     className={`w-full px-4 py-2 text-left flex items-center gap-3 hover:bg-slate-50 ${userStatus === 'AVAILABLE' ? 'bg-slate-50' : ''}`}
                   >
                     <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
                     <span className="text-xs font-semibold text-slate-700">Available</span>
                   </button>
                   <button
-                    onClick={() => { setUserStatus('BUSY'); setShowStatusDropdown(false); }}
+                    onClick={() => updateUserStatus('BUSY')}
                     className={`w-full px-4 py-2 text-left flex items-center gap-3 hover:bg-slate-50 ${userStatus === 'BUSY' ? 'bg-slate-50' : ''}`}
                   >
                     <div className="w-2 h-2 rounded-full bg-red-500"></div>
                     <span className="text-xs font-semibold text-slate-700">Busy</span>
                   </button>
                   <button
-                    onClick={() => { setUserStatus('AWAY'); setShowStatusDropdown(false); }}
+                    onClick={() => updateUserStatus('AWAY')}
                     className={`w-full px-4 py-2 text-left flex items-center gap-3 hover:bg-slate-50 ${userStatus === 'AWAY' ? 'bg-slate-50' : ''}`}
                   >
                     <div className="w-2 h-2 rounded-full bg-amber-500"></div>
                     <span className="text-xs font-semibold text-slate-700">Away</span>
                   </button>
                   <button
-                    onClick={() => { setUserStatus('OFFLINE'); setShowStatusDropdown(false); }}
+                    onClick={() => updateUserStatus('OFFLINE')}
                     className={`w-full px-4 py-2 text-left flex items-center gap-3 hover:bg-slate-50 ${userStatus === 'OFFLINE' ? 'bg-slate-50' : ''}`}
                   >
                     <div className="w-2 h-2 rounded-full bg-slate-400"></div>
@@ -341,73 +411,93 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
       <WorldClock />
 
       {/* On Duty Now - Expandable Indicator */}
-      <div className="mb-8">
-        <button
-          onClick={() => setOnDutyExpanded(!onDutyExpanded)}
-          className="w-full bg-white border border-slate-200 rounded-sm shadow-sm p-4 flex items-center justify-between hover:border-paragon transition-colors"
-        >
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-              <span className="text-[11px] font-bold uppercase tracking-widest text-slate-900">On Duty Now</span>
-            </div>
-            <div className="flex -space-x-2">
-              <div className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center text-white font-bold text-[10px] border-2 border-white">JS</div>
-              <div className="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center text-white font-bold text-[10px] border-2 border-white">SK</div>
-              <div className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center text-white font-bold text-[10px] border-2 border-white">EV</div>
-            </div>
-            <span className="text-[10px] text-slate-400 font-semibold">3 team members online</span>
+      {(() => {
+        // Filter users who are not OFFLINE (on duty)
+        const onDutyUsers = allUsers.filter(u => u.status !== 'OFFLINE');
+        const getInitials = (name: string) => name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+        const getStatusColor = (status: string) => {
+          switch (status) {
+            case 'AVAILABLE': return 'bg-emerald-500';
+            case 'BUSY': return 'bg-red-500';
+            case 'AWAY': return 'bg-amber-500';
+            default: return 'bg-slate-400';
+          }
+        };
+        const getRoleLabel = (role: string) => {
+          switch (role) {
+            case 'admin': return 'Administrator';
+            case 'manager': return 'Manager';
+            default: return 'Concierge Agent';
+          }
+        };
+
+        return (
+          <div className="mb-8">
+            <button
+              onClick={() => setOnDutyExpanded(!onDutyExpanded)}
+              className="w-full bg-white border border-slate-200 rounded-sm shadow-sm p-4 flex items-center justify-between hover:border-paragon transition-colors"
+            >
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${onDutyUsers.length > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></div>
+                  <span className="text-[11px] font-bold uppercase tracking-widest text-slate-900">On Duty Now</span>
+                </div>
+                <div className="flex -space-x-2">
+                  {onDutyUsers.slice(0, 5).map(user => (
+                    <div
+                      key={user.googleId}
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-[10px] border-2 border-white"
+                      style={{ backgroundColor: user.avatarColor }}
+                      title={user.name}
+                    >
+                      {getInitials(user.name)}
+                    </div>
+                  ))}
+                  {onDutyUsers.length > 5 && (
+                    <div className="w-8 h-8 rounded-full bg-slate-300 flex items-center justify-center text-slate-600 font-bold text-[10px] border-2 border-white">
+                      +{onDutyUsers.length - 5}
+                    </div>
+                  )}
+                </div>
+                <span className="text-[10px] text-slate-400 font-semibold">
+                  {onDutyUsers.length} team member{onDutyUsers.length !== 1 ? 's' : ''} online
+                </span>
+              </div>
+              <svg className={`w-4 h-4 text-slate-400 transition-transform ${onDutyExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {onDutyExpanded && (
+              <div className="bg-white border border-t-0 border-slate-200 rounded-b-sm shadow-sm p-6 animate-in slide-in-from-top-2 duration-200">
+                {onDutyUsers.length === 0 ? (
+                  <p className="text-sm text-slate-400 text-center py-4">No team members currently on duty</p>
+                ) : (
+                  <div className="grid grid-cols-3 gap-6">
+                    {onDutyUsers.map(user => (
+                      <div key={user.googleId} className="flex items-center gap-3">
+                        <div className="relative">
+                          <div
+                            className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-sm"
+                            style={{ backgroundColor: user.avatarColor }}
+                          >
+                            {getInitials(user.name)}
+                          </div>
+                          <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full ${getStatusColor(user.status)} border-2 border-white`}></div>
+                        </div>
+                        <div>
+                          <div className="text-sm font-bold text-slate-900">{user.name}</div>
+                          <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">{getRoleLabel(user.role)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-          <svg className={`w-4 h-4 text-slate-400 transition-transform ${onDutyExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-          </svg>
-        </button>
-
-        {onDutyExpanded && (
-          <div className="bg-white border border-t-0 border-slate-200 rounded-b-sm shadow-sm p-6 animate-in slide-in-from-top-2 duration-200">
-            <div className="grid grid-cols-3 gap-6">
-              {/* Jonathan Sterling */}
-              <div className="flex items-center gap-3">
-                <div className="relative">
-                  <div className="w-12 h-12 rounded-full bg-red-500 flex items-center justify-center text-white font-bold text-sm">JS</div>
-                  <div className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white"></div>
-                </div>
-                <div>
-                  <div className="text-sm font-bold text-slate-900">Jonathan Sterling</div>
-                  <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Senior Concierge</div>
-                </div>
-              </div>
-
-              {/* Sarah Kensington */}
-              <div className="flex items-center gap-3">
-                <div className="relative">
-                  <div className="w-12 h-12 rounded-full bg-purple-500 flex items-center justify-center text-white font-bold text-sm">SK</div>
-                  <div className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white"></div>
-                </div>
-                <div>
-                  <div className="text-sm font-bold text-slate-900">Sarah Kensington</div>
-                  <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Lifestyle Manager</div>
-                </div>
-              </div>
-
-              {/* Elena Vance */}
-              <div className="flex items-center gap-3">
-                <div className="relative">
-                  <div className="w-12 h-12 rounded-full bg-red-500 flex items-center justify-center text-white font-bold text-sm">EV</div>
-                  <div className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white"></div>
-                </div>
-                <div>
-                  <div className="text-sm font-bold text-slate-900">Elena Vance</div>
-                  <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Global Logistics</div>
-                </div>
-              </div>
-            </div>
-            {/* <button className="w-full mt-6 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-paragon transition-colors border-t border-slate-100 pt-6">
-              Launch Team Sync
-            </button> */}
-          </div>
-        )}
-      </div>
+        );
+      })()}
 
       <div className="grid grid-cols-12 gap-8">
         {/* Main Content - Operational Dispatch */}
@@ -663,18 +753,22 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                             ) : (
                               announcementComments.map(c => {
                                 const mockAuthor = MOCK_USERS.find(u => u.id === c.authorId);
-                                const isOwnComment = googleUser ? c.authorId === googleUser.id : c.authorId === currentUser.id;
-                                // If it's the current google user's comment, show their name; otherwise try mock user or show "Unknown"
-                                const authorName = (googleUser && c.authorId === googleUser.id) ? googleUser.name : (mockAuthor?.name || 'Unknown');
-                                const authorInitial = authorName.charAt(0);
+                                const isOwnComment = googleUser ? (c.authorId === googleUser.googleId || c.authorId === googleUser.id) : c.authorId === currentUser.id;
+                                // Use authorName from comment if available (saved in DB), otherwise fall back to lookup
+                                const displayName = c.authorName || mockAuthor?.name || 'Unknown';
+                                const authorInitial = displayName.charAt(0);
+                                const avatarColor = c.authorAvatarColor || '#94a3b8';
                                 return (
                                   <div key={c.id} className="flex gap-2 group">
-                                    <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[7px] font-bold flex-shrink-0">
+                                    <div
+                                      className="w-5 h-5 rounded-full flex items-center justify-center text-[7px] font-bold flex-shrink-0 text-white"
+                                      style={{ backgroundColor: avatarColor }}
+                                    >
                                       {authorInitial}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                        <div className="flex gap-1 items-center mb-0.5">
-                                          <span className="text-[9px] font-bold text-slate-900 truncate">{authorName}</span>
+                                          <span className="text-[9px] font-bold text-slate-900 truncate">{displayName}</span>
                                           {isOwnComment && onDeleteComment && (
                                             <button
                                               onClick={() => setDeleteConfirm({ type: 'comment', id: c.id })}

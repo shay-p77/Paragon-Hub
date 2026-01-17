@@ -121,6 +121,8 @@ export interface BookingRequest {
 export interface Comment {
   id: string;
   authorId: string;
+  authorName?: string; // Name of the author (for display)
+  authorAvatarColor?: string; // Avatar color of the author
   text: string;
   timestamp: string;
   parentId: string; // ID of the flight, hotel, trip, or request

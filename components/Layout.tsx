@@ -61,7 +61,10 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
 
         <div className="p-6 border-t border-slate-800 bg-slate-950">
           <div className="flex items-center gap-3">
-            <div className={`w-8 h-8 rounded-full ${avatarColor || 'bg-paragon-gold'} flex items-center justify-center text-white font-bold text-xs shadow-lg`}>
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs shadow-lg"
+              style={{ backgroundColor: googleUser?.avatarColor || '#D4AF37' }}
+            >
               {googleUser ? googleUser.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) : currentUser.name.charAt(0)}
             </div>
             <div>

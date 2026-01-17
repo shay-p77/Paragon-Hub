@@ -9,8 +9,10 @@ import ClientPortal from './components/ClientPortal';
 import Home from './components/Home';
 import NotificationCenter from './components/NotificationCenter';
 import Login, { GoogleUser } from './components/Login';
-import { MOCK_USERS, INITIAL_REQUESTS, MOCK_COMMENTS, MOCK_ANNOUNCEMENTS } from './constants';
+import { MOCK_USERS } from './constants';
 import { User, BookingRequest, Comment, Notification, Announcement, ConvertedFlight, ConvertedHotel, ConvertedLogistics, PipelineTrip } from './types';
+
+const API_URL = 'http://localhost:3001';
 
 const App: React.FC = () => {
   // Auth state
@@ -44,10 +46,47 @@ const App: React.FC = () => {
 
   const [currentUser, setCurrentUser] = useState<User>(MOCK_USERS[0]); // Default Admin
   const [activeTab, setActiveTab] = useState('home');
-  const [requests, setRequests] = useState<BookingRequest[]>(INITIAL_REQUESTS);
-  const [comments, setComments] = useState<Comment[]>(MOCK_COMMENTS);
-  const [announcements, setAnnouncements] = useState<Announcement[]>(MOCK_ANNOUNCEMENTS);
+  const [requests, setRequests] = useState<BookingRequest[]>([]);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [dataLoading, setDataLoading] = useState(true);
+
+  // Fetch data from API on mount
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [announcementsRes, commentsRes, requestsRes] = await Promise.all([
+          fetch(`${API_URL}/api/announcements`),
+          fetch(`${API_URL}/api/comments`),
+          fetch(`${API_URL}/api/requests`),
+        ]);
+
+        if (announcementsRes.ok) {
+          const data = await announcementsRes.json();
+          setAnnouncements(data);
+        }
+        if (commentsRes.ok) {
+          const data = await commentsRes.json();
+          setComments(data);
+        }
+        if (requestsRes.ok) {
+          const data = await requestsRes.json();
+          setRequests(data);
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setDataLoading(false);
+      }
+    };
+
+    if (googleUser) {
+      fetchData();
+    } else {
+      setDataLoading(false);
+    }
+  }, [googleUser]);
   const [convertedFlights, setConvertedFlights] = useState<ConvertedFlight[]>([]);
   const [convertedHotels, setConvertedHotels] = useState<ConvertedHotel[]>([]);
   const [convertedLogistics, setConvertedLogistics] = useState<ConvertedLogistics[]>([]);
@@ -147,62 +186,101 @@ const App: React.FC = () => {
   };
 
   // Logic to handle user tagging notifications
-  const handleAddComment = (text: string, parentId: string) => {
-    const newComment: Comment = {
-      id: `c-${Date.now()}`,
-      authorId: googleUser?.id || currentUser.id,
-      text,
-      timestamp: new Date().toISOString(),
-      parentId
-    };
-    setComments(prev => [...prev, newComment]);
-
-    // Check for tags
-    const tags = text.match(/@u\d+/g);
-    if (tags) {
-      const senderName = googleUser?.name || currentUser.name;
-      const senderId = googleUser?.id || currentUser.id;
-      tags.forEach(tag => {
-        const userId = tag.substring(1);
-        // Don't notify the sender (check both mock user ID and Google user ID)
-        if (userId !== currentUser.id && userId !== senderId) {
-          const targetUser = MOCK_USERS.find(u => u.id === userId);
-          if (targetUser) {
-            setNotifications(prev => [{
-              id: `n-${Date.now()}`,
-              userId,
-              message: `${senderName} tagged you in a comment.`,
-              type: 'TAG',
-              read: false,
-              timestamp: new Date().toISOString(),
-              link: parentId
-            }, ...prev]);
-          }
-        }
+  const handleAddComment = async (text: string, parentId: string) => {
+    try {
+      const res = await fetch(`${API_URL}/api/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          authorId: googleUser?.googleId || currentUser.id,
+          authorName: googleUser?.name || currentUser.name,
+          authorAvatarColor: googleUser?.avatarColor || '#3B82F6',
+          text,
+          parentId
+        }),
       });
+
+      if (res.ok) {
+        const newComment = await res.json();
+        setComments(prev => [...prev, newComment]);
+
+        // Check for tags
+        const tags = text.match(/@u\d+/g);
+        if (tags) {
+          const senderName = googleUser?.name || currentUser.name;
+          const senderId = googleUser?.id || currentUser.id;
+          tags.forEach(tag => {
+            const userId = tag.substring(1);
+            if (userId !== currentUser.id && userId !== senderId) {
+              const targetUser = MOCK_USERS.find(u => u.id === userId);
+              if (targetUser) {
+                setNotifications(prev => [{
+                  id: `n-${Date.now()}`,
+                  userId,
+                  message: `${senderName} tagged you in a comment.`,
+                  type: 'TAG',
+                  read: false,
+                  timestamp: new Date().toISOString(),
+                  link: parentId
+                }, ...prev]);
+              }
+            }
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error adding comment:', error);
     }
   };
 
-  const handleDeleteComment = (commentId: string) => {
-    setComments(prev => prev.filter(c => c.id !== commentId));
+  const handleDeleteComment = async (commentId: string) => {
+    try {
+      await fetch(`${API_URL}/api/comments/${commentId}`, { method: 'DELETE' });
+      setComments(prev => prev.filter(c => c.id !== commentId));
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+    }
   };
 
-  const handleAddAnnouncement = (announcement: Omit<Announcement, 'id' | 'date' | 'author'>) => {
-    const newAnnouncement: Announcement = {
-      id: `a-${Date.now()}`,
-      ...announcement,
-      author: googleUser?.name || currentUser.name,
-      date: new Date().toISOString().split('T')[0] // YYYY-MM-DD format
-    };
-    setAnnouncements(prev => [newAnnouncement, ...prev]);
+  const handleAddAnnouncement = async (announcement: Omit<Announcement, 'id' | 'date' | 'author'>) => {
+    try {
+      const res = await fetch(`${API_URL}/api/announcements`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...announcement,
+          author: googleUser?.name || currentUser.name,
+          authorId: googleUser?.googleId || currentUser.id,
+        }),
+      });
+
+      if (res.ok) {
+        const newAnnouncement = await res.json();
+        setAnnouncements(prev => [newAnnouncement, ...prev]);
+      }
+    } catch (error) {
+      console.error('Error adding announcement:', error);
+    }
   };
 
-  const handleDeleteAnnouncement = (announcementId: string) => {
-    setAnnouncements(prev => prev.filter(a => a.id !== announcementId));
+  const handleDeleteAnnouncement = async (announcementId: string) => {
+    try {
+      await fetch(`${API_URL}/api/announcements/${announcementId}`, { method: 'DELETE' });
+      setAnnouncements(prev => prev.filter(a => a.id !== announcementId));
+      // Also delete associated comments
+      setComments(prev => prev.filter(c => c.parentId !== announcementId));
+    } catch (error) {
+      console.error('Error deleting announcement:', error);
+    }
   };
 
-  const handleDeleteRequest = (requestId: string) => {
-    setRequests(prev => prev.filter(r => r.id !== requestId));
+  const handleDeleteRequest = async (requestId: string) => {
+    try {
+      await fetch(`${API_URL}/api/requests/${requestId}`, { method: 'DELETE' });
+      setRequests(prev => prev.filter(r => r.id !== requestId));
+    } catch (error) {
+      console.error('Error deleting request:', error);
+    }
   };
 
   const handleConvertToFlight = (flight: ConvertedFlight, requestId: string) => {
@@ -256,39 +334,49 @@ const App: React.FC = () => {
     setPipelineTrips(prev => prev.filter(t => t.id !== id));
   };
 
-  const handleAddRequest = (req: Partial<BookingRequest>) => {
-    const newReq: BookingRequest = {
-      id: `req-${Date.now()}`,
-      agentId: req.agentId || googleUser?.id || currentUser.id,
-      clientId: req.clientId || '',
-      type: req.type || 'GENERAL',
-      status: req.status || 'PENDING',
-      priority: req.priority || 'NORMAL',
-      notes: req.notes || '',
-      timestamp: req.timestamp || new Date().toISOString(),
-      details: req.details,
-    };
-    setRequests(prev => [newReq, ...prev]);
+  const handleAddRequest = async (req: Partial<BookingRequest>) => {
+    try {
+      const res = await fetch(`${API_URL}/api/requests`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agentId: req.agentId || googleUser?.googleId || currentUser.id,
+          agentName: googleUser?.name || currentUser.name,
+          clientId: req.clientId || '',
+          clientName: (req.details as any)?.clientName || '',
+          type: req.type || 'GENERAL',
+          priority: req.priority || 'NORMAL',
+          notes: req.notes || '',
+          details: req.details,
+        }),
+      });
 
-    // Notify all users except the author when a new request is created
-    const senderName = googleUser?.name || currentUser.name;
-    const senderId = googleUser?.id || currentUser.id;
-    const priorityText = newReq.priority === 'URGENT' || newReq.priority === 'CRITICAL' ? ' (URGENT)' : '';
+      if (res.ok) {
+        const newReq = await res.json();
+        setRequests(prev => [newReq, ...prev]);
 
-    MOCK_USERS.forEach(u => {
-      // Don't notify the sender (check both mock user ID and Google user ID)
-      if (u.id !== currentUser.id && u.id !== senderId) {
-        setNotifications(prev => [{
-          id: `n-${Date.now()}-${u.id}`,
-          userId: u.id,
-          message: `New ${newReq.type.toLowerCase()} request from ${senderName}${priorityText}`,
-          type: 'ASSIGN',
-          read: false,
-          timestamp: new Date().toISOString(),
-          link: newReq.id
-        }, ...prev]);
+        // Notify all users except the author when a new request is created
+        const senderName = googleUser?.name || currentUser.name;
+        const senderId = googleUser?.id || currentUser.id;
+        const priorityText = newReq.priority === 'URGENT' || newReq.priority === 'CRITICAL' ? ' (URGENT)' : '';
+
+        MOCK_USERS.forEach(u => {
+          if (u.id !== currentUser.id && u.id !== senderId) {
+            setNotifications(prev => [{
+              id: `n-${Date.now()}-${u.id}`,
+              userId: u.id,
+              message: `New ${newReq.type.toLowerCase()} request from ${senderName}${priorityText}`,
+              type: 'ASSIGN',
+              read: false,
+              timestamp: new Date().toISOString(),
+              link: newReq.id
+            }, ...prev]);
+          }
+        });
       }
-    });
+    } catch (error) {
+      console.error('Error adding request:', error);
+    }
   };
 
   const markRead = (id: string) => {
@@ -387,7 +475,10 @@ const App: React.FC = () => {
              <div className="h-8 w-[1px] bg-slate-200"></div>
              {/* User Profile & Logout */}
              <div className="flex items-center gap-3">
-                <div className={`w-8 h-8 rounded-full ${getAvatarColor(googleUser.email)} flex items-center justify-center text-white font-bold text-xs`}>
+                <div
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs"
+                  style={{ backgroundColor: googleUser.avatarColor || '#3B82F6' }}
+                >
                   {getInitials(googleUser.name)}
                 </div>
                 <div className="hidden sm:block">

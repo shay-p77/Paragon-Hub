@@ -2,6 +2,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { SectionHeader, Badge } from './Shared';
 
+const API_URL = 'http://localhost:3001';
+
 // Types for Knowledge Base
 type KnowledgeCategory = 'PROCEDURE' | 'LOCATION' | 'CONTACT' | 'NOTE';
 
@@ -241,11 +243,65 @@ const KnowledgeBase: React.FC = () => {
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<KnowledgeEntry | ContactEntry | NoteEntry | null>(null);
 
-  // Data state - initialized with mock data
-  const [procedures, setProcedures] = useState<KnowledgeEntry[]>(MOCK_PROCEDURES);
-  const [locations, setLocations] = useState<KnowledgeEntry[]>(MOCK_LOCATIONS);
-  const [contacts, setContacts] = useState<ContactEntry[]>(MOCK_CONTACTS);
-  const [notes, setNotes] = useState<NoteEntry[]>(MOCK_NOTES);
+  // Data state - fetch from API
+  const [procedures, setProcedures] = useState<KnowledgeEntry[]>([]);
+  const [locations, setLocations] = useState<KnowledgeEntry[]>([]);
+  const [contacts, setContacts] = useState<ContactEntry[]>([]);
+  const [notes, setNotes] = useState<NoteEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch data from API on mount
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [proceduresRes, locationsRes, notesRes, contactsRes] = await Promise.all([
+          fetch(`${API_URL}/api/knowledge/procedures`),
+          fetch(`${API_URL}/api/knowledge/locations`),
+          fetch(`${API_URL}/api/knowledge/notes`),
+          fetch(`${API_URL}/api/knowledge/contacts`),
+        ]);
+
+        if (proceduresRes.ok) {
+          const data = await proceduresRes.json();
+          setProcedures(data.length > 0 ? data : MOCK_PROCEDURES);
+        } else {
+          setProcedures(MOCK_PROCEDURES);
+        }
+
+        if (locationsRes.ok) {
+          const data = await locationsRes.json();
+          setLocations(data.length > 0 ? data : MOCK_LOCATIONS);
+        } else {
+          setLocations(MOCK_LOCATIONS);
+        }
+
+        if (notesRes.ok) {
+          const data = await notesRes.json();
+          setNotes(data.length > 0 ? data : MOCK_NOTES);
+        } else {
+          setNotes(MOCK_NOTES);
+        }
+
+        if (contactsRes.ok) {
+          const data = await contactsRes.json();
+          setContacts(data.length > 0 ? data : MOCK_CONTACTS);
+        } else {
+          setContacts(MOCK_CONTACTS);
+        }
+      } catch (error) {
+        console.error('Error fetching knowledge base data:', error);
+        // Fall back to mock data on error
+        setProcedures(MOCK_PROCEDURES);
+        setLocations(MOCK_LOCATIONS);
+        setNotes(MOCK_NOTES);
+        setContacts(MOCK_CONTACTS);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   // Quick add form state - now category is selected first
   const [quickAddCategory, setQuickAddCategory] = useState<'PROCEDURE' | 'LOCATION' | 'CONTACT' | 'NOTE' | null>(null);
@@ -329,66 +385,73 @@ const KnowledgeBase: React.FC = () => {
     setContactNotes('');
   };
 
-  const handleQuickAddSubmit = (e: React.FormEvent) => {
+  const handleQuickAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const now = new Date().toISOString();
 
-    if (quickAddCategory === 'PROCEDURE') {
-      const newProc: KnowledgeEntry = {
-        id: `proc-${Date.now()}`,
-        title: procTitle,
-        content: procContent,
-        category: 'PROCEDURE',
-        subcategory: procSubcategory || undefined,
-        tags: procTags.split(',').map(t => t.trim()).filter(t => t),
-        createdBy: 'Current User',
-        createdAt: now,
-        updatedAt: now
-      };
-      setProcedures(prev => [newProc, ...prev]);
-      setActiveTab('procedures');
-    } else if (quickAddCategory === 'LOCATION') {
-      const newLoc: KnowledgeEntry = {
-        id: `loc-${Date.now()}`,
-        title: locTitle,
-        content: locContent,
-        category: 'LOCATION',
-        location: locLocation,
-        tags: locTags.split(',').map(t => t.trim()).filter(t => t),
-        createdBy: 'Current User',
-        createdAt: now,
-        updatedAt: now
-      };
-      setLocations(prev => [newLoc, ...prev]);
-      setActiveTab('locations');
-    } else if (quickAddCategory === 'CONTACT') {
-      const newContact: ContactEntry = {
-        id: `contact-${Date.now()}`,
-        name: contactName,
-        role: contactRole,
-        company: contactCompany,
-        location: contactLocation,
-        phone: contactPhone || undefined,
-        email: contactEmail || undefined,
-        notes: contactNotes || undefined,
-        tags: [],
-        createdBy: 'Current User',
-        createdAt: now
-      };
-      setContacts(prev => [newContact, ...prev]);
-      setActiveTab('contacts');
-    } else if (quickAddCategory === 'NOTE') {
-      const newNote: NoteEntry = {
-        id: `note-${Date.now()}`,
-        title: noteTitle,
-        content: noteContent,
-        tags: noteTags.split(',').map(t => t.trim()).filter(t => t),
-        createdBy: 'Current User',
-        createdAt: now,
-        updatedAt: now
-      };
-      setNotes(prev => [newNote, ...prev]);
-      setActiveTab('notes');
+    // Get current user from localStorage
+    const storedUser = localStorage.getItem('paragon_user');
+    const userName = storedUser ? JSON.parse(storedUser).name : 'Current User';
+
+    try {
+      if (quickAddCategory === 'PROCEDURE' || quickAddCategory === 'LOCATION' || quickAddCategory === 'NOTE') {
+        const entryData = {
+          title: quickAddCategory === 'PROCEDURE' ? procTitle : quickAddCategory === 'LOCATION' ? locTitle : noteTitle,
+          content: quickAddCategory === 'PROCEDURE' ? procContent : quickAddCategory === 'LOCATION' ? locContent : noteContent,
+          category: quickAddCategory,
+          subcategory: quickAddCategory === 'PROCEDURE' ? procSubcategory : undefined,
+          location: quickAddCategory === 'LOCATION' ? locLocation : undefined,
+          tags: quickAddCategory === 'PROCEDURE' ? procTags.split(',').map(t => t.trim()).filter(t => t) :
+                quickAddCategory === 'LOCATION' ? locTags.split(',').map(t => t.trim()).filter(t => t) :
+                noteTags.split(',').map(t => t.trim()).filter(t => t),
+          createdBy: userName,
+        };
+
+        const res = await fetch(`${API_URL}/api/knowledge/entries`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(entryData),
+        });
+
+        if (res.ok) {
+          const newEntry = await res.json();
+          if (quickAddCategory === 'PROCEDURE') {
+            setProcedures(prev => [newEntry, ...prev]);
+            setActiveTab('procedures');
+          } else if (quickAddCategory === 'LOCATION') {
+            setLocations(prev => [newEntry, ...prev]);
+            setActiveTab('locations');
+          } else {
+            setNotes(prev => [newEntry, ...prev]);
+            setActiveTab('notes');
+          }
+        }
+      } else if (quickAddCategory === 'CONTACT') {
+        const contactData = {
+          name: contactName,
+          role: contactRole,
+          company: contactCompany,
+          location: contactLocation,
+          phone: contactPhone || '',
+          email: contactEmail || '',
+          notes: contactNotes || '',
+          tags: [],
+          createdBy: userName,
+        };
+
+        const res = await fetch(`${API_URL}/api/knowledge/contacts`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(contactData),
+        });
+
+        if (res.ok) {
+          const newContact = await res.json();
+          setContacts(prev => [newContact, ...prev]);
+          setActiveTab('contacts');
+        }
+      }
+    } catch (error) {
+      console.error('Error saving entry:', error);
     }
 
     setShowQuickAdd(false);

@@ -6,9 +6,13 @@ interface LoginProps {
 
 export interface GoogleUser {
   id: string;
+  googleId: string;
   email: string;
   name: string;
   picture: string;
+  avatarColor: string;
+  role: string;
+  status: string;
 }
 
 declare global {
@@ -27,19 +31,7 @@ declare global {
 }
 
 const GOOGLE_CLIENT_ID = '375584053864-58t5khqj1js8uqnp2rqsl4svp6l2hha9.apps.googleusercontent.com';
-
-// Decode JWT token from Google
-function decodeJwt(token: string): any {
-  const base64Url = token.split('.')[1];
-  const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-  const jsonPayload = decodeURIComponent(
-    atob(base64)
-      .split('')
-      .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-      .join('')
-  );
-  return JSON.parse(jsonPayload);
-}
+const API_URL = 'http://localhost:3001';
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const googleButtonRef = useRef<HTMLDivElement>(null);
@@ -78,20 +70,31 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     }
   }, []);
 
-  const handleCredentialResponse = (response: { credential: string }) => {
-    const decoded = decodeJwt(response.credential);
+  const handleCredentialResponse = async (response: { credential: string }) => {
+    try {
+      // Send token to backend for verification and user creation/lookup
+      const res = await fetch(`${API_URL}/api/auth/google`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ credential: response.credential }),
+      });
 
-    const user: GoogleUser = {
-      id: decoded.sub,
-      email: decoded.email,
-      name: decoded.name,
-      picture: decoded.picture,
-    };
+      if (!res.ok) {
+        throw new Error('Authentication failed');
+      }
 
-    // Store in localStorage for persistence
-    localStorage.setItem('paragon_user', JSON.stringify(user));
+      const user: GoogleUser = await res.json();
 
-    onLogin(user);
+      // Store in localStorage for persistence
+      localStorage.setItem('paragon_user', JSON.stringify(user));
+
+      onLogin(user);
+    } catch (error) {
+      console.error('Login error:', error);
+      alert('Login failed. Please try again.');
+    }
   };
 
   return (
