@@ -51,10 +51,12 @@ const App: React.FC = () => {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
+  const [dataError, setDataError] = useState<string | null>(null);
 
   // Fetch data from API on mount
   useEffect(() => {
     const fetchData = async () => {
+      setDataError(null);
       try {
         const [announcementsRes, commentsRes, requestsRes] = await Promise.all([
           fetch(`${API_URL}/api/announcements`),
@@ -76,6 +78,7 @@ const App: React.FC = () => {
         }
       } catch (error) {
         console.error('Error fetching data:', error);
+        setDataError('Failed to connect to server. Some features may not work.');
       } finally {
         setDataLoading(false);
       }
@@ -274,6 +277,78 @@ const App: React.FC = () => {
     }
   };
 
+  const handleEditAnnouncement = async (id: string, updates: { title: string; content: string; priority: 'LOW' | 'NORMAL' | 'HIGH' }) => {
+    try {
+      const res = await fetch(`${API_URL}/api/announcements/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+
+      if (res.ok) {
+        const updatedAnnouncement = await res.json();
+        setAnnouncements(prev => prev.map(a => a.id === id ? updatedAnnouncement : a));
+      }
+    } catch (error) {
+      console.error('Error editing announcement:', error);
+    }
+  };
+
+  const handlePinAnnouncement = async (id: string) => {
+    try {
+      const res = await fetch(`${API_URL}/api/announcements/${id}/pin`, {
+        method: 'PUT',
+      });
+
+      if (res.ok) {
+        const updatedAnnouncement = await res.json();
+        // Re-sort announcements so pinned ones come first
+        setAnnouncements(prev => {
+          const updated = prev.map(a => a.id === id ? updatedAnnouncement : a);
+          return updated.sort((a, b) => {
+            if (a.isPinned && !b.isPinned) return -1;
+            if (!a.isPinned && b.isPinned) return 1;
+            return new Date(b.date).getTime() - new Date(a.date).getTime();
+          });
+        });
+      } else {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to pin');
+      }
+    } catch (error) {
+      console.error('Error pinning announcement:', error);
+      throw error;
+    }
+  };
+
+  const handlePinComment = async (commentId: string) => {
+    try {
+      const res = await fetch(`${API_URL}/api/comments/${commentId}/pin`, {
+        method: 'PUT',
+      });
+
+      if (res.ok) {
+        const updatedComment = await res.json();
+        // Re-sort comments so pinned ones come first within their parent
+        setComments(prev => {
+          const updated = prev.map(c => c.id === commentId ? updatedComment : c);
+          return updated.sort((a, b) => {
+            if (a.parentId !== b.parentId) return 0;
+            if (a.isPinned && !b.isPinned) return -1;
+            if (!a.isPinned && b.isPinned) return 1;
+            return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+          });
+        });
+      } else {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to pin');
+      }
+    } catch (error) {
+      console.error('Error pinning comment:', error);
+      throw error;
+    }
+  };
+
   const handleDeleteRequest = async (requestId: string) => {
     try {
       await fetch(`${API_URL}/api/requests/${requestId}`, { method: 'DELETE' });
@@ -390,13 +465,13 @@ const App: React.FC = () => {
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'home': return <Home currentUser={currentUser} announcements={announcements} comments={comments} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onAddAnnouncement={handleAddAnnouncement} onDeleteAnnouncement={handleDeleteAnnouncement} onAddRequest={handleAddRequest} onDeleteRequest={handleDeleteRequest} requests={requests} googleUser={googleUser} />;
+      case 'home': return <Home currentUser={currentUser} announcements={announcements} comments={comments} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onAddAnnouncement={handleAddAnnouncement} onEditAnnouncement={handleEditAnnouncement} onDeleteAnnouncement={handleDeleteAnnouncement} onPinAnnouncement={handlePinAnnouncement} onPinComment={handlePinComment} onAddRequest={handleAddRequest} onDeleteRequest={handleDeleteRequest} requests={requests} googleUser={googleUser} />;
       case 'ops': return <Operations requests={requests} comments={comments} currentUser={currentUser} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} googleUser={googleUser} convertedFlights={convertedFlights} convertedHotels={convertedHotels} convertedLogistics={convertedLogistics} onConvertToFlight={handleConvertToFlight} onConvertToHotel={handleConvertToHotel} onConvertToLogistics={handleConvertToLogistics} onUpdateFlight={handleUpdateFlight} onUpdateHotel={handleUpdateHotel} onUpdateLogistics={handleUpdateLogistics} onDeleteFlight={handleDeleteFlight} onDeleteHotel={handleDeleteHotel} onDeleteLogistics={handleDeleteLogistics} pipelineTrips={pipelineTrips} onAddPipelineTrip={handleAddPipelineTrip} onUpdatePipelineTrip={handleUpdatePipelineTrip} onDeletePipelineTrip={handleDeletePipelineTrip} onAddRequest={handleAddRequest} />;
       case 'sales': return <CRM currentUser={currentUser} requests={requests} comments={comments} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} />;
       case 'accounting': return <Accounting />;
       case 'knowledge': return <KnowledgeBase />;
       case 'portal': return <ClientPortal />;
-      default: return <Home currentUser={currentUser} announcements={announcements} comments={comments} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onAddAnnouncement={handleAddAnnouncement} onDeleteAnnouncement={handleDeleteAnnouncement} onAddRequest={handleAddRequest} onDeleteRequest={handleDeleteRequest} requests={requests} googleUser={googleUser} />;
+      default: return <Home currentUser={currentUser} announcements={announcements} comments={comments} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onAddAnnouncement={handleAddAnnouncement} onEditAnnouncement={handleEditAnnouncement} onDeleteAnnouncement={handleDeleteAnnouncement} onPinAnnouncement={handlePinAnnouncement} onPinComment={handlePinComment} onAddRequest={handleAddRequest} onDeleteRequest={handleDeleteRequest} requests={requests} googleUser={googleUser} />;
     }
   };
 
@@ -498,19 +573,48 @@ const App: React.FC = () => {
           </div>
         </div>
 
+        {/* Error Banner */}
+        {dataError && (
+          <div className="bg-red-50 border-b border-red-200 px-8 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="text-xs text-red-700">{dataError}</span>
+            </div>
+            <button
+              onClick={() => setDataError(null)}
+              className="text-red-400 hover:text-red-600"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        )}
+
         <div className="flex-1">
-          {renderContent()}
+          {dataLoading ? (
+            <div className="flex items-center justify-center h-64">
+              <div className="flex flex-col items-center gap-4">
+                <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-paragon"></div>
+                <span className="text-xs text-slate-400 uppercase tracking-widest">Loading data...</span>
+              </div>
+            </div>
+          ) : (
+            renderContent()
+          )}
         </div>
       </div>
 
       {/* Logout Confirmation Modal */}
       {showLogoutConfirm && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-fadeIn"
           onClick={() => setShowLogoutConfirm(false)}
         >
           <div
-            className="bg-white rounded-sm shadow-2xl w-full max-w-xs mx-4 p-6"
+            className="bg-white rounded-sm shadow-2xl w-full max-w-xs mx-4 p-6 animate-zoomIn"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-sm font-bold text-slate-900 mb-2">Sign Out</h3>

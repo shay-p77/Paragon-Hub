@@ -12,7 +12,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ notifications, 
   const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
-    <div className="absolute right-0 mt-2 w-80 bg-white border border-slate-200 shadow-2xl rounded-sm z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+    <div className="absolute right-0 mt-2 w-80 bg-white border border-slate-200 shadow-2xl rounded-sm z-50 animate-slideUp">
       <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
         <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-900">Notifications ({unreadCount})</h3>
         <button onClick={onClearAll} className="text-[9px] font-bold text-paragon hover:underline uppercase">Clear All</button>

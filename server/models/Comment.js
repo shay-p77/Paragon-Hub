@@ -25,6 +25,10 @@ const commentSchema = new mongoose.Schema({
     type: String,
     required: true, // ID of the announcement or other entity
   },
+  isPinned: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 module.exports = mongoose.model('Comment', commentSchema);

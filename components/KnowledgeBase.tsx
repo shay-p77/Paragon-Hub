@@ -332,7 +332,25 @@ const KnowledgeBase: React.FC = () => {
   const [contactEmail, setContactEmail] = useState('');
   const [contactNotes, setContactNotes] = useState('');
 
+  // Edit modal state
+  const [editingEntry, setEditingEntry] = useState<KnowledgeEntry | ContactEntry | NoteEntry | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<KnowledgeEntry | ContactEntry | NoteEntry | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editContent, setEditContent] = useState('');
+  const [editSubcategory, setEditSubcategory] = useState('');
+  const [editLocation, setEditLocation] = useState('');
+  const [editTags, setEditTags] = useState('');
+  // Contact edit fields
+  const [editContactName, setEditContactName] = useState('');
+  const [editContactRole, setEditContactRole] = useState('');
+  const [editContactCompany, setEditContactCompany] = useState('');
+  const [editContactLocation, setEditContactLocation] = useState('');
+  const [editContactPhone, setEditContactPhone] = useState('');
+  const [editContactEmail, setEditContactEmail] = useState('');
+  const [editContactNotes, setEditContactNotes] = useState('');
+
   const quickAddRef = useRef<HTMLDivElement>(null);
+  const editModalRef = useRef<HTMLDivElement>(null);
 
   // Close quick add when clicking outside
   useEffect(() => {
@@ -357,6 +375,8 @@ const KnowledgeBase: React.FC = () => {
       if (e.key === 'Escape') {
         setShowQuickAdd(false);
         setSelectedEntry(null);
+        setEditingEntry(null);
+        setDeleteConfirm(null);
       }
     };
     document.addEventListener('keydown', handleEscape);
@@ -383,6 +403,121 @@ const KnowledgeBase: React.FC = () => {
     setContactPhone('');
     setContactEmail('');
     setContactNotes('');
+  };
+
+  const handleEditEntry = (entry: KnowledgeEntry | ContactEntry | NoteEntry) => {
+    setEditingEntry(entry);
+    if ('name' in entry) {
+      // Contact
+      setEditContactName(entry.name);
+      setEditContactRole(entry.role);
+      setEditContactCompany(entry.company);
+      setEditContactLocation(entry.location);
+      setEditContactPhone(entry.phone || '');
+      setEditContactEmail(entry.email || '');
+      setEditContactNotes(entry.notes || '');
+    } else {
+      // Knowledge entry (procedure, location, note)
+      setEditTitle(entry.title);
+      setEditContent(entry.content);
+      if ('subcategory' in entry) setEditSubcategory(entry.subcategory || '');
+      if ('location' in entry) setEditLocation(entry.location || '');
+      setEditTags(entry.tags.join(', '));
+    }
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingEntry) return;
+
+    try {
+      if ('name' in editingEntry) {
+        // Update contact
+        const res = await fetch(`${API_URL}/api/knowledge/contacts/${editingEntry.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: editContactName,
+            role: editContactRole,
+            company: editContactCompany,
+            location: editContactLocation,
+            phone: editContactPhone,
+            email: editContactEmail,
+            notes: editContactNotes,
+            tags: editingEntry.tags,
+          }),
+        });
+
+        if (res.ok) {
+          const updated = await res.json();
+          setContacts(prev => prev.map(c => c.id === updated.id ? updated : c));
+          setSelectedEntry(updated);
+        }
+      } else {
+        // Update knowledge entry
+        const res = await fetch(`${API_URL}/api/knowledge/entries/${editingEntry.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: editTitle,
+            content: editContent,
+            subcategory: editSubcategory,
+            location: editLocation,
+            tags: editTags.split(',').map(t => t.trim()).filter(t => t),
+          }),
+        });
+
+        if (res.ok) {
+          const updated = await res.json();
+          if ('category' in editingEntry) {
+            if (editingEntry.category === 'PROCEDURE') {
+              setProcedures(prev => prev.map(p => p.id === updated.id ? updated : p));
+            } else if (editingEntry.category === 'LOCATION') {
+              setLocations(prev => prev.map(l => l.id === updated.id ? updated : l));
+            } else if (editingEntry.category === 'NOTE') {
+              setNotes(prev => prev.map(n => n.id === updated.id ? updated : n));
+            }
+          }
+          setSelectedEntry(updated);
+        }
+      }
+    } catch (error) {
+      console.error('Error updating entry:', error);
+    }
+
+    setEditingEntry(null);
+  };
+
+  const handleDeleteEntry = async () => {
+    if (!deleteConfirm) return;
+
+    try {
+      if ('name' in deleteConfirm) {
+        // Delete contact
+        await fetch(`${API_URL}/api/knowledge/contacts/${deleteConfirm.id}`, { method: 'DELETE' });
+        setContacts(prev => prev.filter(c => c.id !== deleteConfirm.id));
+      } else {
+        // Delete knowledge entry
+        await fetch(`${API_URL}/api/knowledge/entries/${deleteConfirm.id}`, { method: 'DELETE' });
+        if ('category' in deleteConfirm) {
+          if (deleteConfirm.category === 'PROCEDURE') {
+            setProcedures(prev => prev.filter(p => p.id !== deleteConfirm.id));
+          } else if (deleteConfirm.category === 'LOCATION') {
+            setLocations(prev => prev.filter(l => l.id !== deleteConfirm.id));
+          } else if (deleteConfirm.category === 'NOTE') {
+            setNotes(prev => prev.filter(n => n.id !== deleteConfirm.id));
+          }
+        }
+      }
+      // Clear selected entry if it was the deleted one
+      if (selectedEntry?.id === deleteConfirm.id) {
+        setSelectedEntry(null);
+      }
+    } catch (error) {
+      console.error('Error deleting entry:', error);
+    }
+
+    setDeleteConfirm(null);
   };
 
   const handleQuickAddSubmit = async (e: React.FormEvent) => {
@@ -557,6 +692,14 @@ const KnowledgeBase: React.FC = () => {
       </div>
 
       {/* Content Area */}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-24">
+          <div className="flex flex-col items-center gap-4">
+            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-paragon"></div>
+            <span className="text-xs text-slate-400 uppercase tracking-widest">Loading knowledge base...</span>
+          </div>
+        </div>
+      ) : (
       <div className="grid grid-cols-12 gap-6">
         <div className={selectedEntry ? 'col-span-7' : 'col-span-12'}>
           {/* Procedures Tab */}
@@ -720,16 +863,22 @@ const KnowledgeBase: React.FC = () => {
                 <h3 className="text-xs font-bold uppercase tracking-widest text-paragon">Details</h3>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => {
-                      // TODO: Implement edit functionality with backend
-                      console.log('Edit entry:', selectedEntry.id);
-                    }}
+                    onClick={() => handleEditEntry(selectedEntry)}
                     className="flex items-center gap-1 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-500 hover:text-paragon hover:bg-slate-50 rounded transition-colors"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                     </svg>
                     Edit
+                  </button>
+                  <button
+                    onClick={() => setDeleteConfirm(selectedEntry)}
+                    className="flex items-center gap-1 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    Delete
                   </button>
                   <button onClick={() => setSelectedEntry(null)} className="text-slate-400 hover:text-slate-600 text-lg">&times;</button>
                 </div>
@@ -821,11 +970,12 @@ const KnowledgeBase: React.FC = () => {
           </div>
         )}
       </div>
+      )}
 
       {/* Quick Add Modal */}
       {showQuickAdd && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div ref={quickAddRef} className="bg-white w-full max-w-lg max-h-[80vh] flex flex-col rounded-sm shadow-2xl">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fadeIn">
+          <div ref={quickAddRef} className="bg-white w-full max-w-lg max-h-[80vh] flex flex-col rounded-sm shadow-2xl animate-zoomIn">
             <div className="p-4 border-b border-slate-200 flex justify-between items-center">
               <div className="flex items-center gap-2">
                 {quickAddCategory && (
@@ -1151,6 +1301,242 @@ const KnowledgeBase: React.FC = () => {
                 </button>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {editingEntry && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fadeIn"
+          onClick={() => setEditingEntry(null)}
+        >
+          <div
+            ref={editModalRef}
+            className="bg-white w-full max-w-lg max-h-[80vh] flex flex-col rounded-sm shadow-2xl animate-zoomIn"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-4 border-b border-slate-200 flex justify-between items-center">
+              <h2 className="font-cinzel text-lg font-bold">
+                {'name' in editingEntry ? 'Edit Contact' : 'Edit Entry'}
+              </h2>
+              <button onClick={() => setEditingEntry(null)} className="text-slate-400 hover:text-slate-600 text-xl">&times;</button>
+            </div>
+
+            {'name' in editingEntry ? (
+              // Contact edit form
+              <form onSubmit={handleSaveEdit} className="p-4 flex-1 overflow-y-auto">
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Name *</label>
+                    <input
+                      type="text"
+                      value={editContactName}
+                      onChange={(e) => setEditContactName(e.target.value)}
+                      className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Role *</label>
+                    <input
+                      type="text"
+                      value={editContactRole}
+                      onChange={(e) => setEditContactRole(e.target.value)}
+                      className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Company *</label>
+                    <input
+                      type="text"
+                      value={editContactCompany}
+                      onChange={(e) => setEditContactCompany(e.target.value)}
+                      className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Location *</label>
+                    <input
+                      type="text"
+                      value={editContactLocation}
+                      onChange={(e) => setEditContactLocation(e.target.value)}
+                      className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Phone</label>
+                    <input
+                      type="tel"
+                      value={editContactPhone}
+                      onChange={(e) => setEditContactPhone(e.target.value)}
+                      className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Email</label>
+                    <input
+                      type="email"
+                      value={editContactEmail}
+                      onChange={(e) => setEditContactEmail(e.target.value)}
+                      className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                    />
+                  </div>
+                </div>
+                <div className="mb-4">
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Notes</label>
+                  <textarea
+                    value={editContactNotes}
+                    onChange={(e) => setEditContactNotes(e.target.value)}
+                    className="w-full p-3 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm resize-none h-24"
+                  />
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setEditingEntry(null)}
+                    className="flex-1 py-3 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-sm"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-3 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-sm"
+                  >
+                    Save Changes
+                  </button>
+                </div>
+              </form>
+            ) : (
+              // Knowledge entry edit form
+              <form onSubmit={handleSaveEdit} className="p-4 flex-1 overflow-y-auto">
+                <div className="mb-4">
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Title *</label>
+                  <input
+                    type="text"
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                    required
+                  />
+                </div>
+                {'category' in editingEntry && editingEntry.category === 'PROCEDURE' && (
+                  <div className="mb-4">
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Subcategory</label>
+                    <select
+                      value={editSubcategory}
+                      onChange={(e) => setEditSubcategory(e.target.value)}
+                      className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                    >
+                      <option value="">Select subcategory</option>
+                      <option value="Hotels">Hotels</option>
+                      <option value="Aviation">Aviation</option>
+                      <option value="Client Management">Client Management</option>
+                      <option value="Policies">Policies</option>
+                      <option value="General">General</option>
+                    </select>
+                  </div>
+                )}
+                {'category' in editingEntry && editingEntry.category === 'LOCATION' && (
+                  <div className="mb-4">
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Location</label>
+                    <input
+                      type="text"
+                      value={editLocation}
+                      onChange={(e) => setEditLocation(e.target.value)}
+                      placeholder="E.g., 'Monaco'"
+                      className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                    />
+                  </div>
+                )}
+                <div className="mb-4">
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Content *</label>
+                  <textarea
+                    value={editContent}
+                    onChange={(e) => setEditContent(e.target.value)}
+                    className="w-full p-3 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm resize-none h-32"
+                    required
+                  />
+                </div>
+                <div className="mb-4">
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Tags (comma separated)</label>
+                  <input
+                    type="text"
+                    value={editTags}
+                    onChange={(e) => setEditTags(e.target.value)}
+                    className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                  />
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setEditingEntry(null)}
+                    className="flex-1 py-3 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-sm"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-3 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-sm"
+                  >
+                    Save Changes
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          onClick={() => setDeleteConfirm(null)}
+        >
+          <div
+            className="bg-white rounded-sm shadow-2xl w-full max-w-sm mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                  <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    Delete {'name' in deleteConfirm ? 'Contact' : 'Entry'}
+                  </h3>
+                  <p className="text-xs text-slate-500">This action cannot be undone</p>
+                </div>
+              </div>
+              <p className="text-sm text-slate-600 mb-6">
+                Are you sure you want to delete "{'name' in deleteConfirm ? deleteConfirm.name : deleteConfirm.title}"? This will permanently remove it from the knowledge base.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDeleteConfirm(null)}
+                  className="flex-1 py-2.5 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteEntry}
+                  className="flex-1 py-2.5 bg-red-600 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-red-700 transition-colors rounded-sm"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

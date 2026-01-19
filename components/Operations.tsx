@@ -946,7 +946,7 @@ const Operations: React.FC<OperationsProps> = ({
 
         {selectedElementId && (
           <div className="col-span-4 sticky top-20 h-fit">
-            <div className="bg-white border border-slate-200 p-6 rounded-sm shadow-lg animate-in slide-in-from-right-4 duration-300">
+            <div className="bg-white border border-slate-200 p-6 rounded-sm shadow-lg animate-slideUp">
               <div className="flex justify-between items-center mb-4">
                  <h3 className="text-xs font-bold uppercase tracking-widest text-paragon">Collaboration Panel</h3>
                  <button onClick={() => setSelectedElementId(null)} className="text-slate-400 hover:text-slate-600">&times;</button>
@@ -970,11 +970,11 @@ const Operations: React.FC<OperationsProps> = ({
       {/* Convert Modal */}
       {showConvertModal && convertingRequest && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-fadeIn"
           onClick={closeConvertModal}
         >
           <div
-            className="bg-white rounded-sm shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto"
+            className="bg-white rounded-sm shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto animate-zoomIn"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-6 border-b border-slate-200">
@@ -1375,11 +1375,11 @@ const Operations: React.FC<OperationsProps> = ({
       {/* Edit Modal */}
       {showEditModal && editingItem && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-fadeIn"
           onClick={closeEditModal}
         >
           <div
-            className="bg-white rounded-sm shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto"
+            className="bg-white rounded-sm shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto animate-zoomIn"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-6 border-b border-slate-200">
@@ -1746,11 +1746,11 @@ const Operations: React.FC<OperationsProps> = ({
       {/* Pipeline Trip Modal */}
       {showPipelineModal && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-fadeIn"
           onClick={closePipelineModal}
         >
           <div
-            className="bg-white rounded-sm shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto"
+            className="bg-white rounded-sm shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto animate-zoomIn"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-6 border-b border-slate-200">
@@ -1979,11 +1979,11 @@ const Operations: React.FC<OperationsProps> = ({
       {/* View Trip Modal */}
       {viewingTrip && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-fadeIn"
           onClick={() => setViewingTrip(null)}
         >
           <div
-            className="bg-white rounded-sm shadow-2xl w-full max-w-xl mx-4 max-h-[90vh] overflow-y-auto"
+            className="bg-white rounded-sm shadow-2xl w-full max-w-xl mx-4 max-h-[90vh] overflow-y-auto animate-zoomIn"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -2145,11 +2145,11 @@ const Operations: React.FC<OperationsProps> = ({
       {/* Dispatch Modal (NEW ELEMENT) */}
       {showDispatchModal && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-fadeIn"
           onClick={closeDispatchModal}
         >
           <div
-            className="bg-white rounded-sm shadow-2xl w-full max-w-2xl mx-4 max-h-[85vh] flex flex-col"
+            className="bg-white rounded-sm shadow-2xl w-full max-w-2xl mx-4 max-h-[85vh] flex flex-col animate-zoomIn"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-6 border-b border-slate-200 flex-shrink-0">

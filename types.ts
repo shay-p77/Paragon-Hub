@@ -126,6 +126,7 @@ export interface Comment {
   text: string;
   timestamp: string;
   parentId: string; // ID of the flight, hotel, trip, or request
+  isPinned?: boolean; // Whether the comment is pinned (max 2 per post)
 }
 
 export interface Notification {
@@ -144,7 +145,9 @@ export interface Announcement {
   content: string;
   priority: 'LOW' | 'NORMAL' | 'HIGH';
   author: string;
+  authorId?: string;
   date: string;
+  isPinned?: boolean; // Whether the post is pinned (max 2 total)
 }
 
 // Converted element types (after completing a request)

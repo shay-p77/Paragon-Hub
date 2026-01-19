@@ -12,7 +12,10 @@ interface HomeProps {
   onAddComment?: (text: string, parentId: string) => void;
   onDeleteComment?: (commentId: string) => void;
   onAddAnnouncement?: (announcement: Omit<Announcement, 'id' | 'date' | 'author'>) => void;
+  onEditAnnouncement?: (id: string, updates: { title: string; content: string; priority: 'LOW' | 'NORMAL' | 'HIGH' }) => void;
   onDeleteAnnouncement?: (announcementId: string) => void;
+  onPinAnnouncement?: (id: string) => Promise<void>;
+  onPinComment?: (commentId: string) => Promise<void>;
   onAddRequest?: (req: any) => void;
   onDeleteRequest?: (requestId: string) => void;
   requests?: BookingRequest[];
@@ -50,7 +53,7 @@ const WorldClock: React.FC = () => {
   );
 };
 
-const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], onAddComment, onDeleteComment, onAddAnnouncement, onDeleteAnnouncement, onAddRequest, onDeleteRequest, requests = [], googleUser }) => {
+const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], onAddComment, onDeleteComment, onAddAnnouncement, onEditAnnouncement, onDeleteAnnouncement, onPinAnnouncement, onPinComment, onAddRequest, onDeleteRequest, requests = [], googleUser }) => {
   const [chatMessage, setChatMessage] = useState('');
   const [messages, setMessages] = useState([
     { id: 1, user: 'Elena Vance', text: 'Anyone have a driver contact for Courchevel tonight?', time: '09:42' },
@@ -75,6 +78,29 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
 
   // Delete confirmation state
   const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'post' | 'comment' | 'request'; id: string } | null>(null);
+
+  // Edit announcement state
+  const [editingAnnouncement, setEditingAnnouncement] = useState<Announcement | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editContent, setEditContent] = useState('');
+  const [editPriority, setEditPriority] = useState<'LOW' | 'NORMAL' | 'HIGH'>('NORMAL');
+
+  // Saving states for buttons
+  const [isSavingPost, setIsSavingPost] = useState(false);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [isSavingRequest, setIsSavingRequest] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Error toast state
+  const [errorToast, setErrorToast] = useState<string | null>(null);
+
+  // Auto-dismiss error toast after 5 seconds
+  useEffect(() => {
+    if (errorToast) {
+      const timer = setTimeout(() => setErrorToast(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [errorToast]);
 
   // On Duty expanded state
   const [onDutyExpanded, setOnDutyExpanded] = useState(false);
@@ -242,22 +268,57 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
         if (showCreateModal) setShowCreateModal(false);
         if (showQuickAdd) setShowQuickAdd(false);
         if (deleteConfirm) setDeleteConfirm(null);
+        if (editingAnnouncement) setEditingAnnouncement(null);
       }
     };
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
-  }, [showCreateModal, showQuickAdd, deleteConfirm]);
+  }, [showCreateModal, showQuickAdd, deleteConfirm, editingAnnouncement]);
 
-  const handleConfirmDelete = () => {
-    if (!deleteConfirm) return;
-    if (deleteConfirm.type === 'post' && onDeleteAnnouncement) {
-      onDeleteAnnouncement(deleteConfirm.id);
-    } else if (deleteConfirm.type === 'comment' && onDeleteComment) {
-      onDeleteComment(deleteConfirm.id);
-    } else if (deleteConfirm.type === 'request' && onDeleteRequest) {
-      onDeleteRequest(deleteConfirm.id);
+  const handleEditAnnouncement = (announcement: Announcement) => {
+    setEditingAnnouncement(announcement);
+    setEditTitle(announcement.title);
+    setEditContent(announcement.content);
+    setEditPriority(announcement.priority);
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingAnnouncement || !editTitle.trim() || !editContent.trim()) return;
+    if (onEditAnnouncement) {
+      setIsSavingEdit(true);
+      try {
+        await onEditAnnouncement(editingAnnouncement.id, {
+          title: editTitle,
+          content: editContent,
+          priority: editPriority,
+        });
+        setEditingAnnouncement(null);
+      } catch (error) {
+        setErrorToast('Failed to save changes. Please try again.');
+      } finally {
+        setIsSavingEdit(false);
+      }
     }
-    setDeleteConfirm(null);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteConfirm) return;
+    setIsDeleting(true);
+    try {
+      if (deleteConfirm.type === 'post' && onDeleteAnnouncement) {
+        await onDeleteAnnouncement(deleteConfirm.id);
+      } else if (deleteConfirm.type === 'comment' && onDeleteComment) {
+        await onDeleteComment(deleteConfirm.id);
+      } else if (deleteConfirm.type === 'request' && onDeleteRequest) {
+        await onDeleteRequest(deleteConfirm.id);
+      }
+      setDeleteConfirm(null);
+    } catch (error) {
+      setErrorToast('Failed to delete. Please try again.');
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleSendMessage = (e: React.FormEvent) => {
@@ -272,66 +333,86 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
     setChatMessage('');
   };
 
-  const handleCreatePost = (e: React.FormEvent) => {
+  const handleCreatePost = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPostTitle.trim() || !newPostContent.trim()) return;
     if (onAddAnnouncement) {
-      onAddAnnouncement({
-        title: newPostTitle,
-        content: newPostContent,
-        priority: newPostPriority
-      });
+      setIsSavingPost(true);
+      try {
+        await onAddAnnouncement({
+          title: newPostTitle,
+          content: newPostContent,
+          priority: newPostPriority
+        });
+        setNewPostTitle('');
+        setNewPostContent('');
+        setNewPostPriority('NORMAL');
+        setShowCreateModal(false);
+      } catch (error) {
+        setErrorToast('Failed to create post. Please try again.');
+      } finally {
+        setIsSavingPost(false);
+      }
     }
-    setNewPostTitle('');
-    setNewPostContent('');
-    setNewPostPriority('NORMAL');
-    setShowCreateModal(false);
   };
 
-  const handleQuickAddSubmit = (e: React.FormEvent) => {
+  const handleQuickAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!onAddRequest) return;
 
     const agentId = googleUser?.id || currentUser.id;
     const agentName = googleUser?.name || currentUser.name;
 
-    if (requestMode === 'QUICK') {
-      if (!quickSnippet.trim()) return;
-      onAddRequest({
-        agentId,
-        clientId: '',
-        type: 'GENERAL',
-        status: 'PENDING',
-        priority: requestPriority,
-        notes: quickSnippet,
-        timestamp: new Date().toISOString(),
-        details: {
-          agentName
+    setIsSavingRequest(true);
+    try {
+      if (requestMode === 'QUICK') {
+        if (!quickSnippet.trim()) {
+          setIsSavingRequest(false);
+          return;
         }
-      });
-      setQuickSnippet('');
-    } else {
-      if (!detailClientName.trim() || !detailSpecs.trim()) return;
-      onAddRequest({
-        agentId,
-        clientId: '',
-        type: detailServiceType,
-        status: 'PENDING',
-        priority: requestPriority,
-        notes: detailSpecs,
-        timestamp: new Date().toISOString(),
-        details: {
-          clientName: detailClientName,
-          targetDate: detailTargetDate,
-          agentName
+        await onAddRequest({
+          agentId,
+          clientId: '',
+          type: 'GENERAL',
+          status: 'PENDING',
+          priority: requestPriority,
+          notes: quickSnippet,
+          timestamp: new Date().toISOString(),
+          details: {
+            agentName
+          }
+        });
+        setQuickSnippet('');
+      } else {
+        if (!detailClientName.trim() || !detailSpecs.trim()) {
+          setIsSavingRequest(false);
+          return;
         }
-      });
-      setDetailClientName('');
-      setDetailTargetDate('');
-      setDetailSpecs('');
+        await onAddRequest({
+          agentId,
+          clientId: '',
+          type: detailServiceType,
+          status: 'PENDING',
+          priority: requestPriority,
+          notes: detailSpecs,
+          timestamp: new Date().toISOString(),
+          details: {
+            clientName: detailClientName,
+            targetDate: detailTargetDate,
+            agentName
+          }
+        });
+        setDetailClientName('');
+        setDetailTargetDate('');
+        setDetailSpecs('');
+      }
+      setRequestPriority('NORMAL');
+      setShowQuickAdd(false);
+    } catch (error) {
+      setErrorToast('Failed to submit request. Please try again.');
+    } finally {
+      setIsSavingRequest(false);
     }
-    setRequestPriority('NORMAL');
-    setShowQuickAdd(false);
   };
 
   return (
@@ -371,7 +452,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
             </button>
 
             {showStatusDropdown && (
-              <div className="absolute right-0 mt-2 w-48 bg-white border border-slate-200 rounded-sm shadow-lg z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+              <div className="absolute right-0 mt-2 w-48 bg-white border border-slate-200 rounded-sm shadow-lg z-50 animate-slideUp">
                 <div className="py-1">
                   <button
                     onClick={() => updateUserStatus('AVAILABLE')}
@@ -469,7 +550,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
             </button>
 
             {onDutyExpanded && (
-              <div className="bg-white border border-t-0 border-slate-200 rounded-b-sm shadow-sm p-6 animate-in slide-in-from-top-2 duration-200">
+              <div className="bg-white border border-t-0 border-slate-200 rounded-b-sm shadow-sm p-6 animate-slideUp">
                 {onDutyUsers.length === 0 ? (
                   <p className="text-sm text-slate-400 text-center py-4">No team members currently on duty</p>
                 ) : (
@@ -584,9 +665,17 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                     </div>
                     <button
                       type="submit"
-                      className="mt-4 w-full bg-paragon-gold text-slate-900 py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-amber-500 transition-colors flex-shrink-0 rounded-sm"
+                      disabled={isSavingRequest}
+                      className="mt-4 w-full bg-paragon-gold text-slate-900 py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-amber-500 transition-colors flex-shrink-0 rounded-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
-                      Confirm Quick Request
+                      {isSavingRequest ? (
+                        <>
+                          <div className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-slate-900"></div>
+                          Submitting...
+                        </>
+                      ) : (
+                        'Confirm Quick Request'
+                      )}
                     </button>
                   </div>
                 ) : (
@@ -665,9 +754,17 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                     </div>
                     <button
                       type="submit"
-                      className="w-full bg-paragon-gold text-slate-900 py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-amber-500 transition-colors flex-shrink-0 rounded-sm"
+                      disabled={isSavingRequest}
+                      className="w-full bg-paragon-gold text-slate-900 py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-amber-500 transition-colors flex-shrink-0 rounded-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
-                      Confirm Detailed Request
+                      {isSavingRequest ? (
+                        <>
+                          <div className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-slate-900"></div>
+                          Submitting...
+                        </>
+                      ) : (
+                        'Confirm Detailed Request'
+                      )}
                     </button>
                   </div>
                 )}
@@ -683,19 +780,58 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                 <button onClick={() => setShowCreateModal(true)} className="text-[10px] font-bold text-paragon hover:underline uppercase tracking-widest">+ Post</button>
               </div>
               <div className="space-y-4 flex-1 overflow-y-auto pr-2">
-                {announcements.map(a => {
+                {announcements.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <svg className="w-12 h-12 text-slate-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+                    </svg>
+                    <p className="text-xs text-slate-400 font-semibold uppercase tracking-widest mb-1">No Posts Yet</p>
+                    <p className="text-[10px] text-slate-400">Be the first to share an update with the team</p>
+                  </div>
+                ) : (
+                announcements.map(a => {
                   const announcementComments = comments.filter(c => c.parentId === a.id);
                   const isExpanded = expandedAnnouncement === a.id;
 
                   const isOwnPost = googleUser ? a.author === googleUser.name : a.author === currentUser.name;
 
                   return (
-                   <div key={a.id} className={`border-l-2 ${a.priority === 'HIGH' ? 'border-red-500 bg-red-50' : 'border-paragon bg-slate-50'} rounded-r-sm group`}>
+                   <div key={a.id} className={`border-l-2 ${a.isPinned ? 'border-amber-500 bg-amber-50' : a.priority === 'HIGH' ? 'border-red-500 bg-red-50' : 'border-paragon bg-slate-50'} rounded-r-sm group`}>
                       <div className="p-4">
                         <div className="flex justify-between items-start mb-1">
-                          <h3 className="text-xs font-bold text-slate-900 leading-tight">{a.title}</h3>
+                          <div className="flex items-center gap-1.5">
+                            {a.isPinned && (
+                              <svg className="w-3 h-3 text-amber-500 flex-shrink-0 rotate-45" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M16 4a1 1 0 01.117 1.993L16 6h-.67l-.46 4.61a3 3 0 012.093 2.543L17 13.4V15h-4v6a1 1 0 01-2 0v-6H7v-1.6a3 3 0 011.963-2.815l.084-.024L8.587 6H8a1 1 0 01-.117-1.993L8 4h8z" />
+                              </svg>
+                            )}
+                            <h3 className="text-xs font-bold text-slate-900 leading-tight">{a.title}</h3>
+                          </div>
                           <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                            {a.isPinned && <Badge color="gold">PINNED</Badge>}
                             <Badge color={a.priority === 'HIGH' ? 'red' : 'teal'}>{a.priority}</Badge>
+                            {isOwnPost && onPinAnnouncement && (
+                              <button
+                                onClick={() => onPinAnnouncement(a.id)}
+                                className={`${a.isPinned ? 'text-amber-500' : 'text-slate-400 hover:text-amber-500 opacity-0 group-hover:opacity-100'} transition-opacity`}
+                                title={a.isPinned ? 'Unpin post' : 'Pin post'}
+                              >
+                                <svg className="w-3.5 h-3.5 rotate-45" fill={a.isPinned ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                  <path d="M16 4h-8a1 1 0 000 2h.587l.46 4.61a3 3 0 00-2.047 2.79v1.6h4v6a1 1 0 002 0v-6h4v-1.6a3 3 0 00-2.047-2.79L14.413 6H15a1 1 0 100-2z" />
+                                </svg>
+                              </button>
+                            )}
+                            {isOwnPost && onEditAnnouncement && (
+                              <button
+                                onClick={() => handleEditAnnouncement(a)}
+                                className="text-slate-400 hover:text-paragon opacity-0 group-hover:opacity-100 transition-opacity"
+                                title="Edit post"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                              </button>
+                            )}
                             {isOwnPost && onDeleteAnnouncement && (
                               <button
                                 onClick={() => setDeleteConfirm({ type: 'post', id: a.id })}
@@ -759,25 +895,48 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                                 const authorInitial = displayName.charAt(0);
                                 const avatarColor = c.authorAvatarColor || '#94a3b8';
                                 return (
-                                  <div key={c.id} className="flex gap-2 group">
-                                    <div
-                                      className="w-5 h-5 rounded-full flex items-center justify-center text-[7px] font-bold flex-shrink-0 text-white"
-                                      style={{ backgroundColor: avatarColor }}
-                                    >
-                                      {authorInitial}
+                                  <div key={c.id} className={`flex gap-2 group ${c.isPinned ? 'bg-amber-50 -mx-3 px-3 py-1.5 rounded-sm' : ''}`}>
+                                    <div className="relative">
+                                      <div
+                                        className="w-5 h-5 rounded-full flex items-center justify-center text-[7px] font-bold flex-shrink-0 text-white"
+                                        style={{ backgroundColor: avatarColor }}
+                                      >
+                                        {authorInitial}
+                                      </div>
+                                      {c.isPinned && (
+                                        <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-500 rounded-full flex items-center justify-center">
+                                          <svg className="w-1.5 h-1.5 text-white rotate-45" fill="currentColor" viewBox="0 0 24 24">
+                                            <path d="M16 4h-8a1 1 0 000 2h.587l.46 4.61a3 3 0 00-2.047 2.79v1.6h4v6a1 1 0 002 0v-6h4v-1.6a3 3 0 00-2.047-2.79L14.413 6H15a1 1 0 100-2z" />
+                                          </svg>
+                                        </div>
+                                      )}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                        <div className="flex gap-1 items-center mb-0.5">
                                           <span className="text-[9px] font-bold text-slate-900 truncate">{displayName}</span>
-                                          {isOwnComment && onDeleteComment && (
-                                            <button
-                                              onClick={() => setDeleteConfirm({ type: 'comment', id: c.id })}
-                                              className="ml-auto text-[8px] text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                                              title="Delete comment"
-                                            >
-                                              ✕
-                                            </button>
-                                          )}
+                                          {c.isPinned && <span className="text-[7px] font-bold text-amber-600 uppercase">Pinned</span>}
+                                          <div className="ml-auto flex items-center gap-1">
+                                            {isOwnPost && onPinComment && (
+                                              <button
+                                                onClick={() => onPinComment(c.id)}
+                                                className={`text-[8px] ${c.isPinned ? 'text-amber-500' : 'text-slate-400 hover:text-amber-500 opacity-0 group-hover:opacity-100'} transition-opacity`}
+                                                title={c.isPinned ? 'Unpin comment' : 'Pin comment'}
+                                              >
+                                                <svg className="w-2.5 h-2.5 rotate-45" fill={c.isPinned ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                                  <path d="M16 4h-8a1 1 0 000 2h.587l.46 4.61a3 3 0 00-2.047 2.79v1.6h4v6a1 1 0 002 0v-6h4v-1.6a3 3 0 00-2.047-2.79L14.413 6H15a1 1 0 100-2z" />
+                                                </svg>
+                                              </button>
+                                            )}
+                                            {isOwnComment && onDeleteComment && (
+                                              <button
+                                                onClick={() => setDeleteConfirm({ type: 'comment', id: c.id })}
+                                                className="text-[8px] text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                title="Delete comment"
+                                              >
+                                                ✕
+                                              </button>
+                                            )}
+                                          </div>
                                        </div>
                                        <div className="text-[10px] text-slate-700 leading-snug">
                                           <span
@@ -844,7 +1003,8 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                       )}
                    </div>
                   );
-                })}
+                })
+                )}
               </div>
            </div>
         </div>
@@ -908,11 +1068,11 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
       {/* Create Post Modal */}
       {showCreateModal && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-in fade-in duration-200"
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-fadeIn"
           onClick={() => setShowCreateModal(false)}
         >
           <div
-            className="bg-white rounded-sm shadow-2xl w-full max-w-lg mx-4 animate-in zoom-in-95 duration-200"
+            className="bg-white rounded-sm shadow-2xl w-full max-w-lg mx-4 animate-zoomIn"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-6 border-b border-slate-200">
@@ -984,9 +1144,17 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-3 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-sm"
+                  disabled={isSavingPost}
+                  className="flex-1 py-3 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  Create Post
+                  {isSavingPost ? (
+                    <>
+                      <div className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-white"></div>
+                      Saving...
+                    </>
+                  ) : (
+                    'Create Post'
+                  )}
                 </button>
               </div>
             </form>
@@ -997,11 +1165,11 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-in fade-in duration-200"
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-fadeIn"
           onClick={() => setDeleteConfirm(null)}
         >
           <div
-            className="bg-white rounded-sm shadow-2xl w-full max-w-sm mx-4 animate-in zoom-in-95 duration-200"
+            className="bg-white rounded-sm shadow-2xl w-full max-w-sm mx-4 animate-zoomIn"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-6">
@@ -1028,13 +1196,136 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                 </button>
                 <button
                   onClick={handleConfirmDelete}
-                  className="flex-1 py-2.5 bg-red-600 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-red-700 transition-colors rounded-sm"
+                  disabled={isDeleting}
+                  className="flex-1 py-2.5 bg-red-600 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-red-700 transition-colors rounded-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  Delete
+                  {isDeleting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-white"></div>
+                      Deleting...
+                    </>
+                  ) : (
+                    'Delete'
+                  )}
                 </button>
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Edit Announcement Modal */}
+      {editingAnnouncement && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-fadeIn"
+          onClick={() => setEditingAnnouncement(null)}
+        >
+          <div
+            className="bg-white rounded-sm shadow-2xl w-full max-w-lg mx-4 animate-zoomIn"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6 border-b border-slate-200">
+              <div className="flex justify-between items-center">
+                <h3 className="text-sm font-bold uppercase tracking-widest text-slate-900">Edit Post</h3>
+                <button onClick={() => setEditingAnnouncement(null)} className="text-slate-400 hover:text-slate-600 text-xl">&times;</button>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="p-6 space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Title</label>
+                <input
+                  type="text"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className="w-full p-3 border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                  placeholder="Post title..."
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Content</label>
+                <textarea
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  className="w-full p-3 border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm h-32"
+                  placeholder="Post content..."
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Priority</label>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setEditPriority('NORMAL')}
+                    className={`flex-1 py-2 px-4 rounded-sm text-[10px] font-bold uppercase tracking-widest transition-all ${
+                      editPriority === 'NORMAL'
+                        ? 'bg-paragon text-white'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    Normal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditPriority('HIGH')}
+                    className={`flex-1 py-2 px-4 rounded-sm text-[10px] font-bold uppercase tracking-widest transition-all ${
+                      editPriority === 'HIGH'
+                        ? 'bg-red-600 text-white'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    High Priority
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setEditingAnnouncement(null)}
+                  className="flex-1 py-3 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingEdit}
+                  className="flex-1 py-3 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {isSavingEdit ? (
+                    <>
+                      <div className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-white"></div>
+                      Saving...
+                    </>
+                  ) : (
+                    'Save Changes'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Error Toast */}
+      {errorToast && (
+        <div className="fixed bottom-6 right-6 bg-red-600 text-white px-6 py-4 rounded-sm shadow-lg flex items-center gap-3 animate-slideUp z-50">
+          <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span className="text-sm">{errorToast}</span>
+          <button
+            onClick={() => setErrorToast(null)}
+            className="ml-2 text-red-200 hover:text-white"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
       )}
     </div>

@@ -26,6 +26,10 @@ const announcementSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  isPinned: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 module.exports = mongoose.model('Announcement', announcementSchema);
