@@ -631,15 +631,15 @@ const KnowledgeBase: React.FC = () => {
   };
 
   return (
-    <div className="p-8">
-      <div className="flex justify-between items-start mb-8">
+    <div className="p-4 sm:p-6 lg:p-8">
+      <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6 sm:mb-8">
         <div>
-          <h1 className="font-cinzel text-2xl font-bold text-slate-900 tracking-wide">Knowledge Base</h1>
-          <p className="text-xs text-slate-500 mt-1">Business procedures, destination intel, and contact directory</p>
+          <h1 className="font-cinzel text-xl sm:text-2xl font-bold text-slate-900 tracking-wide">Knowledge Base</h1>
+          <p className="text-[10px] sm:text-xs text-slate-500 mt-1">Business procedures, destination intel, and contact directory</p>
         </div>
         <button
           onClick={() => setShowQuickAdd(true)}
-          className="flex items-center gap-2 bg-paragon text-white px-4 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors"
+          className="flex items-center gap-2 bg-paragon text-white px-3 sm:px-4 py-2 text-[9px] sm:text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors w-full sm:w-auto justify-center"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -649,7 +649,7 @@ const KnowledgeBase: React.FC = () => {
       </div>
 
       {/* Search Bar */}
-      <div className="mb-6">
+      <div className="mb-4 sm:mb-6">
         <div className="relative">
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -659,30 +659,31 @@ const KnowledgeBase: React.FC = () => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search procedures, locations, contacts..."
-            className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+            className="w-full pl-10 pr-4 py-2.5 sm:py-3 bg-white border border-slate-200 text-xs sm:text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm"
           />
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-8 border-b border-slate-200 mb-6">
+      <div className="flex gap-3 sm:gap-8 border-b border-slate-200 mb-4 sm:mb-6 overflow-x-auto pb-0 -mb-[1px]">
         {[
-          { id: 'procedures', label: 'PROCEDURES', count: filteredProcedures.length },
-          { id: 'locations', label: 'LOCATIONS', count: filteredLocations.length },
-          { id: 'contacts', label: 'CONTACTS', count: filteredContacts.length },
-          { id: 'notes', label: 'NOTES', count: filteredNotes.length },
+          { id: 'procedures', label: 'PROCS', fullLabel: 'PROCEDURES', count: filteredProcedures.length },
+          { id: 'locations', label: 'LOCS', fullLabel: 'LOCATIONS', count: filteredLocations.length },
+          { id: 'contacts', label: 'CONTACTS', fullLabel: 'CONTACTS', count: filteredContacts.length },
+          { id: 'notes', label: 'NOTES', fullLabel: 'NOTES', count: filteredNotes.length },
         ].map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
-            className={`pb-4 text-xs font-bold tracking-widest transition-all flex items-center gap-2 ${
+            className={`pb-3 sm:pb-4 text-[10px] sm:text-xs font-bold tracking-widest transition-all flex items-center gap-1 sm:gap-2 whitespace-nowrap ${
               activeTab === tab.id
                 ? 'text-paragon border-b-2 border-paragon'
                 : 'text-slate-400 hover:text-slate-600'
             }`}
           >
-            {tab.label}
-            <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${
+            <span className="sm:hidden">{tab.label}</span>
+            <span className="hidden sm:inline">{tab.fullLabel}</span>
+            <span className={`text-[8px] sm:text-[9px] px-1 sm:px-1.5 py-0.5 rounded-full ${
               activeTab === tab.id ? 'bg-paragon text-white' : 'bg-slate-100 text-slate-500'
             }`}>
               {tab.count}
@@ -700,8 +701,8 @@ const KnowledgeBase: React.FC = () => {
           </div>
         </div>
       ) : (
-      <div className="grid grid-cols-12 gap-6">
-        <div className={selectedEntry ? 'col-span-7' : 'col-span-12'}>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
+        <div className={selectedEntry ? 'lg:col-span-7' : 'lg:col-span-12'}>
           {/* Procedures Tab */}
           {activeTab === 'procedures' && (
             <div className="space-y-4">
@@ -857,8 +858,8 @@ const KnowledgeBase: React.FC = () => {
 
         {/* Detail Panel */}
         {selectedEntry && (
-          <div className="col-span-5">
-            <div className="bg-white border border-slate-200 p-6 rounded-sm sticky top-4">
+          <div className="lg:col-span-5">
+            <div className="bg-white border border-slate-200 p-4 sm:p-6 rounded-sm sticky top-4">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-xs font-bold uppercase tracking-widest text-paragon">Details</h3>
                 <div className="flex items-center gap-2">

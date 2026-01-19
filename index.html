@@ -3,7 +3,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Paragon Hub | Enterprise Concierge OS</title>
   <link rel="icon" type="image/jpeg" href="/paragon-favicon.jpg">
   <script src="https://cdn.tailwindcss.com"></script>
@@ -67,6 +67,13 @@
     }
     .animate-slideUp {
       animation: slideInFromBottom 0.3s ease-out forwards;
+    }
+    /* Safe area for iPhone notch/home indicator */
+    .safe-area-bottom {
+      padding-bottom: env(safe-area-inset-bottom, 0);
+    }
+    .safe-area-top {
+      padding-top: env(safe-area-inset-top, 0);
     }
   </style>
   <script>

@@ -502,14 +502,19 @@ const App: React.FC = () => {
     >
       <div className="flex-1 bg-slate-50 overflow-auto flex flex-col relative">
         {/* Top Header/Breadcrumb */}
-        <div className="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-8 sticky top-0 z-10 shadow-sm">
-          <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
-             <span>SYSTEM</span>
-             <span>/</span>
-             <span className="text-slate-900">{activeTab}</span>
+        <div className="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-3 sm:px-8 sticky top-0 z-10 shadow-sm">
+          {/* Mobile: Show logo, Desktop: Show breadcrumb */}
+          <div className="flex items-center gap-2">
+            <h1 className="md:hidden font-cinzel text-lg font-bold tracking-widest text-paragon">PARAGON</h1>
+            <div className="hidden md:flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
+              <span>SYSTEM</span>
+              <span>/</span>
+              <span className="text-slate-900">{activeTab}</span>
+            </div>
           </div>
-          <div className="flex gap-6 items-center">
-             <div className="text-[10px] font-bold text-slate-500 uppercase flex gap-3">
+          <div className="flex gap-2 sm:gap-6 items-center">
+             {/* Role switcher - Hidden on mobile */}
+             <div className="hidden lg:flex text-[10px] font-bold text-slate-500 uppercase gap-3">
                 <span className="text-slate-300">Switch Role:</span>
                 {MOCK_USERS.map(u => (
                    <button
@@ -526,7 +531,7 @@ const App: React.FC = () => {
                    </button>
                 ))}
              </div>
-             <div className="h-8 w-[1px] bg-slate-200"></div>
+             <div className="hidden lg:block h-8 w-[1px] bg-slate-200"></div>
              <div className="relative" ref={notificationRef}>
                 <button
                   onClick={() => setShowNotifications(!showNotifications)}
@@ -549,9 +554,9 @@ const App: React.FC = () => {
              </div>
              <div className="h-8 w-[1px] bg-slate-200"></div>
              {/* User Profile & Logout */}
-             <div className="flex items-center gap-3">
+             <div className="flex items-center gap-2 sm:gap-3">
                 <div
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs"
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs flex-shrink-0"
                   style={{ backgroundColor: googleUser.avatarColor || '#3B82F6' }}
                 >
                   {getInitials(googleUser.name)}

@@ -533,16 +533,16 @@ const Operations: React.FC<OperationsProps> = ({
   ];
 
   return (
-    <div className="p-8">
-      <div className="flex justify-between items-end mb-8 border-b border-slate-200">
-        <div className="flex gap-8">
+    <div className="p-4 sm:p-6 lg:p-8">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 mb-6 sm:mb-8 border-b border-slate-200 pb-4 sm:pb-0">
+        <div className="flex gap-4 sm:gap-8 overflow-x-auto w-full sm:w-auto pb-2 sm:pb-0 -mb-[1px]">
           {tabs.map(t => (
             <button
               key={t.id}
               onClick={() => { setSubTab(t.id); setSelectedElementId(null); }}
-              className={`pb-4 text-xs font-bold tracking-widest transition-all ${
-                subTab === t.id 
-                  ? 'text-paragon border-b-2 border-paragon' 
+              className={`pb-3 sm:pb-4 text-[10px] sm:text-xs font-bold tracking-widest transition-all whitespace-nowrap ${
+                subTab === t.id
+                  ? 'text-paragon border-b-2 border-paragon'
                   : 'text-slate-400 hover:text-slate-600'
               }`}
             >
@@ -550,24 +550,24 @@ const Operations: React.FC<OperationsProps> = ({
             </button>
           ))}
         </div>
-        <div className="pb-3 flex gap-2">
-           <div className="relative">
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] px-1 rounded-full">{requests.filter(r => r.status === 'PENDING').length}</span>
-              <button onClick={() => setSubTab('pending')} className="bg-slate-100 text-slate-600 text-[10px] px-4 py-2 font-bold tracking-widest hover:bg-slate-200 transition-colors">
-                PENDING REQS
+        <div className="flex gap-2 w-full sm:w-auto sm:pb-3">
+           <div className="relative flex-1 sm:flex-initial">
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] px-1 rounded-full z-10">{requests.filter(r => r.status === 'PENDING').length}</span>
+              <button onClick={() => setSubTab('pending')} className="w-full sm:w-auto bg-slate-100 text-slate-600 text-[9px] sm:text-[10px] px-3 sm:px-4 py-2 font-bold tracking-widest hover:bg-slate-200 transition-colors">
+                PENDING
               </button>
            </div>
            <button
              onClick={() => setShowDispatchModal(true)}
-             className="bg-paragon text-white text-[10px] px-4 py-2 font-bold tracking-widest hover:bg-paragon-dark transition-colors"
+             className="flex-1 sm:flex-initial bg-paragon text-white text-[9px] sm:text-[10px] px-3 sm:px-4 py-2 font-bold tracking-widest hover:bg-paragon-dark transition-colors"
            >
-             NEW ELEMENT +
+             NEW +
            </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-12 gap-8">
-        <div className={selectedElementId ? 'col-span-8' : 'col-span-12'}>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 lg:gap-8">
+        <div className={selectedElementId ? 'lg:col-span-8' : 'lg:col-span-12'}>
           {subTab === 'flights' && (
             <div>
               <SectionHeader title="Global Flight Operations" subtitle="Manage commercial and private jet inventory." />
@@ -813,35 +813,35 @@ const Operations: React.FC<OperationsProps> = ({
           {subTab === 'trips' && (
             <div>
               {/* Header */}
-              <div className="flex justify-between items-center mb-6">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 sm:mb-6">
                 <div>
-                  <h2 className="font-cinzel text-xl font-bold text-slate-900 tracking-wide">Concierge Command</h2>
-                  <p className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold mt-1">Unified Operational Control</p>
+                  <h2 className="font-cinzel text-lg sm:text-xl font-bold text-slate-900 tracking-wide">Concierge Command</h2>
+                  <p className="text-[9px] sm:text-[10px] uppercase tracking-widest text-slate-400 font-semibold mt-1">Unified Operational Control</p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 w-full sm:w-auto overflow-x-auto">
                   <button
                     onClick={() => openPipelineModal()}
-                    className="bg-paragon text-white text-[10px] px-5 py-2.5 font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-sm"
+                    className="flex-1 sm:flex-initial bg-paragon text-white text-[9px] sm:text-[10px] px-3 sm:px-5 py-2 sm:py-2.5 font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-sm whitespace-nowrap"
                   >
-                    Request New Booking
+                    New Booking
                   </button>
-                  <button className="bg-slate-800 text-white text-[10px] px-4 py-2.5 font-bold uppercase tracking-widest hover:bg-slate-700 transition-colors rounded-sm">
+                  <button className="hidden sm:block bg-slate-800 text-white text-[10px] px-4 py-2.5 font-bold uppercase tracking-widest hover:bg-slate-700 transition-colors rounded-sm">
                     Pipeline
                   </button>
-                  <button className="bg-slate-100 text-slate-500 text-[10px] px-4 py-2.5 font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-sm">
+                  <button className="hidden sm:block bg-slate-100 text-slate-500 text-[10px] px-4 py-2.5 font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-sm">
                     External Sync
                   </button>
                 </div>
               </div>
 
               {/* Kanban Board */}
-              <div className="grid grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 overflow-x-auto">
                 {pipelineStages.map(stage => {
                   const stageTrips = pipelineTrips.filter(t => t.stage === stage.id);
                   return (
                     <div
                       key={stage.id}
-                      className={`bg-slate-100 p-4 border-t-4 ${stage.color} rounded-sm min-h-[500px] transition-colors ${dragOverStage === stage.id ? 'bg-slate-200 ring-2 ring-paragon ring-opacity-50' : ''}`}
+                      className={`bg-slate-100 p-3 sm:p-4 border-t-4 ${stage.color} rounded-sm min-h-[200px] sm:min-h-[400px] lg:min-h-[500px] transition-colors ${dragOverStage === stage.id ? 'bg-slate-200 ring-2 ring-paragon ring-opacity-50' : ''}`}
                       onDragOver={(e) => handleDragOver(e, stage.id)}
                       onDragLeave={handleDragLeave}
                       onDrop={(e) => handleDrop(e, stage.id)}
@@ -945,8 +945,8 @@ const Operations: React.FC<OperationsProps> = ({
         </div>
 
         {selectedElementId && (
-          <div className="col-span-4 sticky top-20 h-fit">
-            <div className="bg-white border border-slate-200 p-6 rounded-sm shadow-lg animate-slideUp">
+          <div className="lg:col-span-4 sticky top-20 h-fit">
+            <div className="bg-white border border-slate-200 p-4 sm:p-6 rounded-sm shadow-lg animate-slideUp">
               <div className="flex justify-between items-center mb-4">
                  <h3 className="text-xs font-bold uppercase tracking-widest text-paragon">Collaboration Panel</h3>
                  <button onClick={() => setSelectedElementId(null)} className="text-slate-400 hover:text-slate-600">&times;</button>

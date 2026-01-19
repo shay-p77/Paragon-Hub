@@ -42,11 +42,11 @@ const WorldClock: React.FC = () => {
   }, []);
 
   return (
-    <div className="grid grid-cols-5 gap-4 mb-8">
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-4 mb-6 sm:mb-8">
       {Object.entries(times).map(([city, time]) => (
-        <div key={city} className="bg-slate-900 border border-slate-800 p-4 rounded-sm text-center">
-          <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">{city}</div>
-          <div className="text-xl font-mono text-paragon-gold font-bold">{time}</div>
+        <div key={city} className="bg-slate-900 border border-slate-800 p-2 sm:p-4 rounded-sm text-center">
+          <div className="text-[8px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">{city}</div>
+          <div className="text-sm sm:text-xl font-mono text-paragon-gold font-bold">{time}</div>
         </div>
       ))}
     </div>
@@ -416,17 +416,17 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
   };
 
   return (
-    <div className="p-8 max-w-[1600px] mx-auto">
-      <div className="flex justify-between items-start mb-8">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto">
+      <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6 sm:mb-8">
         <div>
-          <h1 className="font-cinzel text-3xl font-bold text-slate-900 uppercase tracking-widest">Command Center</h1>
-          <p className="text-xs text-slate-500 mt-1 uppercase tracking-tight">System Status: <span className="text-emerald-500 font-bold">OPERATIONAL</span> / Active Agents: 14</p>
+          <h1 className="font-cinzel text-xl sm:text-2xl lg:text-3xl font-bold text-slate-900 uppercase tracking-widest">Command Center</h1>
+          <p className="text-[10px] sm:text-xs text-slate-500 mt-1 uppercase tracking-tight">System Status: <span className="text-emerald-500 font-bold">OPERATIONAL</span> / Active Agents: 14</p>
         </div>
-        <div className="flex gap-4">
-          <div className="relative" ref={statusDropdownRef}>
+        <div className="flex gap-4 w-full sm:w-auto">
+          <div className="relative flex-1 sm:flex-initial" ref={statusDropdownRef}>
             <button
               onClick={() => setShowStatusDropdown(!showStatusDropdown)}
-              className="bg-white border border-slate-200 p-4 rounded-sm shadow-sm flex items-center gap-4 hover:border-paragon transition-colors"
+              className="w-full sm:w-auto bg-white border border-slate-200 p-3 sm:p-4 rounded-sm shadow-sm flex items-center gap-3 sm:gap-4 hover:border-paragon transition-colors"
             >
                <div className="relative">
                  <div
@@ -442,11 +442,11 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                    'bg-slate-400'
                  }`}></div>
                </div>
-               <div className="text-left">
+               <div className="text-left flex-1 sm:flex-initial">
                   <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{userStatus}</div>
-                  <div className="text-xs font-bold text-slate-900">{googleUser?.name || currentUser.name}</div>
+                  <div className="text-xs font-bold text-slate-900 truncate max-w-[120px] sm:max-w-none">{googleUser?.name || currentUser.name}</div>
                </div>
-               <svg className={`w-4 h-4 text-slate-400 transition-transform ${showStatusDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+               <svg className={`w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ${showStatusDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
                </svg>
             </button>
@@ -513,62 +513,62 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
         };
 
         return (
-          <div className="mb-8">
+          <div className="mb-6 sm:mb-8">
             <button
               onClick={() => setOnDutyExpanded(!onDutyExpanded)}
-              className="w-full bg-white border border-slate-200 rounded-sm shadow-sm p-4 flex items-center justify-between hover:border-paragon transition-colors"
+              className="w-full bg-white border border-slate-200 rounded-sm shadow-sm p-3 sm:p-4 flex items-center justify-between hover:border-paragon transition-colors"
             >
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
                 <div className="flex items-center gap-2">
                   <div className={`w-2 h-2 rounded-full ${onDutyUsers.length > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></div>
-                  <span className="text-[11px] font-bold uppercase tracking-widest text-slate-900">On Duty Now</span>
+                  <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-widest text-slate-900">On Duty Now</span>
                 </div>
                 <div className="flex -space-x-2">
-                  {onDutyUsers.slice(0, 5).map(user => (
+                  {onDutyUsers.slice(0, 3).map(user => (
                     <div
                       key={user.googleId}
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-[10px] border-2 border-white"
+                      className="w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-white font-bold text-[8px] sm:text-[10px] border-2 border-white"
                       style={{ backgroundColor: user.avatarColor }}
                       title={user.name}
                     >
                       {getInitials(user.name)}
                     </div>
                   ))}
-                  {onDutyUsers.length > 5 && (
-                    <div className="w-8 h-8 rounded-full bg-slate-300 flex items-center justify-center text-slate-600 font-bold text-[10px] border-2 border-white">
-                      +{onDutyUsers.length - 5}
+                  {onDutyUsers.length > 3 && (
+                    <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-slate-300 flex items-center justify-center text-slate-600 font-bold text-[8px] sm:text-[10px] border-2 border-white">
+                      +{onDutyUsers.length - 3}
                     </div>
                   )}
                 </div>
-                <span className="text-[10px] text-slate-400 font-semibold">
+                <span className="text-[9px] sm:text-[10px] text-slate-400 font-semibold hidden sm:inline">
                   {onDutyUsers.length} team member{onDutyUsers.length !== 1 ? 's' : ''} online
                 </span>
               </div>
-              <svg className={`w-4 h-4 text-slate-400 transition-transform ${onDutyExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className={`w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ${onDutyExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
               </svg>
             </button>
 
             {onDutyExpanded && (
-              <div className="bg-white border border-t-0 border-slate-200 rounded-b-sm shadow-sm p-6 animate-slideUp">
+              <div className="bg-white border border-t-0 border-slate-200 rounded-b-sm shadow-sm p-4 sm:p-6 animate-slideUp">
                 {onDutyUsers.length === 0 ? (
                   <p className="text-sm text-slate-400 text-center py-4">No team members currently on duty</p>
                 ) : (
-                  <div className="grid grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                     {onDutyUsers.map(user => (
                       <div key={user.googleId} className="flex items-center gap-3">
-                        <div className="relative">
+                        <div className="relative flex-shrink-0">
                           <div
-                            className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-sm"
+                            className="w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-white font-bold text-xs sm:text-sm"
                             style={{ backgroundColor: user.avatarColor }}
                           >
                             {getInitials(user.name)}
                           </div>
-                          <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full ${getStatusColor(user.status)} border-2 border-white`}></div>
+                          <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full ${getStatusColor(user.status)} border-2 border-white`}></div>
                         </div>
-                        <div>
-                          <div className="text-sm font-bold text-slate-900">{user.name}</div>
-                          <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">{getRoleLabel(user.role)}</div>
+                        <div className="min-w-0">
+                          <div className="text-xs sm:text-sm font-bold text-slate-900 truncate">{user.name}</div>
+                          <div className="text-[9px] sm:text-[10px] uppercase tracking-wider text-slate-400 font-semibold">{getRoleLabel(user.role)}</div>
                         </div>
                       </div>
                     ))}
@@ -580,19 +580,19 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
         );
       })()}
 
-      <div className="grid grid-cols-12 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 lg:gap-8">
         {/* Main Content - Operational Dispatch */}
-        <div className="col-span-8">
+        <div className="lg:col-span-8 order-2 lg:order-1">
            {/* Quick Add Operational Dispatch */}
-           <div className="bg-white border border-slate-200 rounded-sm shadow-sm h-[400px] flex flex-col">
-              <div className="bg-slate-900 p-4 flex items-center justify-between flex-shrink-0">
+           <div className="bg-white border border-slate-200 rounded-sm shadow-sm h-auto lg:h-[400px] flex flex-col">
+              <div className="bg-slate-900 p-3 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0 flex-shrink-0">
                 <div className="flex items-center gap-2">
-                  <svg className="w-5 h-5 text-paragon-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 sm:w-5 sm:h-5 text-paragon-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
                   </svg>
-                  <h3 className="text-xs font-bold uppercase tracking-widest text-paragon-gold">Operational Dispatch</h3>
+                  <h3 className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-paragon-gold">Operational Dispatch</h3>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 w-full sm:w-auto">
                   <button
                     onClick={() => {
                       setRequestMode('QUICK');
@@ -601,7 +601,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                       setDetailTargetDate('');
                       setDetailSpecs('');
                     }}
-                    className={`px-4 py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-sm ${
+                    className={`flex-1 sm:flex-initial px-3 sm:px-4 py-2 text-[9px] sm:text-[10px] font-bold uppercase tracking-widest transition-all rounded-sm ${
                       requestMode === 'QUICK'
                         ? 'bg-paragon-gold text-slate-900'
                         : 'bg-slate-700 text-slate-400 hover:text-white hover:bg-slate-600'
@@ -615,7 +615,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                       // Clear quick field when switching to detail
                       setQuickSnippet('');
                     }}
-                    className={`px-4 py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-sm ${
+                    className={`flex-1 sm:flex-initial px-3 sm:px-4 py-2 text-[9px] sm:text-[10px] font-bold uppercase tracking-widest transition-all rounded-sm ${
                       requestMode === 'DETAIL'
                         ? 'bg-paragon-gold text-slate-900'
                         : 'bg-slate-700 text-slate-400 hover:text-white hover:bg-slate-600'
@@ -626,7 +626,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                 </div>
               </div>
 
-              <form onSubmit={handleQuickAddSubmit} className="p-6 flex-1 flex flex-col overflow-hidden">
+              <form onSubmit={handleQuickAddSubmit} className="p-4 sm:p-6 flex-1 flex flex-col overflow-hidden">
                 {requestMode === 'QUICK' ? (
                   <div className="flex-1 flex flex-col">
                     <textarea
@@ -680,7 +680,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                   </div>
                 ) : (
                   <div className="flex-1 flex flex-col space-y-3">
-                    <div className="grid grid-cols-3 gap-4 flex-shrink-0">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 flex-shrink-0">
                       <div>
                         <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Service Type</label>
                         <select
@@ -773,8 +773,8 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
         </div>
 
         {/* Bulletin Board - Sidebar */}
-        <div className="col-span-4">
-           <div className="bg-white border border-slate-200 p-6 rounded-sm shadow-sm h-[400px] flex flex-col">
+        <div className="lg:col-span-4 order-1 lg:order-2">
+           <div className="bg-white border border-slate-200 p-4 sm:p-6 rounded-sm shadow-sm h-auto max-h-[350px] sm:max-h-[400px] lg:h-[400px] flex flex-col">
               <div className="flex justify-between items-center mb-4 flex-shrink-0">
                 <SectionHeader title="Bulletin Board" />
                 <button onClick={() => setShowCreateModal(true)} className="text-[10px] font-bold text-paragon hover:underline uppercase tracking-widest">+ Post</button>
@@ -1012,7 +1012,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
 
       {/* Inbound Queue (All Pending Requests) */}
       {requests && requests.filter(r => r.status === 'PENDING').length > 0 && (
-        <div className="mt-8 bg-white border border-slate-200 rounded-sm shadow-sm p-6">
+        <div className="mt-6 sm:mt-8 bg-white border border-slate-200 rounded-sm shadow-sm p-4 sm:p-6">
           <div className="flex items-center mb-4">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-amber-500"></div>
@@ -1313,7 +1313,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
 
       {/* Error Toast */}
       {errorToast && (
-        <div className="fixed bottom-6 right-6 bg-red-600 text-white px-6 py-4 rounded-sm shadow-lg flex items-center gap-3 animate-slideUp z-50">
+        <div className="fixed bottom-20 sm:bottom-6 left-4 right-4 sm:left-auto sm:right-6 bg-red-600 text-white px-4 sm:px-6 py-3 sm:py-4 rounded-sm shadow-lg flex items-center gap-3 animate-slideUp z-50">
           <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
