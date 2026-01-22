@@ -110,13 +110,21 @@ const Operations: React.FC<OperationsProps> = ({
 
   // Dispatch modal state (for NEW ELEMENT button)
   const [showDispatchModal, setShowDispatchModal] = useState(false);
-  const [dispatchMode, setDispatchMode] = useState<'QUICK' | 'DETAIL'>('QUICK');
+  const [dispatchMode, setDispatchMode] = useState<'QUICK' | 'DETAIL' | 'AI_PARSE'>('QUICK');
   const [dispatchSnippet, setDispatchSnippet] = useState('');
   const [dispatchServiceType, setDispatchServiceType] = useState<'FLIGHT' | 'HOTEL' | 'LOGISTICS'>('FLIGHT');
   const [dispatchClientName, setDispatchClientName] = useState('');
   const [dispatchTargetDate, setDispatchTargetDate] = useState('');
   const [dispatchSpecs, setDispatchSpecs] = useState('');
   const [dispatchPriority, setDispatchPriority] = useState<'NORMAL' | 'URGENT'>('NORMAL');
+
+  // AI Parse state
+  const [aiParseText, setAiParseText] = useState('');
+  const [aiParsing, setAiParsing] = useState(false);
+  const [aiParseError, setAiParseError] = useState<string | null>(null);
+  const [aiParsedData, setAiParsedData] = useState<any>(null);
+  const [aiParseStep, setAiParseStep] = useState<'input' | 'review'>('input');
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const closeDispatchModal = () => {
     setShowDispatchModal(false);
@@ -127,6 +135,188 @@ const Operations: React.FC<OperationsProps> = ({
     setDispatchTargetDate('');
     setDispatchSpecs('');
     setDispatchPriority('NORMAL');
+    // Reset AI parse state
+    setAiParseText('');
+    setAiParsing(false);
+    setAiParseError(null);
+    setAiParsedData(null);
+    setAiParseStep('input');
+  };
+
+  const API_URL = 'http://localhost:3001';
+
+  // AI Parse functions
+  const handleAiParseText = async () => {
+    if (!aiParseText.trim()) return;
+
+    setAiParsing(true);
+    setAiParseError(null);
+
+    try {
+      const response = await fetch(`${API_URL}/api/parse/text`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: aiParseText }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to parse text');
+      }
+
+      setAiParsedData(result.data);
+      setAiParseStep('review');
+
+      // Pre-fill the detail form based on parsed data
+      if (result.data.bookingType) {
+        setDispatchServiceType(result.data.bookingType as 'FLIGHT' | 'HOTEL' | 'LOGISTICS');
+      }
+      if (result.data.clientName) {
+        setDispatchClientName(result.data.clientName);
+      }
+
+      // Build specs from parsed data
+      let specs = '';
+      if (result.data.bookingType === 'FLIGHT' && result.data.flight) {
+        const f = result.data.flight;
+        specs = [
+          f.pnr ? `PNR: ${f.pnr}` : '',
+          f.airline ? `Airline: ${f.airline}` : '',
+          f.routes ? `Routes: ${f.routes}` : '',
+          f.dates ? `Dates: ${f.dates}` : '',
+          f.passengerCount ? `Passengers: ${f.passengerCount}` : '',
+          f.flightNumbers?.length ? `Flights: ${f.flightNumbers.join(', ')}` : '',
+        ].filter(Boolean).join('\n');
+        if (f.dates) setDispatchTargetDate(f.dates.split(',')[0].trim());
+      } else if (result.data.bookingType === 'HOTEL' && result.data.hotel) {
+        const h = result.data.hotel;
+        specs = [
+          h.confirmationNumber ? `Confirmation: ${h.confirmationNumber}` : '',
+          h.hotelName ? `Hotel: ${h.hotelName}` : '',
+          h.roomType ? `Room: ${h.roomType}` : '',
+          h.checkIn ? `Check-in: ${h.checkIn}` : '',
+          h.checkOut ? `Check-out: ${h.checkOut}` : '',
+          h.guestCount ? `Guests: ${h.guestCount}` : '',
+        ].filter(Boolean).join('\n');
+        if (h.checkIn) setDispatchTargetDate(h.checkIn);
+      } else if (result.data.bookingType === 'LOGISTICS' && result.data.logistics) {
+        const l = result.data.logistics;
+        specs = [
+          l.confirmationNumber ? `Confirmation: ${l.confirmationNumber}` : '',
+          l.serviceType ? `Service: ${l.serviceType}` : '',
+          l.provider ? `Provider: ${l.provider}` : '',
+          l.date ? `Date: ${l.date}` : '',
+          l.time ? `Time: ${l.time}` : '',
+          l.pickupLocation ? `Pickup: ${l.pickupLocation}` : '',
+          l.dropoffLocation ? `Dropoff: ${l.dropoffLocation}` : '',
+        ].filter(Boolean).join('\n');
+        if (l.date) setDispatchTargetDate(l.date);
+      }
+
+      if (result.data.notes) {
+        specs += specs ? `\n\nNotes: ${result.data.notes}` : `Notes: ${result.data.notes}`;
+      }
+
+      setDispatchSpecs(specs);
+
+    } catch (error: any) {
+      setAiParseError(error.message || 'Failed to parse confirmation');
+    } finally {
+      setAiParsing(false);
+    }
+  };
+
+  const handleAiParsePdf = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setAiParsing(true);
+    setAiParseError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('pdf', file);
+
+      const response = await fetch(`${API_URL}/api/parse/pdf`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to parse PDF');
+      }
+
+      setAiParsedData(result.data);
+      setAiParseStep('review');
+
+      // Pre-fill the detail form (same logic as text parse)
+      if (result.data.bookingType) {
+        setDispatchServiceType(result.data.bookingType as 'FLIGHT' | 'HOTEL' | 'LOGISTICS');
+      }
+      if (result.data.clientName) {
+        setDispatchClientName(result.data.clientName);
+      }
+
+      let specs = '';
+      if (result.data.bookingType === 'FLIGHT' && result.data.flight) {
+        const f = result.data.flight;
+        specs = [
+          f.pnr ? `PNR: ${f.pnr}` : '',
+          f.airline ? `Airline: ${f.airline}` : '',
+          f.routes ? `Routes: ${f.routes}` : '',
+          f.dates ? `Dates: ${f.dates}` : '',
+          f.passengerCount ? `Passengers: ${f.passengerCount}` : '',
+          f.flightNumbers?.length ? `Flights: ${f.flightNumbers.join(', ')}` : '',
+        ].filter(Boolean).join('\n');
+        if (f.dates) setDispatchTargetDate(f.dates.split(',')[0].trim());
+      } else if (result.data.bookingType === 'HOTEL' && result.data.hotel) {
+        const h = result.data.hotel;
+        specs = [
+          h.confirmationNumber ? `Confirmation: ${h.confirmationNumber}` : '',
+          h.hotelName ? `Hotel: ${h.hotelName}` : '',
+          h.roomType ? `Room: ${h.roomType}` : '',
+          h.checkIn ? `Check-in: ${h.checkIn}` : '',
+          h.checkOut ? `Check-out: ${h.checkOut}` : '',
+          h.guestCount ? `Guests: ${h.guestCount}` : '',
+        ].filter(Boolean).join('\n');
+        if (h.checkIn) setDispatchTargetDate(h.checkIn);
+      } else if (result.data.bookingType === 'LOGISTICS' && result.data.logistics) {
+        const l = result.data.logistics;
+        specs = [
+          l.confirmationNumber ? `Confirmation: ${l.confirmationNumber}` : '',
+          l.serviceType ? `Service: ${l.serviceType}` : '',
+          l.provider ? `Provider: ${l.provider}` : '',
+          l.date ? `Date: ${l.date}` : '',
+          l.time ? `Time: ${l.time}` : '',
+          l.pickupLocation ? `Pickup: ${l.pickupLocation}` : '',
+          l.dropoffLocation ? `Dropoff: ${l.dropoffLocation}` : '',
+        ].filter(Boolean).join('\n');
+        if (l.date) setDispatchTargetDate(l.date);
+      }
+
+      if (result.data.notes) {
+        specs += specs ? `\n\nNotes: ${result.data.notes}` : `Notes: ${result.data.notes}`;
+      }
+
+      setDispatchSpecs(specs);
+
+    } catch (error: any) {
+      setAiParseError(error.message || 'Failed to parse PDF');
+    } finally {
+      setAiParsing(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleAiParseSubmit = () => {
+    // Switch to detail mode with pre-filled data
+    setDispatchMode('DETAIL');
   };
 
   const handleDispatchSubmit = (e: React.FormEvent) => {
@@ -2165,7 +2355,7 @@ const Operations: React.FC<OperationsProps> = ({
               <div className="flex border border-slate-200 rounded-sm overflow-hidden">
                 <button
                   type="button"
-                  onClick={() => setDispatchMode('QUICK')}
+                  onClick={() => { setDispatchMode('QUICK'); setAiParseStep('input'); }}
                   className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest transition-all ${
                     dispatchMode === 'QUICK'
                       ? 'bg-paragon text-white'
@@ -2176,14 +2366,25 @@ const Operations: React.FC<OperationsProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setDispatchMode('DETAIL')}
+                  onClick={() => { setDispatchMode('AI_PARSE'); setAiParseStep('input'); }}
+                  className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest transition-all ${
+                    dispatchMode === 'AI_PARSE'
+                      ? 'bg-amber-500 text-white'
+                      : 'bg-white text-slate-500 hover:bg-slate-50'
+                  }`}
+                >
+                  AI Parse
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setDispatchMode('DETAIL'); setAiParseStep('input'); }}
                   className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest transition-all ${
                     dispatchMode === 'DETAIL'
                       ? 'bg-paragon text-white'
                       : 'bg-white text-slate-500 hover:bg-slate-50'
                   }`}
                 >
-                  Detailed Request
+                  Detailed
                 </button>
               </div>
             </div>
@@ -2231,6 +2432,195 @@ const Operations: React.FC<OperationsProps> = ({
                   >
                     Submit Request
                   </button>
+                </div>
+              ) : dispatchMode === 'AI_PARSE' ? (
+                <div className="flex-1 flex flex-col">
+                  {aiParseStep === 'input' ? (
+                    <>
+                      {/* AI Parse Input */}
+                      <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-sm">
+                        <div className="flex items-center gap-2 mb-2">
+                          <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                          </svg>
+                          <span className="text-xs font-bold text-amber-800 uppercase tracking-widest">AI-Powered Parsing</span>
+                        </div>
+                        <p className="text-[11px] text-amber-700">
+                          Paste a booking confirmation email or upload a PDF. Our AI will automatically extract flight, hotel, or logistics details.
+                        </p>
+                      </div>
+
+                      <textarea
+                        value={aiParseText}
+                        onChange={(e) => setAiParseText(e.target.value)}
+                        placeholder="Paste your booking confirmation, itinerary, or PNR details here...
+
+Example:
+BOOKING CONFIRMATION
+Confirmation Number: ABC123
+Guest: John Smith
+Hotel: The Ritz-Carlton, New York
+Check-in: January 25, 2026
+Check-out: January 28, 2026
+Room Type: Deluxe King"
+                        className="w-full flex-1 p-4 bg-white border border-slate-300 text-sm text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-amber-400 rounded-sm resize-none min-h-[180px]"
+                      />
+
+                      {aiParseError && (
+                        <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-sm">
+                          <p className="text-xs text-red-700">{aiParseError}</p>
+                        </div>
+                      )}
+
+                      <div className="mt-4 flex gap-3">
+                        <button
+                          type="button"
+                          onClick={handleAiParseText}
+                          disabled={aiParsing || !aiParseText.trim()}
+                          className="flex-1 py-3 bg-amber-500 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-amber-600 transition-colors rounded-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                          {aiParsing ? (
+                            <>
+                              <div className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-white"></div>
+                              Parsing...
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                              </svg>
+                              Parse Text
+                            </>
+                          )}
+                        </button>
+
+                        <input
+                          type="file"
+                          ref={fileInputRef}
+                          accept=".pdf"
+                          onChange={handleAiParsePdf}
+                          className="hidden"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={aiParsing}
+                          className="flex-1 py-3 bg-slate-700 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-slate-800 transition-colors rounded-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                          {aiParsing ? (
+                            <>
+                              <div className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-white"></div>
+                              Parsing...
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                              </svg>
+                              Upload PDF
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {/* AI Parse Review */}
+                      <div className="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-sm">
+                        <div className="flex items-center gap-2 mb-2">
+                          <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <span className="text-xs font-bold text-emerald-800 uppercase tracking-widest">Parsed Successfully</span>
+                          {aiParsedData?.confidence && (
+                            <span className="ml-auto text-[10px] text-emerald-600 font-semibold">{aiParsedData.confidence}% confidence</span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-emerald-700">
+                          Review the extracted information below. Click "Use This Data" to pre-fill the detailed form, or go back to try again.
+                        </p>
+                      </div>
+
+                      <div className="flex-1 overflow-y-auto space-y-3">
+                        <div className="p-3 bg-slate-50 border border-slate-200 rounded-sm">
+                          <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Booking Type</div>
+                          <div className="text-sm font-bold text-slate-900">{aiParsedData?.bookingType || 'Unknown'}</div>
+                        </div>
+
+                        {aiParsedData?.clientName && (
+                          <div className="p-3 bg-slate-50 border border-slate-200 rounded-sm">
+                            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Client Name</div>
+                            <div className="text-sm text-slate-900">{aiParsedData.clientName}</div>
+                          </div>
+                        )}
+
+                        {aiParsedData?.bookingType === 'FLIGHT' && aiParsedData.flight && (
+                          <div className="p-3 bg-blue-50 border border-blue-200 rounded-sm">
+                            <div className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-2">Flight Details</div>
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                              {aiParsedData.flight.pnr && <div><span className="text-slate-500">PNR:</span> <span className="font-mono font-bold">{aiParsedData.flight.pnr}</span></div>}
+                              {aiParsedData.flight.airline && <div><span className="text-slate-500">Airline:</span> {aiParsedData.flight.airline}</div>}
+                              {aiParsedData.flight.routes && <div className="col-span-2"><span className="text-slate-500">Routes:</span> {aiParsedData.flight.routes}</div>}
+                              {aiParsedData.flight.dates && <div><span className="text-slate-500">Dates:</span> {aiParsedData.flight.dates}</div>}
+                              {aiParsedData.flight.passengerCount && <div><span className="text-slate-500">Passengers:</span> {aiParsedData.flight.passengerCount}</div>}
+                            </div>
+                          </div>
+                        )}
+
+                        {aiParsedData?.bookingType === 'HOTEL' && aiParsedData.hotel && (
+                          <div className="p-3 bg-amber-50 border border-amber-200 rounded-sm">
+                            <div className="text-[10px] font-bold text-amber-600 uppercase tracking-widest mb-2">Hotel Details</div>
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                              {aiParsedData.hotel.confirmationNumber && <div><span className="text-slate-500">Conf #:</span> <span className="font-mono font-bold">{aiParsedData.hotel.confirmationNumber}</span></div>}
+                              {aiParsedData.hotel.hotelName && <div><span className="text-slate-500">Hotel:</span> {aiParsedData.hotel.hotelName}</div>}
+                              {aiParsedData.hotel.roomType && <div><span className="text-slate-500">Room:</span> {aiParsedData.hotel.roomType}</div>}
+                              {aiParsedData.hotel.checkIn && <div><span className="text-slate-500">Check-in:</span> {aiParsedData.hotel.checkIn}</div>}
+                              {aiParsedData.hotel.checkOut && <div><span className="text-slate-500">Check-out:</span> {aiParsedData.hotel.checkOut}</div>}
+                              {aiParsedData.hotel.guestCount && <div><span className="text-slate-500">Guests:</span> {aiParsedData.hotel.guestCount}</div>}
+                            </div>
+                          </div>
+                        )}
+
+                        {aiParsedData?.bookingType === 'LOGISTICS' && aiParsedData.logistics && (
+                          <div className="p-3 bg-purple-50 border border-purple-200 rounded-sm">
+                            <div className="text-[10px] font-bold text-purple-600 uppercase tracking-widest mb-2">Logistics Details</div>
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                              {aiParsedData.logistics.confirmationNumber && <div><span className="text-slate-500">Conf #:</span> <span className="font-mono font-bold">{aiParsedData.logistics.confirmationNumber}</span></div>}
+                              {aiParsedData.logistics.serviceType && <div><span className="text-slate-500">Service:</span> {aiParsedData.logistics.serviceType}</div>}
+                              {aiParsedData.logistics.provider && <div><span className="text-slate-500">Provider:</span> {aiParsedData.logistics.provider}</div>}
+                              {aiParsedData.logistics.date && <div><span className="text-slate-500">Date:</span> {aiParsedData.logistics.date}</div>}
+                              {aiParsedData.logistics.pickupLocation && <div className="col-span-2"><span className="text-slate-500">Pickup:</span> {aiParsedData.logistics.pickupLocation}</div>}
+                              {aiParsedData.logistics.dropoffLocation && <div className="col-span-2"><span className="text-slate-500">Dropoff:</span> {aiParsedData.logistics.dropoffLocation}</div>}
+                            </div>
+                          </div>
+                        )}
+
+                        {aiParsedData?.notes && (
+                          <div className="p-3 bg-slate-50 border border-slate-200 rounded-sm">
+                            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Notes</div>
+                            <div className="text-xs text-slate-700">{aiParsedData.notes}</div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="mt-4 flex gap-3">
+                        <button
+                          type="button"
+                          onClick={() => { setAiParseStep('input'); setAiParsedData(null); }}
+                          className="flex-1 py-3 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-sm"
+                        >
+                          Back
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleAiParseSubmit}
+                          className="flex-1 py-3 bg-emerald-600 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-emerald-700 transition-colors rounded-sm"
+                        >
+                          Use This Data
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
               ) : (
                 <div className="flex-1 flex flex-col space-y-3">

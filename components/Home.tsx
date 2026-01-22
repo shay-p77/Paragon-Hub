@@ -34,6 +34,7 @@ const WorldClock: React.FC = () => {
         'LONDON': now.toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit', second: '2-digit' }),
         'TEL AVIV': now.toLocaleTimeString('en-US', { timeZone: 'Asia/Jerusalem', hour: '2-digit', minute: '2-digit', second: '2-digit' }),
         'SYDNEY': now.toLocaleTimeString('en-US', { timeZone: 'Australia/Sydney', hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        'TOKYO': now.toLocaleTimeString('en-US', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit', second: '2-digit' }),
       });
     };
     update();
@@ -41,14 +42,24 @@ const WorldClock: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
+  // Cities to show on all screens (5 clocks)
+  const mainCities = ['LA', 'NYC', 'LONDON', 'TEL AVIV', 'SYDNEY'];
+  // Extra city to show only on mobile for even grid (6th clock)
+  const mobileOnlyCity = 'TOKYO';
+
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-4 mb-6 sm:mb-8">
-      {Object.entries(times).map(([city, time]) => (
+      {mainCities.map((city) => (
         <div key={city} className="bg-slate-900 border border-slate-800 p-2 sm:p-4 rounded-sm text-center">
           <div className="text-[8px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">{city}</div>
-          <div className="text-sm sm:text-xl font-mono text-paragon-gold font-bold">{time}</div>
+          <div className="text-sm sm:text-xl font-mono text-paragon-gold font-bold">{times[city]}</div>
         </div>
       ))}
+      {/* 6th clock - only visible on mobile for even 2-column grid */}
+      <div className="bg-slate-900 border border-slate-800 p-2 sm:p-4 rounded-sm text-center sm:hidden">
+        <div className="text-[8px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">{mobileOnlyCity}</div>
+        <div className="text-sm sm:text-xl font-mono text-paragon-gold font-bold">{times[mobileOnlyCity]}</div>
+      </div>
     </div>
   );
 };
@@ -420,7 +431,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
       <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6 sm:mb-8">
         <div>
           <h1 className="font-cinzel text-xl sm:text-2xl lg:text-3xl font-bold text-slate-900 uppercase tracking-widest">Command Center</h1>
-          <p className="text-[10px] sm:text-xs text-slate-500 mt-1 uppercase tracking-tight">System Status: <span className="text-emerald-500 font-bold">OPERATIONAL</span> / Active Agents: 14</p>
+          <p className="text-[10px] sm:text-xs text-slate-500 mt-1 uppercase tracking-tight">System Status: <span className="text-emerald-500 font-bold">OPERATIONAL</span> / Active Agents: <span className="font-bold">{allUsers.filter(u => u.status !== 'OFFLINE').length}</span></p>
         </div>
         <div className="flex gap-4 w-full sm:w-auto">
           <div className="relative flex-1 sm:flex-initial" ref={statusDropdownRef}>
