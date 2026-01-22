@@ -11,8 +11,7 @@ import NotificationCenter from './components/NotificationCenter';
 import Login, { GoogleUser } from './components/Login';
 import { MOCK_USERS } from './constants';
 import { User, BookingRequest, Comment, Notification, Announcement, ConvertedFlight, ConvertedHotel, ConvertedLogistics, PipelineTrip } from './types';
-
-const API_URL = 'http://localhost:3001';
+import { API_URL } from './config';
 
 const App: React.FC = () => {
   // Auth state

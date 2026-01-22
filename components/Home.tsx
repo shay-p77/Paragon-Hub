@@ -4,6 +4,7 @@ import { SectionHeader, Badge } from './Shared';
 import { MOCK_USERS } from '../constants';
 import { User, Comment, Announcement, BookingRequest } from '../types';
 import { GoogleUser } from './Login';
+import { API_URL } from '../config';
 
 interface HomeProps {
   currentUser: User;
@@ -130,7 +131,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const res = await fetch('http://localhost:3001/api/auth/users');
+        const res = await fetch(`${API_URL}/api/auth/users`);
         if (res.ok) {
           const users = await res.json();
           setAllUsers(users);
@@ -152,8 +153,6 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const statusDropdownRef = useRef<HTMLDivElement>(null);
 
-  // API URL for backend calls
-  const API_URL = 'http://localhost:3001';
 
   // Function to update status in backend and localStorage
   const updateUserStatus = async (newStatus: 'AVAILABLE' | 'BUSY' | 'AWAY' | 'OFFLINE') => {

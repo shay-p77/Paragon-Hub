@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { API_URL } from '../config';
 
 interface LoginProps {
   onLogin: (user: GoogleUser) => void;
@@ -31,7 +32,6 @@ declare global {
 }
 
 const GOOGLE_CLIENT_ID = '375584053864-58t5khqj1js8uqnp2rqsl4svp6l2hha9.apps.googleusercontent.com';
-const API_URL = 'http://localhost:3001';
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const googleButtonRef = useRef<HTMLDivElement>(null);

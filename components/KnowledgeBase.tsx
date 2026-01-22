@@ -1,8 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { SectionHeader, Badge } from './Shared';
-
-const API_URL = 'http://localhost:3001';
+import { API_URL } from '../config';
 
 // Types for Knowledge Base
 type KnowledgeCategory = 'PROCEDURE' | 'LOCATION' | 'CONTACT' | 'NOTE';

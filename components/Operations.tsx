@@ -5,6 +5,7 @@ import { MOCK_FLIGHTS, MOCK_HOTELS, MOCK_TRIPS, MOCK_USERS } from '../constants'
 import { ElementStatus, BookingRequest, Comment, User, ConvertedFlight, ConvertedHotel, ConvertedLogistics, PipelineTrip, PipelineStage, PipelineTask } from '../types';
 import Comments from './Comments';
 import { GoogleUser } from './Login';
+import { API_URL } from '../config';
 
 interface OperationsProps {
   requests: BookingRequest[];
@@ -143,7 +144,6 @@ const Operations: React.FC<OperationsProps> = ({
     setAiParseStep('input');
   };
 
-  const API_URL = 'http://localhost:3001';
 
   // AI Parse functions
   const handleAiParseText = async () => {
