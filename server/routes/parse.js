@@ -1,8 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const Anthropic = require('@anthropic-ai/sdk');
 const multer = require('multer');
-const pdfParse = require('pdf-parse');
+
+// Lazy load these to avoid startup issues
+let Anthropic;
+let pdfParse;
 
 // Configure multer for PDF uploads (memory storage)
 const upload = multer({
@@ -17,12 +19,23 @@ const upload = multer({
   }
 });
 
-// Initialize Anthropic client
+// Initialize Anthropic client (lazy load)
 const getAnthropicClient = () => {
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY === 'your_anthropic_api_key_here') {
     throw new Error('ANTHROPIC_API_KEY not configured');
   }
+  if (!Anthropic) {
+    Anthropic = require('@anthropic-ai/sdk');
+  }
   return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+};
+
+// Lazy load pdf-parse
+const getPdfParse = () => {
+  if (!pdfParse) {
+    pdfParse = require('pdf-parse');
+  }
+  return pdfParse;
 };
 
 // System prompt for parsing booking confirmations
@@ -148,7 +161,8 @@ router.post('/pdf', upload.single('pdf'), async (req, res) => {
     }
 
     // Extract text from PDF
-    const pdfData = await pdfParse(req.file.buffer);
+    const pdfParser = getPdfParse();
+    const pdfData = await pdfParser(req.file.buffer);
     const extractedText = pdfData.text;
 
     if (!extractedText || extractedText.trim().length < 20) {
