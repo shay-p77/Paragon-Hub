@@ -13,9 +13,293 @@ interface CRMProps {
   onDeleteComment?: (commentId: string) => void;
 }
 
+// Expandable List Item Component
+const ExpandableRequestItem: React.FC<{
+  request: BookingRequest;
+  clientName: string;
+  isExpanded: boolean;
+  onToggle: () => void;
+  onSelect: () => void;
+  isSelected: boolean;
+}> = ({ request, clientName, isExpanded, onToggle, onSelect, isSelected }) => {
+  const priorityColors: Record<string, string> = {
+    'URGENT': 'bg-red-100 text-red-700 border-red-200',
+    'HIGH': 'bg-orange-100 text-orange-700 border-orange-200',
+    'NORMAL': 'bg-slate-100 text-slate-700 border-slate-200',
+    'LOW': 'bg-slate-50 text-slate-500 border-slate-200',
+  };
+
+  const typeIcons: Record<string, string> = {
+    'FLIGHT': '✈️',
+    'HOTEL': '🏨',
+    'LOGISTICS': '🚗',
+    'PACKAGE': '📦',
+  };
+
+  return (
+    <div className={`border rounded-sm mb-2 overflow-hidden transition-all ${isSelected ? 'border-paragon bg-paragon-light/20' : 'border-slate-200 bg-white'}`}>
+      {/* Header Row - Always visible */}
+      <div
+        className="flex items-center justify-between p-3 sm:p-4 cursor-pointer hover:bg-slate-50"
+        onClick={onToggle}
+      >
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <span className="text-lg flex-shrink-0">{typeIcons[request.type] || '📋'}</span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-bold text-sm text-slate-800 truncate">{clientName}</span>
+              <Badge color="slate">{request.type}</Badge>
+            </div>
+            <p className="text-xs text-slate-500 truncate mt-0.5">{request.notes}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+          <span className={`text-[9px] font-bold px-2 py-0.5 rounded border ${priorityColors[request.priority] || priorityColors['NORMAL']}`}>
+            {request.priority}
+          </span>
+          <svg
+            className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      </div>
+
+      {/* Expanded Details */}
+      {isExpanded && (
+        <div className="border-t border-slate-100 bg-slate-50/50 p-3 sm:p-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+            <div>
+              <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Submitted</p>
+              <p className="text-xs font-semibold text-slate-700">{new Date(request.timestamp).toLocaleDateString()}</p>
+            </div>
+            <div>
+              <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Status</p>
+              <Badge color={request.status === 'CONVERTED' ? 'teal' : request.status === 'PENDING' ? 'gold' : 'slate'}>{request.status}</Badge>
+            </div>
+            <div>
+              <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Priority</p>
+              <p className="text-xs font-semibold text-slate-700">{request.priority}</p>
+            </div>
+            <div>
+              <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Type</p>
+              <p className="text-xs font-semibold text-slate-700">{request.type}</p>
+            </div>
+          </div>
+
+          {request.notes && (
+            <div className="mb-4">
+              <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider mb-1">Notes</p>
+              <p className="text-xs text-slate-600 bg-white p-2 rounded border border-slate-100">{request.notes}</p>
+            </div>
+          )}
+
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={(e) => { e.stopPropagation(); onSelect(); }}
+              className="flex-1 sm:flex-none px-4 py-2 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest rounded-sm hover:bg-paragon-dark transition-colors"
+            >
+              View Details
+            </button>
+            <button className="flex-1 sm:flex-none px-4 py-2 border border-slate-200 text-slate-600 text-[10px] font-bold uppercase tracking-widest rounded-sm hover:bg-slate-50 transition-colors">
+              Edit
+            </button>
+            <button className="flex-1 sm:flex-none px-4 py-2 border border-slate-200 text-slate-600 text-[10px] font-bold uppercase tracking-widest rounded-sm hover:bg-slate-50 transition-colors">
+              Convert
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Expandable Booking Item Component
+const ExpandableBookingItem: React.FC<{
+  booking: any;
+  type: 'flight' | 'hotel';
+  isExpanded: boolean;
+  onToggle: () => void;
+  onSelect: () => void;
+  isSelected: boolean;
+}> = ({ booking, type, isExpanded, onToggle, onSelect, isSelected }) => {
+  return (
+    <div className={`border rounded-sm mb-2 overflow-hidden transition-all ${isSelected ? 'border-paragon bg-paragon-light/20' : 'border-slate-200 bg-white'}`}>
+      {/* Header Row */}
+      <div
+        className="flex items-center justify-between p-3 sm:p-4 cursor-pointer hover:bg-slate-50"
+        onClick={onToggle}
+      >
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <span className="text-lg flex-shrink-0">{type === 'flight' ? '✈️' : '🏨'}</span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-bold text-sm text-slate-800">{type === 'flight' ? booking.carrier : booking.name}</span>
+              <span className="font-mono text-xs text-paragon font-bold">{type === 'flight' ? booking.pnr : booking.confirmation}</span>
+            </div>
+            <p className="text-xs text-slate-500 truncate mt-0.5">
+              {type === 'flight'
+                ? booking.segments?.map((s: any) => `${s.from}-${s.to}`).join(', ')
+                : `${booking.checkIn} - ${booking.checkOut}`
+              }
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 flex-shrink-0 ml-2">
+          <span className="text-sm font-bold text-teal-600">+${booking.markup?.toLocaleString()}</span>
+          <svg
+            className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      </div>
+
+      {/* Expanded Details */}
+      {isExpanded && (
+        <div className="border-t border-slate-100 bg-slate-50/50 p-3 sm:p-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+            <div>
+              <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">{type === 'flight' ? 'PNR' : 'Confirmation'}</p>
+              <p className="text-xs font-mono font-bold text-paragon">{type === 'flight' ? booking.pnr : booking.confirmation}</p>
+            </div>
+            <div>
+              <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Cost</p>
+              <p className="text-xs font-semibold text-slate-700">${booking.cost?.toLocaleString()}</p>
+            </div>
+            <div>
+              <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Markup</p>
+              <p className="text-xs font-semibold text-teal-600">${booking.markup?.toLocaleString()}</p>
+            </div>
+            <div>
+              <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Status</p>
+              <Badge color="teal">CONFIRMED</Badge>
+            </div>
+          </div>
+
+          {type === 'flight' && booking.segments && (
+            <div className="mb-4">
+              <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider mb-2">Segments</p>
+              <div className="space-y-1">
+                {booking.segments.map((seg: any, idx: number) => (
+                  <div key={idx} className="text-xs bg-white p-2 rounded border border-slate-100 flex justify-between">
+                    <span className="font-semibold">{seg.from} → {seg.to}</span>
+                    <span className="text-slate-500">{seg.date} • {seg.time}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={(e) => { e.stopPropagation(); onSelect(); }}
+              className="flex-1 sm:flex-none px-4 py-2 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest rounded-sm hover:bg-paragon-dark transition-colors"
+            >
+              View Details
+            </button>
+            <button className="flex-1 sm:flex-none px-4 py-2 border border-slate-200 text-slate-600 text-[10px] font-bold uppercase tracking-widest rounded-sm hover:bg-slate-50 transition-colors">
+              Edit
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Expandable Customer Item Component
+const ExpandableCustomerItem: React.FC<{
+  customer: { name: string; status: string; accountType: string; spend: number };
+  isExpanded: boolean;
+  onToggle: () => void;
+  onSelect: () => void;
+  isSelected: boolean;
+}> = ({ customer, isExpanded, onToggle, onSelect, isSelected }) => {
+  return (
+    <div className={`border rounded-sm mb-2 overflow-hidden transition-all ${isSelected ? 'border-paragon bg-paragon-light/20' : 'border-slate-200 bg-white'}`}>
+      {/* Header Row */}
+      <div
+        className="flex items-center justify-between p-3 sm:p-4 cursor-pointer hover:bg-slate-50"
+        onClick={onToggle}
+      >
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="w-10 h-10 rounded-full bg-paragon-gold/20 flex items-center justify-center flex-shrink-0">
+            <span className="font-bold text-paragon-gold">{customer.name.charAt(0)}</span>
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-bold text-sm text-slate-800">{customer.name}</span>
+              <Badge color="teal">{customer.status}</Badge>
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">{customer.accountType}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 flex-shrink-0 ml-2">
+          <span className="text-sm font-bold text-slate-800">${customer.spend.toLocaleString()}</span>
+          <svg
+            className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      </div>
+
+      {/* Expanded Details */}
+      {isExpanded && (
+        <div className="border-t border-slate-100 bg-slate-50/50 p-3 sm:p-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+            <div>
+              <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Status</p>
+              <Badge color="teal">{customer.status}</Badge>
+            </div>
+            <div>
+              <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Account Type</p>
+              <p className="text-xs font-semibold text-slate-700">{customer.accountType}</p>
+            </div>
+            <div>
+              <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">YTD Spend</p>
+              <p className="text-xs font-semibold text-slate-700">${customer.spend.toLocaleString()}</p>
+            </div>
+            <div>
+              <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Last Booking</p>
+              <p className="text-xs font-semibold text-slate-700">Dec 15, 2025</p>
+            </div>
+          </div>
+
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={(e) => { e.stopPropagation(); onSelect(); }}
+              className="flex-1 sm:flex-none px-4 py-2 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest rounded-sm hover:bg-paragon-dark transition-colors"
+            >
+              View Profile
+            </button>
+            <button className="flex-1 sm:flex-none px-4 py-2 border border-slate-200 text-slate-600 text-[10px] font-bold uppercase tracking-widest rounded-sm hover:bg-slate-50 transition-colors">
+              New Booking
+            </button>
+            <button className="flex-1 sm:flex-none px-4 py-2 border border-slate-200 text-slate-600 text-[10px] font-bold uppercase tracking-widest rounded-sm hover:bg-slate-50 transition-colors">
+              Contact
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const CRM: React.FC<CRMProps> = ({ currentUser, requests, comments, onAddComment, onDeleteComment }) => {
   const [activeSubTab, setActiveSubTab] = useState('customers');
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [filters, setFilters] = useState({
     spend: { under50k: false, fiftyTo100k: false, over100k: false },
@@ -25,7 +309,6 @@ const CRM: React.FC<CRMProps> = ({ currentUser, requests, comments, onAddComment
 
   const filterDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close filter dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (filterDropdownRef.current && !filterDropdownRef.current.contains(event.target as Node)) {
@@ -47,46 +330,56 @@ const CRM: React.FC<CRMProps> = ({ currentUser, requests, comments, onAddComment
   const myHotels = MOCK_HOTELS.filter(h => h.agentId === currentUser.id);
   const clients = MOCK_USERS.filter(u => u.role === 'CLIENT');
 
+  // Sample customer data
+  const sampleCustomers = [
+    { id: 'max-power', name: 'Max Power', status: 'VIP GOLD', accountType: 'Direct Private', spend: 145200 },
+    { id: 'jane-doe', name: 'Jane Doe', status: 'VIP', accountType: 'Corporate', spend: 89500 },
+    { id: 'john-smith', name: 'John Smith', status: 'Active', accountType: 'Direct', spend: 34200 },
+  ];
+
   return (
-    <div className="p-8">
-      <div className="flex justify-between items-end mb-8 border-b border-slate-200">
-        <div className="flex gap-8">
+    <div className="p-4 sm:p-8">
+      {/* Tab Navigation - Scrollable on mobile */}
+      <div className="flex justify-between items-end mb-6 sm:mb-8 border-b border-slate-200 overflow-x-auto">
+        <div className="flex gap-4 sm:gap-8 min-w-max">
           {[
             { id: 'customers', label: 'MY CLIENTS' },
             { id: 'my-requests', label: 'MY REQUESTS' },
             { id: 'my-bookings', label: 'MY BOOKINGS' },
           ].map(t => (
-            <button key={t.id} onClick={() => { setActiveSubTab(t.id); setSelectedElementId(null); }} className={`pb-4 text-xs font-bold tracking-widest transition-all ${activeSubTab === t.id ? 'text-paragon border-b-2 border-paragon' : 'text-slate-400 hover:text-slate-600'}`}>
+            <button
+              key={t.id}
+              onClick={() => { setActiveSubTab(t.id); setSelectedElementId(null); setExpandedId(null); }}
+              className={`pb-3 sm:pb-4 text-[10px] sm:text-xs font-bold tracking-widest transition-all whitespace-nowrap ${activeSubTab === t.id ? 'text-paragon border-b-2 border-paragon' : 'text-slate-400 hover:text-slate-600'}`}
+            >
               {t.label}
             </button>
           ))}
         </div>
       </div>
 
-      <div className="grid grid-cols-12 gap-8">
-        <div className={selectedElementId ? 'col-span-8' : 'col-span-12'}>
+      <div className="flex flex-col lg:grid lg:grid-cols-12 gap-4 sm:gap-8">
+        <div className={selectedElementId ? 'lg:col-span-8' : 'lg:col-span-12'}>
+
+          {/* Customers Tab */}
           {activeSubTab === 'customers' && (
             <div>
-              <div className="flex justify-between items-center mb-6">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 sm:mb-6">
                 <h3 className="text-sm font-bold text-slate-700">Customer Pipeline</h3>
                 <div className="relative" ref={filterDropdownRef}>
                   <button
                     onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-                    className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-sm text-[10px] font-bold uppercase tracking-widest hover:bg-slate-50 transition-colors"
+                    className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-white border border-slate-200 rounded-sm text-[10px] font-bold uppercase tracking-widest hover:bg-slate-50 transition-colors"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
                     </svg>
                     Filters
-                    {(Object.values(filters.spend).some(v => v) || Object.values(filters.status).some(v => v) || Object.values(filters.activity).some(v => v)) && (
-                      <span className="w-2 h-2 bg-paragon rounded-full"></span>
-                    )}
                   </button>
 
                   {showFilterDropdown && (
                     <div className="absolute right-0 top-full mt-2 w-72 bg-white border border-slate-200 rounded-sm shadow-lg z-50">
                       <div className="p-4 space-y-4">
-                        {/* Spend Filters */}
                         <div>
                           <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Spend</h4>
                           <div className="space-y-2">
@@ -104,50 +397,6 @@ const CRM: React.FC<CRMProps> = ({ currentUser, requests, comments, onAddComment
                             </label>
                           </div>
                         </div>
-
-                        {/* Status Filters */}
-                        <div className="border-t border-slate-100 pt-4">
-                          <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Status</h4>
-                          <div className="space-y-2">
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <input type="checkbox" checked={filters.status.vip} onChange={() => setFilters({...filters, status: {...filters.status, vip: !filters.status.vip}})} className="accent-paragon" />
-                              <span className="text-xs">VIP</span>
-                            </label>
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <input type="checkbox" checked={filters.status.active} onChange={() => setFilters({...filters, status: {...filters.status, active: !filters.status.active}})} className="accent-paragon" />
-                              <span className="text-xs">Active</span>
-                            </label>
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <input type="checkbox" checked={filters.status.prospect} onChange={() => setFilters({...filters, status: {...filters.status, prospect: !filters.status.prospect}})} className="accent-paragon" />
-                              <span className="text-xs">Prospect</span>
-                            </label>
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <input type="checkbox" checked={filters.status.inactive} onChange={() => setFilters({...filters, status: {...filters.status, inactive: !filters.status.inactive}})} className="accent-paragon" />
-                              <span className="text-xs">Inactive</span>
-                            </label>
-                          </div>
-                        </div>
-
-                        {/* Activity Filters */}
-                        <div className="border-t border-slate-100 pt-4">
-                          <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Activity</h4>
-                          <div className="space-y-2">
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <input type="checkbox" checked={filters.activity.lastMonth} onChange={() => setFilters({...filters, activity: {...filters.activity, lastMonth: !filters.activity.lastMonth}})} className="accent-paragon" />
-                              <span className="text-xs">Booked in last month</span>
-                            </label>
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <input type="checkbox" checked={filters.activity.lastQuarter} onChange={() => setFilters({...filters, activity: {...filters.activity, lastQuarter: !filters.activity.lastQuarter}})} className="accent-paragon" />
-                              <span className="text-xs">Booked in last quarter</span>
-                            </label>
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <input type="checkbox" checked={filters.activity.lastYear} onChange={() => setFilters({...filters, activity: {...filters.activity, lastYear: !filters.activity.lastYear}})} className="accent-paragon" />
-                              <span className="text-xs">Booked in last year</span>
-                            </label>
-                          </div>
-                        </div>
-
-                        {/* Clear Filters */}
                         <div className="border-t border-slate-100 pt-4 flex gap-2">
                           <button
                             onClick={() => setFilters({
@@ -157,7 +406,7 @@ const CRM: React.FC<CRMProps> = ({ currentUser, requests, comments, onAddComment
                             })}
                             className="flex-1 text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-slate-600 py-2"
                           >
-                            Clear All
+                            Clear
                           </button>
                           <button
                             onClick={() => setShowFilterDropdown(false)}
@@ -172,61 +421,110 @@ const CRM: React.FC<CRMProps> = ({ currentUser, requests, comments, onAddComment
                 </div>
               </div>
 
-              <DataTable headers={['Customer Name', 'Status', 'Account Type', 'Spend YTD', 'Action']}>
-                  <tr className="hover:bg-slate-50 cursor-pointer" onClick={() => setSelectedElementId('max-power-profile')}>
-                    <td className="px-4 py-3 font-bold">Max Power</td>
-                    <td className="px-4 py-3"><Badge color="teal">VIP GOLD</Badge></td>
-                    <td className="px-4 py-3">Direct Private</td>
-                    <td className="px-4 py-3 font-bold">$145,200</td>
-                    <td className="px-4 py-3 text-right"><button className="text-[10px] font-bold text-paragon">VIEW</button></td>
-                  </tr>
-                </DataTable>
+              {/* Expandable Customer List */}
+              <div>
+                {sampleCustomers.map(customer => (
+                  <ExpandableCustomerItem
+                    key={customer.id}
+                    customer={customer}
+                    isExpanded={expandedId === customer.id}
+                    onToggle={() => setExpandedId(expandedId === customer.id ? null : customer.id)}
+                    onSelect={() => setSelectedElementId(customer.id)}
+                    isSelected={selectedElementId === customer.id}
+                  />
+                ))}
+              </div>
             </div>
           )}
 
+          {/* Requests Tab */}
           {activeSubTab === 'my-requests' && (
-            <DataTable headers={['Submitted', 'Client', 'Type', 'Notes', 'Priority', 'Status', 'Action']}>
-              {myRequests.map(r => (
-                <tr key={r.id} className={`hover:bg-slate-50 cursor-pointer ${selectedElementId === r.id ? 'bg-paragon-light/30' : ''}`} onClick={() => setSelectedElementId(r.id)}>
-                  <td className="px-4 py-3">{new Date(r.timestamp).toLocaleDateString()}</td>
-                  <td className="px-4 py-3 font-bold">{clients.find(c => c.id === r.clientId)?.name}</td>
-                  <td className="px-4 py-3"><Badge color="slate">{r.type}</Badge></td>
-                  <td className="px-4 py-3 italic truncate max-w-xs">{r.notes}</td>
-                  <td className="px-4 py-3 font-bold">{r.priority}</td>
-                  <td className="px-4 py-3"><Badge color={r.status === 'CONVERTED' ? 'teal' : 'gold'}>{r.status}</Badge></td>
-                  <td className="px-4 py-3 text-right"><button className="text-[10px] font-bold text-slate-400">EDIT</button></td>
-                </tr>
-              ))}
-            </DataTable>
+            <div>
+              <h3 className="text-sm font-bold text-slate-700 mb-4 sm:mb-6">My Requests</h3>
+              {myRequests.length === 0 ? (
+                <div className="text-center py-12 text-slate-400">
+                  <p className="text-sm">No requests assigned to you.</p>
+                </div>
+              ) : (
+                myRequests.map(r => (
+                  <ExpandableRequestItem
+                    key={r.id}
+                    request={r}
+                    clientName={clients.find(c => c.id === r.clientId)?.name || 'Unknown Client'}
+                    isExpanded={expandedId === r.id}
+                    onToggle={() => setExpandedId(expandedId === r.id ? null : r.id)}
+                    onSelect={() => setSelectedElementId(r.id)}
+                    isSelected={selectedElementId === r.id}
+                  />
+                ))
+              )}
+            </div>
           )}
 
+          {/* Bookings Tab */}
           {activeSubTab === 'my-bookings' && (
-            <div className="space-y-12">
-              <DataTable headers={['Flight', 'PNR', 'Segments', 'Cost', 'Markup', 'Action']}>
-                {myFlights.map(f => (
-                  <tr key={f.id} className={`hover:bg-slate-50 cursor-pointer ${selectedElementId === f.id ? 'bg-paragon-light/30' : ''}`} onClick={() => setSelectedElementId(f.id)}>
-                    <td className="px-4 py-3 font-bold">{f.carrier}</td>
-                    <td className="px-4 py-3 font-mono text-paragon font-bold underline">{f.pnr}</td>
-                    <td className="px-4 py-3 truncate max-w-xs">{f.segments.map(s => `${s.from}-${s.to}`).join(', ')}</td>
-                    <td className="px-4 py-3 font-bold">${f.cost.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-teal-600 font-bold">${f.markup.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-right"><button className="text-[10px] font-bold">VIEW</button></td>
-                  </tr>
-                ))}
-              </DataTable>
+            <div>
+              <h3 className="text-sm font-bold text-slate-700 mb-4 sm:mb-6">My Bookings</h3>
+
+              {myFlights.length > 0 && (
+                <div className="mb-6">
+                  <p className="text-[10px] uppercase text-slate-400 font-bold tracking-widest mb-3">Flights</p>
+                  {myFlights.map(f => (
+                    <ExpandableBookingItem
+                      key={f.id}
+                      booking={f}
+                      type="flight"
+                      isExpanded={expandedId === f.id}
+                      onToggle={() => setExpandedId(expandedId === f.id ? null : f.id)}
+                      onSelect={() => setSelectedElementId(f.id)}
+                      isSelected={selectedElementId === f.id}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {myHotels.length > 0 && (
+                <div>
+                  <p className="text-[10px] uppercase text-slate-400 font-bold tracking-widest mb-3">Hotels</p>
+                  {myHotels.map(h => (
+                    <ExpandableBookingItem
+                      key={h.id}
+                      booking={h}
+                      type="hotel"
+                      isExpanded={expandedId === h.id}
+                      onToggle={() => setExpandedId(expandedId === h.id ? null : h.id)}
+                      onSelect={() => setSelectedElementId(h.id)}
+                      isSelected={selectedElementId === h.id}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {myFlights.length === 0 && myHotels.length === 0 && (
+                <div className="text-center py-12 text-slate-400">
+                  <p className="text-sm">No bookings yet.</p>
+                </div>
+              )}
             </div>
           )}
 
         </div>
 
+        {/* Collaboration Panel - Slides up on mobile */}
         {selectedElementId && (
-          <div className="col-span-4 sticky top-20 h-fit">
-            <div className="bg-white border border-slate-200 p-6 rounded-sm shadow-lg">
+          <div className="lg:col-span-4 fixed inset-x-0 bottom-0 lg:relative lg:inset-auto lg:sticky lg:top-20 lg:h-fit z-40">
+            <div className="bg-white border-t lg:border border-slate-200 p-4 sm:p-6 rounded-t-lg lg:rounded-sm shadow-lg max-h-[60vh] lg:max-h-none overflow-auto">
               <div className="flex justify-between items-center mb-4">
-                 <h3 className="text-xs font-bold uppercase tracking-widest text-paragon">Collaboration Panel</h3>
-                 <button onClick={() => setSelectedElementId(null)} className="text-slate-400 hover:text-slate-600">&times;</button>
+                <h3 className="text-xs font-bold uppercase tracking-widest text-paragon">Collaboration Panel</h3>
+                <button onClick={() => setSelectedElementId(null)} className="text-slate-400 hover:text-slate-600 text-xl">&times;</button>
               </div>
-              <Comments parentId={selectedElementId} currentUser={currentUser} comments={comments} onAddComment={(text) => onAddComment(text, selectedElementId)} onDeleteComment={onDeleteComment} />
+              <Comments
+                parentId={selectedElementId}
+                currentUser={currentUser}
+                comments={comments}
+                onAddComment={(text) => onAddComment(text, selectedElementId)}
+                onDeleteComment={onDeleteComment}
+              />
             </div>
           </div>
         )}
