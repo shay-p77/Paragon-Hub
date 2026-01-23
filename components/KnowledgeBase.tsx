@@ -740,7 +740,7 @@ const KnowledgeBase: React.FC = () => {
 
           {/* Locations Tab */}
           {activeTab === 'locations' && (
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {filteredLocations.map(loc => (
                 <div
                   key={loc.id}
@@ -974,9 +974,9 @@ const KnowledgeBase: React.FC = () => {
 
       {/* Quick Add Modal */}
       {showQuickAdd && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fadeIn">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fadeIn">
           <div ref={quickAddRef} className="bg-white w-full max-w-lg max-h-[80vh] flex flex-col rounded-sm shadow-2xl animate-zoomIn">
-            <div className="p-4 border-b border-slate-200 flex justify-between items-center">
+            <div className="p-3 sm:p-4 border-b border-slate-200 flex justify-between items-center">
               <div className="flex items-center gap-2">
                 {quickAddCategory && (
                   <button
@@ -1000,9 +1000,9 @@ const KnowledgeBase: React.FC = () => {
 
             {/* Step 1: Category Selection */}
             {!quickAddCategory && (
-              <div className="p-6">
+              <div className="p-4 sm:p-6">
                 <p className="text-xs text-slate-500 mb-4">What would you like to add?</p>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <button
                     onClick={() => setQuickAddCategory('PROCEDURE')}
                     className="p-4 border border-slate-200 rounded-sm hover:border-paragon hover:bg-paragon/5 transition-all text-left group"
@@ -1175,7 +1175,7 @@ const KnowledgeBase: React.FC = () => {
 
             {quickAddCategory === 'CONTACT' && (
               <form onSubmit={handleQuickAddSubmit} className="p-4 flex-1 overflow-y-auto">
-                <div className="grid grid-cols-2 gap-4 mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                   <div>
                     <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Name *</label>
                     <input
@@ -1199,7 +1199,7 @@ const KnowledgeBase: React.FC = () => {
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4 mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                   <div>
                     <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Company *</label>
                     <input
@@ -1223,7 +1223,7 @@ const KnowledgeBase: React.FC = () => {
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4 mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                   <div>
                     <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Phone</label>
                     <input
@@ -1308,7 +1308,7 @@ const KnowledgeBase: React.FC = () => {
       {/* Edit Modal */}
       {editingEntry && (
         <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fadeIn"
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fadeIn"
           onClick={() => setEditingEntry(null)}
         >
           <div
@@ -1316,7 +1316,7 @@ const KnowledgeBase: React.FC = () => {
             className="bg-white w-full max-w-lg max-h-[80vh] flex flex-col rounded-sm shadow-2xl animate-zoomIn"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="p-4 border-b border-slate-200 flex justify-between items-center">
+            <div className="p-3 sm:p-4 border-b border-slate-200 flex justify-between items-center">
               <h2 className="font-cinzel text-lg font-bold">
                 {'name' in editingEntry ? 'Edit Contact' : 'Edit Entry'}
               </h2>
@@ -1325,8 +1325,8 @@ const KnowledgeBase: React.FC = () => {
 
             {'name' in editingEntry ? (
               // Contact edit form
-              <form onSubmit={handleSaveEdit} className="p-4 flex-1 overflow-y-auto">
-                <div className="grid grid-cols-2 gap-4 mb-4">
+              <form onSubmit={handleSaveEdit} className="p-3 sm:p-4 flex-1 overflow-y-auto">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                   <div>
                     <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Name *</label>
                     <input
@@ -1348,7 +1348,7 @@ const KnowledgeBase: React.FC = () => {
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4 mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                   <div>
                     <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Company *</label>
                     <input
@@ -1370,7 +1370,7 @@ const KnowledgeBase: React.FC = () => {
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4 mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                   <div>
                     <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Phone</label>
                     <input

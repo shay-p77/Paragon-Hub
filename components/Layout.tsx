@@ -66,7 +66,7 @@ const getTabShortLabel = (tabId: string) => {
   switch (tabId) {
     case 'home': return 'Home';
     case 'ops': return 'Ops';
-    case 'sales': return 'Sales';
+    case 'sales': return 'CRM';
     case 'accounting': return 'Finance';
     case 'knowledge': return 'KB';
     case 'portal': return 'Portal';
@@ -137,7 +137,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
       </div>
 
       {/* Main Content - With bottom padding on mobile for tab bar */}
-      <main className="flex-1 overflow-hidden flex flex-col pb-24 md:pb-0">
+      <main className="flex-1 overflow-hidden flex flex-col pb-28 md:pb-0">
         {children}
       </main>
 

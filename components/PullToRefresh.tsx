@@ -136,6 +136,7 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh }) =>
 
       {/* Content with transform */}
       <div
+        className="pb-8 md:pb-0"
         style={{
           transform: `translateY(${pullDistance}px)`,
           transition: isPulling ? 'none' : 'transform 0.3s ease-out',

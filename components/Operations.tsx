@@ -1671,7 +1671,7 @@ const Operations: React.FC<OperationsProps> = ({
             className="bg-white rounded-sm shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto animate-zoomIn"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="p-6 border-b border-slate-200">
+            <div className="p-4 sm:p-6 border-b border-slate-200">
               <div className="flex justify-between items-center">
                 <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest">
                   Complete {convertingRequest.type} Request
@@ -1681,11 +1681,11 @@ const Operations: React.FC<OperationsProps> = ({
               <p className="text-xs text-slate-500 mt-1">Fill in the details to complete this booking</p>
             </div>
 
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               {/* Flight Form */}
               {convertingRequest.type === 'FLIGHT' && (
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Description (LastName-FlightNo)</label>
                       <input
@@ -1708,7 +1708,7 @@ const Operations: React.FC<OperationsProps> = ({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Payment Status</label>
                       <select
@@ -1743,7 +1743,7 @@ const Operations: React.FC<OperationsProps> = ({
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Passenger #</label>
                       <input
@@ -1766,7 +1766,7 @@ const Operations: React.FC<OperationsProps> = ({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Agent</label>
                       <input
@@ -1807,7 +1807,7 @@ const Operations: React.FC<OperationsProps> = ({
               {/* Hotel Form */}
               {convertingRequest.type === 'HOTEL' && (
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Description (LastName-Hotel)</label>
                       <input
@@ -1830,7 +1830,7 @@ const Operations: React.FC<OperationsProps> = ({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Payment Status</label>
                       <select
@@ -1854,7 +1854,7 @@ const Operations: React.FC<OperationsProps> = ({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Room Type</label>
                       <input
@@ -1877,7 +1877,7 @@ const Operations: React.FC<OperationsProps> = ({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Check-In</label>
                       <input
@@ -1900,7 +1900,7 @@ const Operations: React.FC<OperationsProps> = ({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Agent</label>
                       <input
@@ -1940,7 +1940,7 @@ const Operations: React.FC<OperationsProps> = ({
               {/* Logistics / General Form */}
               {(convertingRequest.type === 'LOGISTICS' || convertingRequest.type === 'GENERAL') && (
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Description</label>
                       <input
@@ -1963,7 +1963,7 @@ const Operations: React.FC<OperationsProps> = ({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Payment Status</label>
                       <select
@@ -1998,7 +1998,7 @@ const Operations: React.FC<OperationsProps> = ({
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Date</label>
                       <input
@@ -2021,7 +2021,7 @@ const Operations: React.FC<OperationsProps> = ({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Profit/Loss ($)</label>
                       <input
@@ -2076,7 +2076,7 @@ const Operations: React.FC<OperationsProps> = ({
             className="bg-white rounded-sm shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto animate-zoomIn"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="p-6 border-b border-slate-200">
+            <div className="p-4 sm:p-6 border-b border-slate-200">
               <div className="flex justify-between items-center">
                 <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest">
                   Edit {editingItem.type.charAt(0).toUpperCase() + editingItem.type.slice(1)}
@@ -2085,11 +2085,11 @@ const Operations: React.FC<OperationsProps> = ({
               </div>
             </div>
 
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               {/* Flight Edit Form */}
               {editingItem.type === 'flight' && (
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Description</label>
                       <input
@@ -2109,7 +2109,7 @@ const Operations: React.FC<OperationsProps> = ({
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Payment Status</label>
                       <select
@@ -2140,7 +2140,7 @@ const Operations: React.FC<OperationsProps> = ({
                       className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Passenger #</label>
                       <input
@@ -2161,7 +2161,7 @@ const Operations: React.FC<OperationsProps> = ({
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Agent</label>
                       <input
@@ -2200,7 +2200,7 @@ const Operations: React.FC<OperationsProps> = ({
               {/* Hotel Edit Form */}
               {editingItem.type === 'hotel' && (
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Description</label>
                       <input
@@ -2220,7 +2220,7 @@ const Operations: React.FC<OperationsProps> = ({
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Payment Status</label>
                       <select
@@ -2242,7 +2242,7 @@ const Operations: React.FC<OperationsProps> = ({
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Room Type</label>
                       <input
@@ -2263,7 +2263,7 @@ const Operations: React.FC<OperationsProps> = ({
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Check-In</label>
                       <input
@@ -2283,7 +2283,7 @@ const Operations: React.FC<OperationsProps> = ({
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Agent</label>
                       <input
@@ -2321,7 +2321,7 @@ const Operations: React.FC<OperationsProps> = ({
               {/* Logistics Edit Form */}
               {editingItem.type === 'logistics' && (
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Description</label>
                       <input
@@ -2341,7 +2341,7 @@ const Operations: React.FC<OperationsProps> = ({
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Payment Status</label>
                       <select
@@ -2372,7 +2372,7 @@ const Operations: React.FC<OperationsProps> = ({
                       className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon resize-none"
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Date</label>
                       <input
@@ -2392,7 +2392,7 @@ const Operations: React.FC<OperationsProps> = ({
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Profit/Loss ($)</label>
                       <input
@@ -2447,7 +2447,7 @@ const Operations: React.FC<OperationsProps> = ({
             className="bg-white rounded-sm shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto animate-zoomIn"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="p-6 border-b border-slate-200">
+            <div className="p-4 sm:p-6 border-b border-slate-200">
               <div className="flex justify-between items-center">
                 <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest">
                   {editingTrip ? 'Edit Trip' : 'New Booking Request'}
@@ -2461,7 +2461,7 @@ const Operations: React.FC<OperationsProps> = ({
 
             <div className="p-6 space-y-4">
               {/* Basic Info */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Trip Name *</label>
                   <input
@@ -2484,7 +2484,7 @@ const Operations: React.FC<OperationsProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Stage</label>
                   <select
@@ -2511,7 +2511,7 @@ const Operations: React.FC<OperationsProps> = ({
               </div>
 
               {/* Dates */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Start Date</label>
                   <input
@@ -2681,7 +2681,7 @@ const Operations: React.FC<OperationsProps> = ({
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="p-6 border-b border-slate-200">
+            <div className="p-4 sm:p-6 border-b border-slate-200">
               <div className="flex justify-between items-start">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">

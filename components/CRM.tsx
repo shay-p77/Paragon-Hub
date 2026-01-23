@@ -378,7 +378,7 @@ const CRM: React.FC<CRMProps> = ({ currentUser, requests, comments, onAddComment
                   </button>
 
                   {showFilterDropdown && (
-                    <div className="absolute right-0 top-full mt-2 w-72 bg-white border border-slate-200 rounded-sm shadow-lg z-50">
+                    <div className="fixed inset-x-4 top-1/4 sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 w-auto sm:w-72 bg-white border border-slate-200 rounded-sm shadow-lg z-50">
                       <div className="p-4 space-y-4">
                         <div>
                           <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Spend</h4>
