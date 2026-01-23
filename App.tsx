@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Layout from './components/Layout';
 import Operations from './components/Operations';
 import CRM from './components/CRM';
@@ -8,6 +8,7 @@ import KnowledgeBase from './components/KnowledgeBase';
 import ClientPortal from './components/ClientPortal';
 import Home from './components/Home';
 import NotificationCenter from './components/NotificationCenter';
+import PullToRefresh from './components/PullToRefresh';
 import Login, { GoogleUser } from './components/Login';
 import { MOCK_USERS } from './constants';
 import { User, BookingRequest, Comment, Notification, Announcement, ConvertedFlight, ConvertedHotel, ConvertedLogistics, PipelineTrip } from './types';
@@ -52,43 +53,52 @@ const App: React.FC = () => {
   const [dataLoading, setDataLoading] = useState(true);
   const [dataError, setDataError] = useState<string | null>(null);
 
-  // Fetch data from API on mount
-  useEffect(() => {
-    const fetchData = async () => {
-      setDataError(null);
-      try {
-        const [announcementsRes, commentsRes, requestsRes] = await Promise.all([
-          fetch(`${API_URL}/api/announcements`),
-          fetch(`${API_URL}/api/comments`),
-          fetch(`${API_URL}/api/requests`),
-        ]);
+  // Fetch data from API - reusable for initial load and pull-to-refresh
+  const fetchData = useCallback(async (showLoading = true) => {
+    if (showLoading) setDataLoading(true);
+    setDataError(null);
+    try {
+      const [announcementsRes, commentsRes, requestsRes] = await Promise.all([
+        fetch(`${API_URL}/api/announcements`),
+        fetch(`${API_URL}/api/comments`),
+        fetch(`${API_URL}/api/requests`),
+      ]);
 
-        if (announcementsRes.ok) {
-          const data = await announcementsRes.json();
-          setAnnouncements(data);
-        }
-        if (commentsRes.ok) {
-          const data = await commentsRes.json();
-          setComments(data);
-        }
-        if (requestsRes.ok) {
-          const data = await requestsRes.json();
-          setRequests(data);
-        }
-      } catch (error) {
-        console.error('Error fetching data:', error);
-        setDataError('Failed to connect to server. Some features may not work.');
-      } finally {
-        setDataLoading(false);
+      if (announcementsRes.ok) {
+        const data = await announcementsRes.json();
+        setAnnouncements(data);
       }
-    };
+      if (commentsRes.ok) {
+        const data = await commentsRes.json();
+        setComments(data);
+      }
+      if (requestsRes.ok) {
+        const data = await requestsRes.json();
+        setRequests(data);
+      }
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      setDataError('Failed to connect to server. Some features may not work.');
+    } finally {
+      setDataLoading(false);
+    }
+  }, []);
 
+  // Handle pull-to-refresh
+  const handleRefresh = useCallback(async () => {
+    if (googleUser) {
+      await fetchData(false);
+    }
+  }, [googleUser, fetchData]);
+
+  // Fetch data on mount
+  useEffect(() => {
     if (googleUser) {
       fetchData();
     } else {
       setDataLoading(false);
     }
-  }, [googleUser]);
+  }, [googleUser, fetchData]);
   const [convertedFlights, setConvertedFlights] = useState<ConvertedFlight[]>([]);
   const [convertedHotels, setConvertedHotels] = useState<ConvertedHotel[]>([]);
   const [convertedLogistics, setConvertedLogistics] = useState<ConvertedLogistics[]>([]);
@@ -597,7 +607,7 @@ const App: React.FC = () => {
           </div>
         )}
 
-        <div className="flex-1">
+        <div className="flex-1 overflow-hidden">
           {dataLoading ? (
             <div className="flex items-center justify-center h-64">
               <div className="flex flex-col items-center gap-4">
@@ -606,7 +616,9 @@ const App: React.FC = () => {
               </div>
             </div>
           ) : (
-            renderContent()
+            <PullToRefresh onRefresh={handleRefresh}>
+              {renderContent()}
+            </PullToRefresh>
           )}
         </div>
       </div>

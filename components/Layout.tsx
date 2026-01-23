@@ -78,7 +78,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
   const tabs = [
     { id: 'home', label: 'COMMAND CENTER', roles: ['ADMIN', 'OPERATIONS', 'SALES', 'ACCOUNTING'] },
     { id: 'ops', label: 'OPERATIONS', roles: ['ADMIN', 'OPERATIONS', 'ACCOUNTING'] },
-    { id: 'sales', label: 'SALES CRM', roles: ['ADMIN', 'SALES'] },
+    { id: 'sales', label: 'CRM', roles: ['ADMIN', 'SALES'] },
     { id: 'accounting', label: 'ACCOUNTING', roles: ['ADMIN', 'ACCOUNTING'] },
     { id: 'knowledge', label: 'KNOWLEDGE BASE', roles: ['ADMIN', 'OPERATIONS', 'SALES'] },
     { id: 'portal', label: 'CLIENT PORTAL', roles: ['ADMIN', 'CLIENT'] },
@@ -137,7 +137,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
       </div>
 
       {/* Main Content - With bottom padding on mobile for tab bar */}
-      <main className="flex-1 overflow-auto flex flex-col pb-24 md:pb-0">
+      <main className="flex-1 overflow-hidden flex flex-col pb-24 md:pb-0">
         {children}
       </main>
 

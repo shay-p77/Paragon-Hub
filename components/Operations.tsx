@@ -44,6 +44,7 @@ const Operations: React.FC<OperationsProps> = ({
 }) => {
   const [subTab, setSubTab] = useState('flights');
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
+  const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
 
   // Convert modal state
   const [showConvertModal, setShowConvertModal] = useState(false);
@@ -766,67 +767,218 @@ const Operations: React.FC<OperationsProps> = ({
               {convertedFlights.length > 0 && (
                 <div className="mb-6">
                   <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Completed Bookings</h4>
-                  <DataTable headers={['Status', 'Description', 'Airline', 'PNR', 'Flights', 'Pax', 'Agent', 'P/L', 'Payment', 'Action']}>
-                    {convertedFlights.map(f => (
-                      <tr key={f.id} className={`hover:bg-slate-50 cursor-pointer ${selectedElementId === f.id ? 'bg-paragon-light/30' : ''}`} onClick={() => setSelectedElementId(f.id)}>
-                        <td className="px-4 py-3">
-                          <Badge color={f.status === 'TICKETED' ? 'teal' : f.status === 'CONFIRMED' ? 'gold' : f.status === 'CANCELLED' ? 'red' : 'slate'}>
-                            {f.status}
-                          </Badge>
-                        </td>
-                        <td className="px-4 py-3 font-bold">{f.description}</td>
-                        <td className="px-4 py-3">{f.airline}</td>
-                        <td className="px-4 py-3 font-mono text-paragon font-bold">{f.pnr}</td>
-                        <td className="px-4 py-3">{f.flights}</td>
-                        <td className="px-4 py-3">{f.passengerCount}</td>
-                        <td className="px-4 py-3 font-semibold">{f.agent}</td>
-                        <td className={`px-4 py-3 font-bold ${f.profitLoss >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                          ${f.profitLoss.toLocaleString()}
-                        </td>
-                        <td className="px-4 py-3">
-                          <Badge color={f.paymentStatus === 'PAID' ? 'teal' : 'red'}>{f.paymentStatus}</Badge>
-                        </td>
-                        <td className="px-4 py-3 text-right flex gap-2">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); openEditModal('flight', f.id); }}
-                            className="text-[10px] text-slate-400 font-bold hover:text-paragon"
+
+                  {/* Mobile: Expandable List */}
+                  <div className="lg:hidden space-y-2">
+                    {convertedFlights.map(f => {
+                      const isExpanded = expandedItemId === f.id;
+                      const isSelected = selectedElementId === f.id;
+                      return (
+                        <div
+                          key={f.id}
+                          className={`bg-white border rounded-sm transition-all ${isSelected ? 'border-paragon ring-1 ring-paragon' : 'border-slate-200'}`}
+                        >
+                          <div
+                            className="p-3 flex items-center gap-3 cursor-pointer"
+                            onClick={() => setExpandedItemId(isExpanded ? null : f.id)}
                           >
-                            EDIT
-                          </button>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); onDeleteFlight(f.id); }}
-                            className="text-[10px] text-red-400 font-bold hover:text-red-600"
-                          >
-                            DELETE
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </DataTable>
+                            <div className="w-8 h-8 rounded-full bg-red-100 text-red-600 flex items-center justify-center flex-shrink-0">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                              </svg>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold text-xs text-slate-900 truncate">{f.description}</span>
+                                <Badge color={f.status === 'TICKETED' ? 'teal' : f.status === 'CONFIRMED' ? 'gold' : f.status === 'CANCELLED' ? 'red' : 'slate'}>
+                                  {f.status}
+                                </Badge>
+                              </div>
+                              <p className="text-[10px] text-slate-500">{f.airline} • {f.pnr}</p>
+                            </div>
+                            <Badge color={f.paymentStatus === 'PAID' ? 'teal' : 'red'}>{f.paymentStatus}</Badge>
+                            <svg className={`w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </div>
+                          {isExpanded && (
+                            <div className="px-3 pb-3 border-t border-slate-100">
+                              <div className="grid grid-cols-2 gap-3 pt-3 text-[11px]">
+                                <div>
+                                  <span className="text-slate-400 block text-[9px] uppercase tracking-wider">Flights</span>
+                                  <span className="font-medium text-slate-700">{f.flights}</span>
+                                </div>
+                                <div>
+                                  <span className="text-slate-400 block text-[9px] uppercase tracking-wider">Passengers</span>
+                                  <span className="font-medium text-slate-700">{f.passengerCount}</span>
+                                </div>
+                                <div>
+                                  <span className="text-slate-400 block text-[9px] uppercase tracking-wider">Agent</span>
+                                  <span className="font-medium text-slate-700">{f.agent}</span>
+                                </div>
+                                <div>
+                                  <span className="text-slate-400 block text-[9px] uppercase tracking-wider">P/L</span>
+                                  <span className={`font-bold ${f.profitLoss >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>${f.profitLoss.toLocaleString()}</span>
+                                </div>
+                              </div>
+                              <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); openEditModal('flight', f.id); }}
+                                  className="flex-1 bg-slate-100 text-slate-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-slate-200 transition-colors rounded-sm"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); setSelectedElementId(f.id); }}
+                                  className="flex-1 bg-paragon text-white text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-paragon-dark transition-colors rounded-sm"
+                                >
+                                  Discuss
+                                </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); onDeleteFlight(f.id); }}
+                                  className="bg-red-100 text-red-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-red-200 transition-colors rounded-sm"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Desktop: Table */}
+                  <div className="hidden lg:block">
+                    <DataTable headers={['Status', 'Description', 'Airline', 'PNR', 'Flights', 'Pax', 'Agent', 'P/L', 'Payment', 'Action']}>
+                      {convertedFlights.map(f => (
+                        <tr key={f.id} className={`hover:bg-slate-50 cursor-pointer ${selectedElementId === f.id ? 'bg-paragon-light/30' : ''}`} onClick={() => setSelectedElementId(f.id)}>
+                          <td className="px-4 py-3">
+                            <Badge color={f.status === 'TICKETED' ? 'teal' : f.status === 'CONFIRMED' ? 'gold' : f.status === 'CANCELLED' ? 'red' : 'slate'}>
+                              {f.status}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-3 font-bold">{f.description}</td>
+                          <td className="px-4 py-3">{f.airline}</td>
+                          <td className="px-4 py-3 font-mono text-paragon font-bold">{f.pnr}</td>
+                          <td className="px-4 py-3">{f.flights}</td>
+                          <td className="px-4 py-3">{f.passengerCount}</td>
+                          <td className="px-4 py-3 font-semibold">{f.agent}</td>
+                          <td className={`px-4 py-3 font-bold ${f.profitLoss >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                            ${f.profitLoss.toLocaleString()}
+                          </td>
+                          <td className="px-4 py-3">
+                            <Badge color={f.paymentStatus === 'PAID' ? 'teal' : 'red'}>{f.paymentStatus}</Badge>
+                          </td>
+                          <td className="px-4 py-3 text-right flex gap-2">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); openEditModal('flight', f.id); }}
+                              className="text-[10px] text-slate-400 font-bold hover:text-paragon"
+                            >
+                              EDIT
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); onDeleteFlight(f.id); }}
+                              className="text-[10px] text-red-400 font-bold hover:text-red-600"
+                            >
+                              DELETE
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </DataTable>
+                  </div>
                 </div>
               )}
 
               {/* Mock Flights (Original) */}
               <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Existing Inventory</h4>
-              <DataTable headers={['Status', 'Carrier', 'PNR', 'Segments', 'Pax', 'Total Cost', 'Action']}>
-                {MOCK_FLIGHTS.map(f => (
-                  <tr key={f.id} className={`hover:bg-slate-50 group cursor-pointer ${selectedElementId === f.id ? 'bg-paragon-light/30' : ''}`} onClick={() => setSelectedElementId(f.id)}>
-                    <td className="px-4 py-3"><Badge color={f.status === ElementStatus.TICKETED ? 'teal' : 'gold'}>{f.status}</Badge></td>
-                    <td className="px-4 py-3 font-bold">{f.carrier}</td>
-                    <td className="px-4 py-3 font-mono text-paragon font-bold underline">{f.pnr}</td>
-                    <td className="px-4 py-3">
-                      {f.segments.map((s, i) => (
-                        <div key={i}>{s.from} → {s.to} ({s.flightNo})</div>
-                      ))}
-                    </td>
-                    <td className="px-4 py-3 italic truncate max-w-[150px]">{f.passengers.join(', ')}</td>
-                    <td className="px-4 py-3 font-bold">${f.cost.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-right">
-                      <button className="text-[10px] text-slate-400 font-bold hover:text-paragon">VIEW</button>
-                    </td>
-                  </tr>
-                ))}
-              </DataTable>
+
+              {/* Mobile: Expandable List */}
+              <div className="lg:hidden space-y-2">
+                {MOCK_FLIGHTS.map(f => {
+                  const isExpanded = expandedItemId === f.id;
+                  const isSelected = selectedElementId === f.id;
+                  return (
+                    <div
+                      key={f.id}
+                      className={`bg-white border rounded-sm transition-all ${isSelected ? 'border-paragon ring-1 ring-paragon' : 'border-slate-200'}`}
+                    >
+                      <div
+                        className="p-3 flex items-center gap-3 cursor-pointer"
+                        onClick={() => setExpandedItemId(isExpanded ? null : f.id)}
+                      >
+                        <div className="w-8 h-8 rounded-full bg-red-100 text-red-600 flex items-center justify-center flex-shrink-0">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                          </svg>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-xs text-slate-900 truncate">{f.carrier}</span>
+                            <Badge color={f.status === ElementStatus.TICKETED ? 'teal' : 'gold'}>{f.status}</Badge>
+                          </div>
+                          <p className="text-[10px] text-slate-500 font-mono">{f.pnr}</p>
+                        </div>
+                        <svg className={`w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </div>
+                      {isExpanded && (
+                        <div className="px-3 pb-3 border-t border-slate-100">
+                          <div className="pt-3 text-[11px]">
+                            <span className="text-slate-400 block text-[9px] uppercase tracking-wider mb-1">Segments</span>
+                            {f.segments.map((s, i) => (
+                              <div key={i} className="font-medium text-slate-700">{s.from} → {s.to} ({s.flightNo})</div>
+                            ))}
+                          </div>
+                          <div className="grid grid-cols-2 gap-3 pt-3 text-[11px]">
+                            <div>
+                              <span className="text-slate-400 block text-[9px] uppercase tracking-wider">Passengers</span>
+                              <span className="font-medium text-slate-700 truncate block">{f.passengers.join(', ')}</span>
+                            </div>
+                            <div>
+                              <span className="text-slate-400 block text-[9px] uppercase tracking-wider">Total Cost</span>
+                              <span className="font-bold text-slate-900">${f.cost.toLocaleString()}</span>
+                            </div>
+                          </div>
+                          <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setSelectedElementId(f.id); }}
+                              className="flex-1 bg-paragon text-white text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-paragon-dark transition-colors rounded-sm"
+                            >
+                              View Details
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Desktop: Table */}
+              <div className="hidden lg:block">
+                <DataTable headers={['Status', 'Carrier', 'PNR', 'Segments', 'Pax', 'Total Cost', 'Action']}>
+                  {MOCK_FLIGHTS.map(f => (
+                    <tr key={f.id} className={`hover:bg-slate-50 group cursor-pointer ${selectedElementId === f.id ? 'bg-paragon-light/30' : ''}`} onClick={() => setSelectedElementId(f.id)}>
+                      <td className="px-4 py-3"><Badge color={f.status === ElementStatus.TICKETED ? 'teal' : 'gold'}>{f.status}</Badge></td>
+                      <td className="px-4 py-3 font-bold">{f.carrier}</td>
+                      <td className="px-4 py-3 font-mono text-paragon font-bold underline">{f.pnr}</td>
+                      <td className="px-4 py-3">
+                        {f.segments.map((s, i) => (
+                          <div key={i}>{s.from} → {s.to} ({s.flightNo})</div>
+                        ))}
+                      </td>
+                      <td className="px-4 py-3 italic truncate max-w-[150px]">{f.passengers.join(', ')}</td>
+                      <td className="px-4 py-3 font-bold">${f.cost.toLocaleString()}</td>
+                      <td className="px-4 py-3 text-right">
+                        <button className="text-[10px] text-slate-400 font-bold hover:text-paragon">VIEW</button>
+                      </td>
+                    </tr>
+                  ))}
+                </DataTable>
+              </div>
             </div>
           )}
 
@@ -838,62 +990,219 @@ const Operations: React.FC<OperationsProps> = ({
               {convertedHotels.length > 0 && (
                 <div className="mb-6">
                   <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Completed Bookings</h4>
-                  <DataTable headers={['Status', 'Description', 'Hotel', 'Room', 'Dates', 'Guests', 'Agent', 'P/L', 'Payment', 'Action']}>
-                    {convertedHotels.map(h => (
-                      <tr key={h.id} className={`hover:bg-slate-50 cursor-pointer ${selectedElementId === h.id ? 'bg-paragon-light/30' : ''}`} onClick={() => setSelectedElementId(h.id)}>
-                        <td className="px-4 py-3">
-                          <Badge color={h.status === 'CONFIRMED' ? 'teal' : h.status === 'CANCELLED' ? 'red' : 'slate'}>
-                            {h.status}
-                          </Badge>
-                        </td>
-                        <td className="px-4 py-3 font-bold">{h.description}</td>
-                        <td className="px-4 py-3">{h.hotelName}</td>
-                        <td className="px-4 py-3">{h.roomType}</td>
-                        <td className="px-4 py-3">{h.checkIn} — {h.checkOut}</td>
-                        <td className="px-4 py-3">{h.guestCount}</td>
-                        <td className="px-4 py-3 font-semibold">{h.agent}</td>
-                        <td className={`px-4 py-3 font-bold ${h.profitLoss >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                          ${h.profitLoss.toLocaleString()}
-                        </td>
-                        <td className="px-4 py-3">
-                          <Badge color={h.paymentStatus === 'PAID' ? 'teal' : 'red'}>{h.paymentStatus}</Badge>
-                        </td>
-                        <td className="px-4 py-3 text-right flex gap-2">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); openEditModal('hotel', h.id); }}
-                            className="text-[10px] text-slate-400 font-bold hover:text-paragon"
+
+                  {/* Mobile: Expandable List */}
+                  <div className="lg:hidden space-y-2">
+                    {convertedHotels.map(h => {
+                      const isExpanded = expandedItemId === h.id;
+                      const isSelected = selectedElementId === h.id;
+                      return (
+                        <div
+                          key={h.id}
+                          className={`bg-white border rounded-sm transition-all ${isSelected ? 'border-paragon ring-1 ring-paragon' : 'border-slate-200'}`}
+                        >
+                          <div
+                            className="p-3 flex items-center gap-3 cursor-pointer"
+                            onClick={() => setExpandedItemId(isExpanded ? null : h.id)}
                           >
-                            EDIT
-                          </button>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); onDeleteHotel(h.id); }}
-                            className="text-[10px] text-red-400 font-bold hover:text-red-600"
-                          >
-                            DELETE
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </DataTable>
+                            <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center flex-shrink-0">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                              </svg>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold text-xs text-slate-900 truncate">{h.description}</span>
+                                <Badge color={h.status === 'CONFIRMED' ? 'teal' : h.status === 'CANCELLED' ? 'red' : 'slate'}>
+                                  {h.status}
+                                </Badge>
+                              </div>
+                              <p className="text-[10px] text-slate-500">{h.hotelName}</p>
+                            </div>
+                            <Badge color={h.paymentStatus === 'PAID' ? 'teal' : 'red'}>{h.paymentStatus}</Badge>
+                            <svg className={`w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </div>
+                          {isExpanded && (
+                            <div className="px-3 pb-3 border-t border-slate-100">
+                              <div className="grid grid-cols-2 gap-3 pt-3 text-[11px]">
+                                <div>
+                                  <span className="text-slate-400 block text-[9px] uppercase tracking-wider">Room Type</span>
+                                  <span className="font-medium text-slate-700">{h.roomType}</span>
+                                </div>
+                                <div>
+                                  <span className="text-slate-400 block text-[9px] uppercase tracking-wider">Guests</span>
+                                  <span className="font-medium text-slate-700">{h.guestCount}</span>
+                                </div>
+                                <div>
+                                  <span className="text-slate-400 block text-[9px] uppercase tracking-wider">Check-In</span>
+                                  <span className="font-medium text-slate-700">{h.checkIn}</span>
+                                </div>
+                                <div>
+                                  <span className="text-slate-400 block text-[9px] uppercase tracking-wider">Check-Out</span>
+                                  <span className="font-medium text-slate-700">{h.checkOut}</span>
+                                </div>
+                                <div>
+                                  <span className="text-slate-400 block text-[9px] uppercase tracking-wider">Agent</span>
+                                  <span className="font-medium text-slate-700">{h.agent}</span>
+                                </div>
+                                <div>
+                                  <span className="text-slate-400 block text-[9px] uppercase tracking-wider">P/L</span>
+                                  <span className={`font-bold ${h.profitLoss >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>${h.profitLoss.toLocaleString()}</span>
+                                </div>
+                              </div>
+                              <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); openEditModal('hotel', h.id); }}
+                                  className="flex-1 bg-slate-100 text-slate-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-slate-200 transition-colors rounded-sm"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); setSelectedElementId(h.id); }}
+                                  className="flex-1 bg-paragon text-white text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-paragon-dark transition-colors rounded-sm"
+                                >
+                                  Discuss
+                                </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); onDeleteHotel(h.id); }}
+                                  className="bg-red-100 text-red-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-red-200 transition-colors rounded-sm"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Desktop: Table */}
+                  <div className="hidden lg:block">
+                    <DataTable headers={['Status', 'Description', 'Hotel', 'Room', 'Dates', 'Guests', 'Agent', 'P/L', 'Payment', 'Action']}>
+                      {convertedHotels.map(h => (
+                        <tr key={h.id} className={`hover:bg-slate-50 cursor-pointer ${selectedElementId === h.id ? 'bg-paragon-light/30' : ''}`} onClick={() => setSelectedElementId(h.id)}>
+                          <td className="px-4 py-3">
+                            <Badge color={h.status === 'CONFIRMED' ? 'teal' : h.status === 'CANCELLED' ? 'red' : 'slate'}>
+                              {h.status}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-3 font-bold">{h.description}</td>
+                          <td className="px-4 py-3">{h.hotelName}</td>
+                          <td className="px-4 py-3">{h.roomType}</td>
+                          <td className="px-4 py-3">{h.checkIn} — {h.checkOut}</td>
+                          <td className="px-4 py-3">{h.guestCount}</td>
+                          <td className="px-4 py-3 font-semibold">{h.agent}</td>
+                          <td className={`px-4 py-3 font-bold ${h.profitLoss >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                            ${h.profitLoss.toLocaleString()}
+                          </td>
+                          <td className="px-4 py-3">
+                            <Badge color={h.paymentStatus === 'PAID' ? 'teal' : 'red'}>{h.paymentStatus}</Badge>
+                          </td>
+                          <td className="px-4 py-3 text-right flex gap-2">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); openEditModal('hotel', h.id); }}
+                              className="text-[10px] text-slate-400 font-bold hover:text-paragon"
+                            >
+                              EDIT
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); onDeleteHotel(h.id); }}
+                              className="text-[10px] text-red-400 font-bold hover:text-red-600"
+                            >
+                              DELETE
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </DataTable>
+                  </div>
                 </div>
               )}
 
               {/* Mock Hotels (Original) */}
               <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Existing Inventory</h4>
-              <DataTable headers={['Status', 'Hotel', 'Room Type', 'Dates', 'Cost', 'Action']}>
-                {MOCK_HOTELS.map(h => (
-                  <tr key={h.id} className={`hover:bg-slate-50 cursor-pointer ${selectedElementId === h.id ? 'bg-paragon-light/30' : ''}`} onClick={() => setSelectedElementId(h.id)}>
-                    <td className="px-4 py-3"><Badge color="gold">{h.status}</Badge></td>
-                    <td className="px-4 py-3 font-bold">{h.hotelName}</td>
-                    <td className="px-4 py-3">{h.roomType}</td>
-                    <td className="px-4 py-3">{h.checkIn} — {h.checkOut}</td>
-                    <td className="px-4 py-3 font-bold">${h.cost.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-right">
-                      <button className="text-[10px] text-slate-400 font-bold hover:text-paragon">VIEW</button>
-                    </td>
-                  </tr>
-                ))}
-              </DataTable>
+
+              {/* Mobile: Expandable List */}
+              <div className="lg:hidden space-y-2">
+                {MOCK_HOTELS.map(h => {
+                  const isExpanded = expandedItemId === h.id;
+                  const isSelected = selectedElementId === h.id;
+                  return (
+                    <div
+                      key={h.id}
+                      className={`bg-white border rounded-sm transition-all ${isSelected ? 'border-paragon ring-1 ring-paragon' : 'border-slate-200'}`}
+                    >
+                      <div
+                        className="p-3 flex items-center gap-3 cursor-pointer"
+                        onClick={() => setExpandedItemId(isExpanded ? null : h.id)}
+                      >
+                        <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center flex-shrink-0">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                          </svg>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-xs text-slate-900 truncate">{h.hotelName}</span>
+                            <Badge color="gold">{h.status}</Badge>
+                          </div>
+                          <p className="text-[10px] text-slate-500">{h.roomType}</p>
+                        </div>
+                        <svg className={`w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </div>
+                      {isExpanded && (
+                        <div className="px-3 pb-3 border-t border-slate-100">
+                          <div className="grid grid-cols-2 gap-3 pt-3 text-[11px]">
+                            <div>
+                              <span className="text-slate-400 block text-[9px] uppercase tracking-wider">Check-In</span>
+                              <span className="font-medium text-slate-700">{h.checkIn}</span>
+                            </div>
+                            <div>
+                              <span className="text-slate-400 block text-[9px] uppercase tracking-wider">Check-Out</span>
+                              <span className="font-medium text-slate-700">{h.checkOut}</span>
+                            </div>
+                            <div className="col-span-2">
+                              <span className="text-slate-400 block text-[9px] uppercase tracking-wider">Total Cost</span>
+                              <span className="font-bold text-slate-900">${h.cost.toLocaleString()}</span>
+                            </div>
+                          </div>
+                          <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setSelectedElementId(h.id); }}
+                              className="flex-1 bg-paragon text-white text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-paragon-dark transition-colors rounded-sm"
+                            >
+                              View Details
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Desktop: Table */}
+              <div className="hidden lg:block">
+                <DataTable headers={['Status', 'Hotel', 'Room Type', 'Dates', 'Cost', 'Action']}>
+                  {MOCK_HOTELS.map(h => (
+                    <tr key={h.id} className={`hover:bg-slate-50 cursor-pointer ${selectedElementId === h.id ? 'bg-paragon-light/30' : ''}`} onClick={() => setSelectedElementId(h.id)}>
+                      <td className="px-4 py-3"><Badge color="gold">{h.status}</Badge></td>
+                      <td className="px-4 py-3 font-bold">{h.hotelName}</td>
+                      <td className="px-4 py-3">{h.roomType}</td>
+                      <td className="px-4 py-3">{h.checkIn} — {h.checkOut}</td>
+                      <td className="px-4 py-3 font-bold">${h.cost.toLocaleString()}</td>
+                      <td className="px-4 py-3 text-right">
+                        <button className="text-[10px] text-slate-400 font-bold hover:text-paragon">VIEW</button>
+                      </td>
+                    </tr>
+                  ))}
+                </DataTable>
+              </div>
             </div>
           )}
 
@@ -905,42 +1214,122 @@ const Operations: React.FC<OperationsProps> = ({
               {convertedLogistics.length > 0 && (
                 <div className="mb-6">
                   <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Completed Bookings</h4>
-                  <DataTable headers={['Status', 'Description', 'Service', 'Details', 'Date', 'Agent', 'P/L', 'Payment', 'Action']}>
-                    {convertedLogistics.map(l => (
-                      <tr key={l.id} className={`hover:bg-slate-50 cursor-pointer ${selectedElementId === l.id ? 'bg-paragon-light/30' : ''}`} onClick={() => setSelectedElementId(l.id)}>
-                        <td className="px-4 py-3">
-                          <Badge color={l.status === 'CONFIRMED' ? 'teal' : l.status === 'CANCELLED' ? 'red' : 'slate'}>
-                            {l.status}
-                          </Badge>
-                        </td>
-                        <td className="px-4 py-3 font-bold">{l.description}</td>
-                        <td className="px-4 py-3">{l.serviceType}</td>
-                        <td className="px-4 py-3 italic truncate max-w-[200px]">{l.details}</td>
-                        <td className="px-4 py-3">{l.date}</td>
-                        <td className="px-4 py-3 font-semibold">{l.agent}</td>
-                        <td className={`px-4 py-3 font-bold ${l.profitLoss >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                          ${l.profitLoss.toLocaleString()}
-                        </td>
-                        <td className="px-4 py-3">
-                          <Badge color={l.paymentStatus === 'PAID' ? 'teal' : 'red'}>{l.paymentStatus}</Badge>
-                        </td>
-                        <td className="px-4 py-3 text-right flex gap-2">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); openEditModal('logistics', l.id); }}
-                            className="text-[10px] text-slate-400 font-bold hover:text-paragon"
+
+                  {/* Mobile: Expandable List */}
+                  <div className="lg:hidden space-y-2">
+                    {convertedLogistics.map(l => {
+                      const isExpanded = expandedItemId === l.id;
+                      const isSelected = selectedElementId === l.id;
+                      return (
+                        <div
+                          key={l.id}
+                          className={`bg-white border rounded-sm transition-all ${isSelected ? 'border-paragon ring-1 ring-paragon' : 'border-slate-200'}`}
+                        >
+                          <div
+                            className="p-3 flex items-center gap-3 cursor-pointer"
+                            onClick={() => setExpandedItemId(isExpanded ? null : l.id)}
                           >
-                            EDIT
-                          </button>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); onDeleteLogistics(l.id); }}
-                            className="text-[10px] text-red-400 font-bold hover:text-red-600"
-                          >
-                            DELETE
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </DataTable>
+                            <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center flex-shrink-0">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                              </svg>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold text-xs text-slate-900 truncate">{l.description}</span>
+                                <Badge color={l.status === 'CONFIRMED' ? 'teal' : l.status === 'CANCELLED' ? 'red' : 'slate'}>
+                                  {l.status}
+                                </Badge>
+                              </div>
+                              <p className="text-[10px] text-slate-500">{l.serviceType} • {l.date}</p>
+                            </div>
+                            <Badge color={l.paymentStatus === 'PAID' ? 'teal' : 'red'}>{l.paymentStatus}</Badge>
+                            <svg className={`w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </div>
+                          {isExpanded && (
+                            <div className="px-3 pb-3 border-t border-slate-100">
+                              <div className="pt-3 text-[11px]">
+                                <span className="text-slate-400 block text-[9px] uppercase tracking-wider mb-1">Details</span>
+                                <span className="font-medium text-slate-700">{l.details}</span>
+                              </div>
+                              <div className="grid grid-cols-2 gap-3 pt-3 text-[11px]">
+                                <div>
+                                  <span className="text-slate-400 block text-[9px] uppercase tracking-wider">Agent</span>
+                                  <span className="font-medium text-slate-700">{l.agent}</span>
+                                </div>
+                                <div>
+                                  <span className="text-slate-400 block text-[9px] uppercase tracking-wider">P/L</span>
+                                  <span className={`font-bold ${l.profitLoss >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>${l.profitLoss.toLocaleString()}</span>
+                                </div>
+                              </div>
+                              <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); openEditModal('logistics', l.id); }}
+                                  className="flex-1 bg-slate-100 text-slate-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-slate-200 transition-colors rounded-sm"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); setSelectedElementId(l.id); }}
+                                  className="flex-1 bg-paragon text-white text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-paragon-dark transition-colors rounded-sm"
+                                >
+                                  Discuss
+                                </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); onDeleteLogistics(l.id); }}
+                                  className="bg-red-100 text-red-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-red-200 transition-colors rounded-sm"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Desktop: Table */}
+                  <div className="hidden lg:block">
+                    <DataTable headers={['Status', 'Description', 'Service', 'Details', 'Date', 'Agent', 'P/L', 'Payment', 'Action']}>
+                      {convertedLogistics.map(l => (
+                        <tr key={l.id} className={`hover:bg-slate-50 cursor-pointer ${selectedElementId === l.id ? 'bg-paragon-light/30' : ''}`} onClick={() => setSelectedElementId(l.id)}>
+                          <td className="px-4 py-3">
+                            <Badge color={l.status === 'CONFIRMED' ? 'teal' : l.status === 'CANCELLED' ? 'red' : 'slate'}>
+                              {l.status}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-3 font-bold">{l.description}</td>
+                          <td className="px-4 py-3">{l.serviceType}</td>
+                          <td className="px-4 py-3 italic truncate max-w-[200px]">{l.details}</td>
+                          <td className="px-4 py-3">{l.date}</td>
+                          <td className="px-4 py-3 font-semibold">{l.agent}</td>
+                          <td className={`px-4 py-3 font-bold ${l.profitLoss >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                            ${l.profitLoss.toLocaleString()}
+                          </td>
+                          <td className="px-4 py-3">
+                            <Badge color={l.paymentStatus === 'PAID' ? 'teal' : 'red'}>{l.paymentStatus}</Badge>
+                          </td>
+                          <td className="px-4 py-3 text-right flex gap-2">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); openEditModal('logistics', l.id); }}
+                              className="text-[10px] text-slate-400 font-bold hover:text-paragon"
+                            >
+                              EDIT
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); onDeleteLogistics(l.id); }}
+                              className="text-[10px] text-red-400 font-bold hover:text-red-600"
+                            >
+                              DELETE
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </DataTable>
+                  </div>
                 </div>
               )}
 
@@ -955,48 +1344,163 @@ const Operations: React.FC<OperationsProps> = ({
           {subTab === 'pending' && (
             <div>
               <SectionHeader title="Pending Requests" />
-              <DataTable headers={['Recd', 'Client', 'Type', 'Target Date', 'Notes', 'Agent', 'Priority', 'Action']}>
+
+              {/* Mobile: Expandable List */}
+              <div className="lg:hidden space-y-2">
                 {requests
                   .filter(r => r.status === 'PENDING')
                   .sort((a, b) => {
-                    // URGENT/CRITICAL items first
                     const aUrgent = a.priority === 'URGENT' || a.priority === 'CRITICAL';
                     const bUrgent = b.priority === 'URGENT' || b.priority === 'CRITICAL';
                     if (aUrgent && !bUrgent) return -1;
                     if (!aUrgent && bUrgent) return 1;
-                    // Then by timestamp (newest first)
                     return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
                   })
                   .map(r => {
-                  // Get client name from details field or fall back to looking up clientId
-                  const clientName = r.details?.clientName || MOCK_USERS.find(u => u.id === r.clientId)?.name || '—';
-                  const targetDate = r.details?.targetDate ? new Date(r.details.targetDate).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
-                  // Get agent name from details (for Google users) or fall back to mock user lookup
-                  const agentName = r.details?.agentName || (googleUser && r.agentId === googleUser.id ? googleUser.name : (MOCK_USERS.find(u => u.id === r.agentId)?.name || 'Unknown'));
+                    const clientName = r.details?.clientName || MOCK_USERS.find(u => u.id === r.clientId)?.name || '—';
+                    const targetDate = r.details?.targetDate ? new Date(r.details.targetDate).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+                    const agentName = r.details?.agentName || (googleUser && r.agentId === googleUser.id ? googleUser.name : (MOCK_USERS.find(u => u.id === r.agentId)?.name || 'Unknown'));
+                    const isExpanded = expandedItemId === r.id;
+                    const isSelected = selectedElementId === r.id;
 
-                  return (
-                    <tr key={r.id} className={`hover:bg-slate-50 cursor-pointer ${selectedElementId === r.id ? 'bg-paragon-light/30' : ''}`} onClick={() => setSelectedElementId(r.id)}>
-                      <td className="px-4 py-3">{new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
-                      <td className="px-4 py-3 font-bold">{clientName}</td>
-                      <td className="px-4 py-3"><Badge color={r.type === 'FLIGHT' ? 'red' : r.type === 'HOTEL' ? 'gold' : 'slate'}>{r.type}</Badge></td>
-                      <td className="px-4 py-3">{targetDate}</td>
-                      <td className="px-4 py-3 italic truncate max-w-sm">{r.notes}</td>
-                      <td className="px-4 py-3 font-semibold">{agentName}</td>
-                      <td className="px-4 py-3">
-                        <span className={`text-[10px] font-bold ${r.priority === 'URGENT' || r.priority === 'CRITICAL' ? 'text-red-600' : 'text-slate-500'}`}>{r.priority}</span>
-                      </td>
-                      <td className="px-4 py-3 flex gap-2">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); openConvertModal(r); }}
-                          className="text-paragon font-bold text-[10px] hover:text-paragon-dark"
+                    return (
+                      <div
+                        key={r.id}
+                        className={`bg-white border rounded-sm transition-all ${isSelected ? 'border-paragon ring-1 ring-paragon' : 'border-slate-200'}`}
+                      >
+                        {/* Header Row - Always Visible */}
+                        <div
+                          className="p-3 flex items-center gap-3 cursor-pointer"
+                          onClick={() => setExpandedItemId(isExpanded ? null : r.id)}
                         >
-                          COMPLETE
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </DataTable>
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                            r.type === 'FLIGHT' ? 'bg-red-100 text-red-600' :
+                            r.type === 'HOTEL' ? 'bg-amber-100 text-amber-600' :
+                            'bg-slate-100 text-slate-600'
+                          }`}>
+                            {r.type === 'FLIGHT' ? (
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                              </svg>
+                            ) : r.type === 'HOTEL' ? (
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                              </svg>
+                            ) : (
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                              </svg>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-xs text-slate-900 truncate">{clientName}</span>
+                              <Badge color={r.type === 'FLIGHT' ? 'red' : r.type === 'HOTEL' ? 'gold' : 'slate'}>{r.type}</Badge>
+                            </div>
+                            <p className="text-[10px] text-slate-500 truncate">{r.notes}</p>
+                          </div>
+                          {(r.priority === 'URGENT' || r.priority === 'CRITICAL') && (
+                            <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0"></span>
+                          )}
+                          <svg className={`w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </div>
+
+                        {/* Expanded Details */}
+                        {isExpanded && (
+                          <div className="px-3 pb-3 border-t border-slate-100">
+                            <div className="grid grid-cols-2 gap-3 pt-3 text-[11px]">
+                              <div>
+                                <span className="text-slate-400 block text-[9px] uppercase tracking-wider">Received</span>
+                                <span className="font-medium text-slate-700">{new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                              </div>
+                              <div>
+                                <span className="text-slate-400 block text-[9px] uppercase tracking-wider">Target Date</span>
+                                <span className="font-medium text-slate-700">{targetDate}</span>
+                              </div>
+                              <div>
+                                <span className="text-slate-400 block text-[9px] uppercase tracking-wider">Agent</span>
+                                <span className="font-medium text-slate-700">{agentName}</span>
+                              </div>
+                              <div>
+                                <span className="text-slate-400 block text-[9px] uppercase tracking-wider">Priority</span>
+                                <span className={`font-bold ${r.priority === 'URGENT' || r.priority === 'CRITICAL' ? 'text-red-600' : 'text-slate-600'}`}>{r.priority}</span>
+                              </div>
+                            </div>
+                            {r.notes && (
+                              <div className="mt-3 pt-3 border-t border-slate-100">
+                                <span className="text-slate-400 block text-[9px] uppercase tracking-wider mb-1">Notes</span>
+                                <p className="text-[11px] text-slate-700 whitespace-pre-wrap">{r.notes}</p>
+                              </div>
+                            )}
+                            <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); openConvertModal(r); }}
+                                className="flex-1 bg-paragon text-white text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-paragon-dark transition-colors rounded-sm"
+                              >
+                                Complete
+                              </button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setSelectedElementId(r.id); }}
+                                className="flex-1 bg-slate-100 text-slate-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-slate-200 transition-colors rounded-sm"
+                              >
+                                Discuss
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                {requests.filter(r => r.status === 'PENDING').length === 0 && (
+                  <div className="text-center py-8 text-slate-400">
+                    <p className="text-sm">No pending requests</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Desktop: Table */}
+              <div className="hidden lg:block">
+                <DataTable headers={['Recd', 'Client', 'Type', 'Target Date', 'Notes', 'Agent', 'Priority', 'Action']}>
+                  {requests
+                    .filter(r => r.status === 'PENDING')
+                    .sort((a, b) => {
+                      const aUrgent = a.priority === 'URGENT' || a.priority === 'CRITICAL';
+                      const bUrgent = b.priority === 'URGENT' || b.priority === 'CRITICAL';
+                      if (aUrgent && !bUrgent) return -1;
+                      if (!aUrgent && bUrgent) return 1;
+                      return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+                    })
+                    .map(r => {
+                    const clientName = r.details?.clientName || MOCK_USERS.find(u => u.id === r.clientId)?.name || '—';
+                    const targetDate = r.details?.targetDate ? new Date(r.details.targetDate).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+                    const agentName = r.details?.agentName || (googleUser && r.agentId === googleUser.id ? googleUser.name : (MOCK_USERS.find(u => u.id === r.agentId)?.name || 'Unknown'));
+
+                    return (
+                      <tr key={r.id} className={`hover:bg-slate-50 cursor-pointer ${selectedElementId === r.id ? 'bg-paragon-light/30' : ''}`} onClick={() => setSelectedElementId(r.id)}>
+                        <td className="px-4 py-3">{new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
+                        <td className="px-4 py-3 font-bold">{clientName}</td>
+                        <td className="px-4 py-3"><Badge color={r.type === 'FLIGHT' ? 'red' : r.type === 'HOTEL' ? 'gold' : 'slate'}>{r.type}</Badge></td>
+                        <td className="px-4 py-3">{targetDate}</td>
+                        <td className="px-4 py-3 italic truncate max-w-sm">{r.notes}</td>
+                        <td className="px-4 py-3 font-semibold">{agentName}</td>
+                        <td className="px-4 py-3">
+                          <span className={`text-[10px] font-bold ${r.priority === 'URGENT' || r.priority === 'CRITICAL' ? 'text-red-600' : 'text-slate-500'}`}>{r.priority}</span>
+                        </td>
+                        <td className="px-4 py-3 flex gap-2">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); openConvertModal(r); }}
+                            className="text-paragon font-bold text-[10px] hover:text-paragon-dark"
+                          >
+                            COMPLETE
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </DataTable>
+              </div>
             </div>
           )}
           
@@ -1135,16 +1639,16 @@ const Operations: React.FC<OperationsProps> = ({
         </div>
 
         {selectedElementId && (
-          <div className="lg:col-span-4 sticky top-20 h-fit">
-            <div className="bg-white border border-slate-200 p-4 sm:p-6 rounded-sm shadow-lg animate-slideUp">
+          <div className="lg:col-span-4 fixed inset-x-0 bottom-0 lg:relative lg:inset-auto lg:sticky lg:top-20 lg:h-fit z-40">
+            <div className="bg-white border-t lg:border border-slate-200 p-4 sm:p-6 rounded-t-lg lg:rounded-sm shadow-lg max-h-[60vh] lg:max-h-none overflow-auto animate-slideUp">
               <div className="flex justify-between items-center mb-4">
                  <h3 className="text-xs font-bold uppercase tracking-widest text-paragon">Collaboration Panel</h3>
-                 <button onClick={() => setSelectedElementId(null)} className="text-slate-400 hover:text-slate-600">&times;</button>
+                 <button onClick={() => setSelectedElementId(null)} className="text-slate-400 hover:text-slate-600 text-xl">&times;</button>
               </div>
               <div className="text-[10px] font-mono text-slate-400 mb-6 pb-4 border-b border-slate-100 uppercase">
                 ID: {selectedElementId}
               </div>
-              
+
               <Comments
                 parentId={selectedElementId}
                 currentUser={currentUser}
