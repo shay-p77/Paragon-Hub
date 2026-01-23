@@ -974,8 +974,8 @@ const KnowledgeBase: React.FC = () => {
 
       {/* Quick Add Modal */}
       {showQuickAdd && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fadeIn">
-          <div ref={quickAddRef} className="bg-white w-full max-w-lg max-h-[80vh] flex flex-col rounded-sm shadow-2xl animate-zoomIn">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 pb-20 md:pb-4 animate-fadeIn">
+          <div ref={quickAddRef} className="bg-white w-full max-w-lg max-h-[70vh] md:max-h-[80vh] flex flex-col rounded-sm shadow-2xl animate-zoomIn overflow-hidden">
             <div className="p-3 sm:p-4 border-b border-slate-200 flex justify-between items-center">
               <div className="flex items-center gap-2">
                 {quickAddCategory && (
@@ -1308,12 +1308,12 @@ const KnowledgeBase: React.FC = () => {
       {/* Edit Modal */}
       {editingEntry && (
         <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fadeIn"
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 pb-20 md:pb-4 animate-fadeIn"
           onClick={() => setEditingEntry(null)}
         >
           <div
             ref={editModalRef}
-            className="bg-white w-full max-w-lg max-h-[80vh] flex flex-col rounded-sm shadow-2xl animate-zoomIn"
+            className="bg-white w-full max-w-lg max-h-[70vh] md:max-h-[80vh] flex flex-col rounded-sm shadow-2xl animate-zoomIn overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-3 sm:p-4 border-b border-slate-200 flex justify-between items-center">
