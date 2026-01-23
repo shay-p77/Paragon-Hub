@@ -8,7 +8,6 @@ import KnowledgeBase from './components/KnowledgeBase';
 import ClientPortal from './components/ClientPortal';
 import Home from './components/Home';
 import NotificationCenter from './components/NotificationCenter';
-import PullToRefresh from './components/PullToRefresh';
 import Login, { GoogleUser } from './components/Login';
 import { MOCK_USERS } from './constants';
 import { User, BookingRequest, Comment, Notification, Announcement, ConvertedFlight, ConvertedHotel, ConvertedLogistics, PipelineTrip } from './types';
@@ -607,7 +606,7 @@ const App: React.FC = () => {
           </div>
         )}
 
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-auto">
           {dataLoading ? (
             <div className="flex items-center justify-center h-64">
               <div className="flex flex-col items-center gap-4">
@@ -616,9 +615,7 @@ const App: React.FC = () => {
               </div>
             </div>
           ) : (
-            <PullToRefresh onRefresh={handleRefresh}>
-              {renderContent()}
-            </PullToRefresh>
+            renderContent()
           )}
         </div>
       </div>
