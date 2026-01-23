@@ -98,7 +98,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 relative">
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 relative pb-20">
       {/* Background pattern image */}
       <div
         className="absolute inset-0"
