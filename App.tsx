@@ -508,9 +508,9 @@ const App: React.FC = () => {
       avatarColor={googleUser ? getAvatarColor(googleUser.email) : undefined}
       pendingRequestCount={pendingRequestCount}
     >
-      <div className="flex-1 bg-slate-50 overflow-auto flex flex-col relative">
+      <div className="flex-1 bg-slate-50 flex flex-col min-h-0 relative">
         {/* Top Header/Breadcrumb */}
-        <div className="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-3 sm:px-8 sticky top-0 z-10 shadow-sm">
+        <div className="min-h-[3.5rem] bg-white border-b border-slate-200 flex items-center justify-between px-3 sm:px-8 flex-shrink-0 z-10 shadow-sm safe-area-top">
           {/* Mobile: Show logo, Desktop: Show breadcrumb */}
           <div className="flex items-center gap-2">
             <h1 className="md:hidden font-cinzel text-lg font-bold tracking-widest text-paragon">PARAGON</h1>
@@ -606,7 +606,7 @@ const App: React.FC = () => {
           </div>
         )}
 
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto min-h-0">
           {dataLoading ? (
             <div className="flex items-center justify-center h-64">
               <div className="flex flex-col items-center gap-4">
