@@ -137,7 +137,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
       </div>
 
       {/* Main Content - With bottom padding on mobile for tab bar */}
-      <main className="flex-1 overflow-auto flex flex-col pb-16 md:pb-0">
+      <main className="flex-1 overflow-auto flex flex-col pb-24 md:pb-0">
         {children}
       </main>
 
