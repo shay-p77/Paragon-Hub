@@ -37,6 +37,11 @@ app.use('/api/requests', requestRoutes);
 app.use('/api/knowledge', knowledgeRoutes);
 app.use('/api/parse', parseRoutes);
 
+// Root route
+app.get('/', (req, res) => {
+  res.json({ message: 'Paragon Hub API', status: 'running' });
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
