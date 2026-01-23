@@ -113,13 +113,12 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
       <div className="relative z-10 w-full max-w-md">
         {/* Logo and Title */}
-        <div className="text-center mb-6 sm:mb-8">
+        <div className="text-center mb-3 sm:mb-4">
           <img
             src="/paragon-login-page-logo.svg"
             alt="Paragon Logo"
-            className="w-36 h-36 sm:w-48 sm:h-48 mb-4 mx-auto"
+            className="w-36 h-36 sm:w-48 sm:h-48 mb-2 mx-auto"
           />
-          <h1 className="font-cinzel text-3xl sm:text-4xl font-bold text-white tracking-wider mb-2">PARAGON</h1>
           <p className="text-paragon-gold text-xs sm:text-sm font-semibold tracking-[0.2em] sm:tracking-[0.3em] uppercase">Enterprise Concierge OS</p>
         </div>
 
