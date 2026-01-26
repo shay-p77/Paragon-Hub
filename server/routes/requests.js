@@ -85,18 +85,36 @@ router.post('/', async (req, res) => {
   }
 });
 
-// PUT update request status
+// PUT update request status and/or details
 router.put('/:id', async (req, res) => {
   try {
-    const { status } = req.body;
-    const request = await BookingRequest.findByIdAndUpdate(
-      req.params.id,
-      { status },
-      { new: true }
-    );
-    if (!request) {
+    const { status, details } = req.body;
+
+    // First, get the existing request to preserve current details
+    const existingRequest = await BookingRequest.findById(req.params.id);
+    if (!existingRequest) {
       return res.status(404).json({ error: 'Request not found' });
     }
+
+    // Build update object
+    const updateData = {};
+    if (status) {
+      updateData.status = status;
+    }
+    if (details) {
+      // Merge new details with existing details (preserve original fields)
+      updateData.details = {
+        ...existingRequest.details,
+        ...details,
+      };
+    }
+
+    const request = await BookingRequest.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      { new: true }
+    );
+
     res.json({
       id: request._id.toString(),
       agentId: request.agentId,
