@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 
 const authRoutes = require('./routes/auth');
+const userRoutes = require('./routes/users');
 const announcementRoutes = require('./routes/announcements');
 const commentRoutes = require('./routes/comments');
 const requestRoutes = require('./routes/requests');
@@ -31,6 +32,7 @@ app.use(express.json());
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
 app.use('/api/announcements', announcementRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/requests', requestRoutes);

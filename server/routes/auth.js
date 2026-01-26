@@ -5,7 +5,7 @@ const User = require('../models/User');
 const router = express.Router();
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-// POST /api/auth/google - Verify Google token and create/get user
+// POST /api/auth/google - Verify Google token and authenticate user
 router.post('/google', async (req, res) => {
   try {
     const { credential } = req.body;
@@ -23,30 +23,47 @@ router.post('/google', async (req, res) => {
     const payload = ticket.getPayload();
     const { sub: googleId, email, name, picture } = payload;
 
-    // Check if user exists
+    // Check if user exists by googleId (returning user) or email (invited user)
     let user = await User.findOne({ googleId });
 
-    if (user) {
-      // Update last login
+    if (!user) {
+      // Check if user was invited by email
+      user = await User.findOne({ email: email.toLowerCase() });
+
+      if (!user) {
+        // User not invited - reject login
+        return res.status(403).json({
+          error: 'Access denied',
+          message: 'You have not been invited to this system. Please contact an administrator.'
+        });
+      }
+
+      // First login for invited user - update with Google info
+      const avatarColor = user.avatarColor || await User.getNextAvatarColor();
+      user.googleId = googleId;
+      user.name = name;
+      user.picture = picture;
+      user.avatarColor = avatarColor;
       user.lastLogin = new Date();
+      user.status = 'AVAILABLE';
       await user.save();
+      console.log(`Invited user first login: ${email}`);
     } else {
-      // Create new user with unique avatar color
-      const avatarColor = await User.getNextAvatarColor();
-
-      user = new User({
-        googleId,
-        email,
-        name,
-        picture,
-        avatarColor,
-      });
-
+      // Returning user - update last login
+      user.lastLogin = new Date();
+      user.status = 'AVAILABLE';
       await user.save();
-      console.log(`New user created: ${email} with color ${avatarColor}`);
     }
 
-    // Return user data (without sensitive fields)
+    // Check if user is active
+    if (!user.isActive) {
+      return res.status(403).json({
+        error: 'Account disabled',
+        message: 'Your account has been deactivated. Please contact an administrator.'
+      });
+    }
+
+    // Return user data
     res.json({
       id: user._id,
       googleId: user.googleId,
@@ -56,6 +73,7 @@ router.post('/google', async (req, res) => {
       avatarColor: user.avatarColor,
       role: user.role,
       status: user.status,
+      isActive: user.isActive,
     });
 
   } catch (error) {

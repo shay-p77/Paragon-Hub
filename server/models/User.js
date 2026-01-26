@@ -23,13 +23,14 @@ const AVATAR_COLORS = [
 const userSchema = new mongoose.Schema({
   googleId: {
     type: String,
-    required: true,
+    sparse: true,  // Allow null for invited but not yet logged in users
     unique: true,
   },
   email: {
     type: String,
     required: true,
     unique: true,
+    lowercase: true,
   },
   name: {
     type: String,
@@ -41,17 +42,28 @@ const userSchema = new mongoose.Schema({
   },
   avatarColor: {
     type: String,
-    required: true,
+    default: '',
   },
   role: {
     type: String,
-    enum: ['admin', 'manager', 'agent'],
-    default: 'agent',
+    enum: ['ADMIN', 'OPERATIONS', 'SALES', 'ACCOUNTING', 'CLIENT'],
+    default: 'SALES',
   },
   status: {
     type: String,
     enum: ['AVAILABLE', 'BUSY', 'AWAY', 'OFFLINE'],
-    default: 'AVAILABLE',
+    default: 'OFFLINE',
+  },
+  isActive: {
+    type: Boolean,
+    default: true,
+  },
+  invitedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
+  invitedAt: {
+    type: Date,
   },
   createdAt: {
     type: Date,
@@ -59,7 +71,6 @@ const userSchema = new mongoose.Schema({
   },
   lastLogin: {
     type: Date,
-    default: Date.now,
   },
 });
 
