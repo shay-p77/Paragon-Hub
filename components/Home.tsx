@@ -87,6 +87,10 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
   const [detailClientName, setDetailClientName] = useState('');
   const [detailTargetDate, setDetailTargetDate] = useState('');
   const [detailSpecs, setDetailSpecs] = useState('');
+  const [detailOrigin, setDetailOrigin] = useState('');
+  const [detailDestination, setDetailDestination] = useState('');
+  const [detailDepartDate, setDetailDepartDate] = useState('');
+  const [detailReturnDate, setDetailReturnDate] = useState('');
   const [requestPriority, setRequestPriority] = useState<'NORMAL' | 'URGENT'>('NORMAL');
 
   // AI Parse state
@@ -597,12 +601,20 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
           details: {
             clientName: detailClientName,
             targetDate: detailTargetDate,
+            origin: detailOrigin || undefined,
+            destination: detailDestination || undefined,
+            departDate: detailDepartDate || undefined,
+            returnDate: detailReturnDate || undefined,
             agentName
           }
         });
         setDetailClientName('');
         setDetailTargetDate('');
         setDetailSpecs('');
+        setDetailOrigin('');
+        setDetailDestination('');
+        setDetailDepartDate('');
+        setDetailReturnDate('');
       }
       setRequestPriority('NORMAL');
       setAiParsedData(null);
@@ -1104,6 +1116,47 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                           value={detailTargetDate}
                           onChange={(e) => setDetailTargetDate(e.target.value)}
                           min={new Date().toISOString().split('T')[0]}
+                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon-gold rounded-sm"
+                        />
+                      </div>
+                    </div>
+                    {/* Optional Travel Details */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-shrink-0">
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Origin</label>
+                        <input
+                          type="text"
+                          value={detailOrigin}
+                          onChange={(e) => setDetailOrigin(e.target.value)}
+                          placeholder="e.g. JFK, NYC"
+                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon-gold rounded-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Destination</label>
+                        <input
+                          type="text"
+                          value={detailDestination}
+                          onChange={(e) => setDetailDestination(e.target.value)}
+                          placeholder="e.g. LAX, Los Angeles"
+                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon-gold rounded-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Depart Date</label>
+                        <input
+                          type="date"
+                          value={detailDepartDate}
+                          onChange={(e) => setDetailDepartDate(e.target.value)}
+                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon-gold rounded-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Return Date</label>
+                        <input
+                          type="date"
+                          value={detailReturnDate}
+                          onChange={(e) => setDetailReturnDate(e.target.value)}
                           className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon-gold rounded-sm"
                         />
                       </div>

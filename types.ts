@@ -155,7 +155,9 @@ export interface Customer {
 export interface BookingRequest {
   id: string;
   agentId: string;
+  agentName: string;
   clientId: string;
+  clientName: string;
   type: 'FLIGHT' | 'HOTEL' | 'LOGISTICS' | 'GENERAL';
   status: 'PENDING' | 'IN_REVIEW' | 'CONVERTED' | 'REJECTED';
   priority: 'LOW' | 'NORMAL' | 'URGENT' | 'CRITICAL';

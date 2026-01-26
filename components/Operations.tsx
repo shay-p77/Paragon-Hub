@@ -119,6 +119,10 @@ const Operations: React.FC<OperationsProps> = ({
   const [dispatchClientName, setDispatchClientName] = useState('');
   const [dispatchTargetDate, setDispatchTargetDate] = useState('');
   const [dispatchSpecs, setDispatchSpecs] = useState('');
+  const [dispatchOrigin, setDispatchOrigin] = useState('');
+  const [dispatchDestination, setDispatchDestination] = useState('');
+  const [dispatchDepartDate, setDispatchDepartDate] = useState('');
+  const [dispatchReturnDate, setDispatchReturnDate] = useState('');
   const [dispatchPriority, setDispatchPriority] = useState<'NORMAL' | 'URGENT'>('NORMAL');
 
   // AI Parse state
@@ -353,10 +357,19 @@ const Operations: React.FC<OperationsProps> = ({
         details: {
           clientName: dispatchClientName,
           targetDate: dispatchTargetDate,
+          origin: dispatchOrigin || undefined,
+          destination: dispatchDestination || undefined,
+          departDate: dispatchDepartDate || undefined,
+          returnDate: dispatchReturnDate || undefined,
           agentName
         }
       });
     }
+    // Reset all fields
+    setDispatchOrigin('');
+    setDispatchDestination('');
+    setDispatchDepartDate('');
+    setDispatchReturnDate('');
     closeDispatchModal();
   };
 
@@ -3178,6 +3191,47 @@ Room Type: Deluxe King"
                         value={dispatchTargetDate}
                         onChange={(e) => setDispatchTargetDate(e.target.value)}
                         min={new Date().toISOString().split('T')[0]}
+                        className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                      />
+                    </div>
+                  </div>
+                  {/* Optional Travel Fields */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Origin <span className="text-slate-400 font-normal">(Optional)</span></label>
+                      <input
+                        type="text"
+                        value={dispatchOrigin}
+                        onChange={(e) => setDispatchOrigin(e.target.value)}
+                        placeholder="e.g. JFK, New York"
+                        className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Destination <span className="text-slate-400 font-normal">(Optional)</span></label>
+                      <input
+                        type="text"
+                        value={dispatchDestination}
+                        onChange={(e) => setDispatchDestination(e.target.value)}
+                        placeholder="e.g. LAX, Los Angeles"
+                        className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Depart Date <span className="text-slate-400 font-normal">(Optional)</span></label>
+                      <input
+                        type="date"
+                        value={dispatchDepartDate}
+                        onChange={(e) => setDispatchDepartDate(e.target.value)}
+                        className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Return Date <span className="text-slate-400 font-normal">(Optional)</span></label>
+                      <input
+                        type="date"
+                        value={dispatchReturnDate}
+                        onChange={(e) => setDispatchReturnDate(e.target.value)}
                         className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon rounded-sm"
                       />
                     </div>

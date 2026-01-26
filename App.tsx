@@ -77,6 +77,72 @@ const App: React.FC = () => {
       if (requestsRes.ok) {
         const data = await requestsRes.json();
         setRequests(data);
+
+        // Reconstruct converted bookings from requests with status CONVERTED
+        const convertedRequests = data.filter((r: BookingRequest) => r.status === 'CONVERTED');
+
+        const flights: ConvertedFlight[] = [];
+        const hotels: ConvertedHotel[] = [];
+        const logistics: ConvertedLogistics[] = [];
+
+        convertedRequests.forEach((r: BookingRequest) => {
+          const details = r.details || {};
+          const bookingId = details.convertedBookingId || r.id;
+
+          if (r.type === 'FLIGHT') {
+            flights.push({
+              id: bookingId,
+              description: `${r.clientName || 'Client'}-${details.pnr || 'Flight'}`,
+              airline: details.airline || '',
+              paymentStatus: details.paymentStatus || 'UNPAID',
+              pnr: details.pnr || '',
+              flights: details.flights || '',
+              passengerCount: details.passengerCount || 1,
+              dates: details.dates || '',
+              agent: details.bookingAgent || r.agentName,
+              profitLoss: details.profitLoss || 0,
+              status: details.bookingStatus || 'CONFIRMED',
+              createdAt: r.timestamp,
+              originalRequestId: r.id,
+            });
+          } else if (r.type === 'HOTEL') {
+            hotels.push({
+              id: bookingId,
+              description: `${r.clientName || 'Client'}-${details.hotelName || 'Hotel'}`,
+              hotelName: details.hotelName || '',
+              paymentStatus: details.paymentStatus || 'UNPAID',
+              confirmationNumber: details.confirmationNumber || '',
+              roomType: details.roomType || '',
+              guestCount: details.guestCount || 1,
+              checkIn: details.checkIn || '',
+              checkOut: details.checkOut || '',
+              agent: details.bookingAgent || r.agentName,
+              profitLoss: details.profitLoss || 0,
+              status: details.bookingStatus || 'CONFIRMED',
+              createdAt: r.timestamp,
+              originalRequestId: r.id,
+            });
+          } else if (r.type === 'LOGISTICS') {
+            logistics.push({
+              id: bookingId,
+              description: `${r.clientName || 'Client'}-${details.serviceType || 'Logistics'}`,
+              serviceType: details.serviceType || '',
+              paymentStatus: details.paymentStatus || 'UNPAID',
+              confirmationNumber: details.confirmationNumber || '',
+              details: details.logisticsDetails || '',
+              date: details.date || '',
+              agent: details.bookingAgent || r.agentName,
+              profitLoss: details.profitLoss || 0,
+              status: details.bookingStatus || 'CONFIRMED',
+              createdAt: r.timestamp,
+              originalRequestId: r.id,
+            });
+          }
+        });
+
+        setConvertedFlights(flights);
+        setConvertedHotels(hotels);
+        setConvertedLogistics(logistics);
       }
       if (usersRes.ok) {
         const data = await usersRes.json();
