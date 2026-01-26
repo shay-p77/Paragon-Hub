@@ -194,6 +194,7 @@ export interface Announcement {
   authorId?: string;
   date: string;
   isPinned?: boolean; // Whether the post is pinned (max 2 total)
+  isArchived?: boolean; // Whether the post has been archived/resolved
 }
 
 // Converted element types (after completing a request)

@@ -2,9 +2,12 @@
 import React, { useState } from 'react';
 import { SectionHeader } from './Shared';
 import { MOCK_CUSTOMERS } from '../constants';
-import { Customer, LoyaltyProgram } from '../types';
+import { Customer, LoyaltyProgram, BookingRequest } from '../types';
+import { GoogleUser } from './Login';
 
 interface CRMProps {
+  requests?: BookingRequest[];
+  googleUser?: GoogleUser | null;
 }
 
 // Customer Form Modal Component
@@ -681,13 +684,23 @@ const CustomerDetailModal: React.FC<{
   );
 };
 
-const CRM: React.FC<CRMProps> = () => {
+const CRM: React.FC<CRMProps> = ({ requests = [], googleUser }) => {
+  const [activeSubTab, setActiveSubTab] = useState<'customers' | 'my-requests' | 'my-bookings'>('customers');
   const [customers, setCustomers] = useState<Customer[]>(MOCK_CUSTOMERS);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Filter requests for current user
+  const myRequests = requests
+    .filter(r => r.agentId === googleUser?.googleId && r.status !== 'CONVERTED')
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+  const myBookings = requests
+    .filter(r => r.agentId === googleUser?.googleId && r.status === 'CONVERTED')
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
   // Get primary customers (those without a primaryCustomerId)
   const primaryCustomers = customers.filter(c => !c.primaryCustomerId);
@@ -740,10 +753,242 @@ const CRM: React.FC<CRMProps> = () => {
     );
   });
 
+  // Format date helper
+  const formatRequestDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  // Get priority color
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'CRITICAL': return 'bg-red-100 text-red-700';
+      case 'URGENT': return 'bg-amber-100 text-amber-700';
+      case 'NORMAL': return 'bg-blue-100 text-blue-700';
+      case 'LOW': return 'bg-slate-100 text-slate-600';
+      default: return 'bg-slate-100 text-slate-600';
+    }
+  };
+
+  // Get status color
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'PENDING': return 'bg-amber-100 text-amber-700';
+      case 'IN_REVIEW': return 'bg-blue-100 text-blue-700';
+      case 'CONVERTED': return 'bg-emerald-100 text-emerald-700';
+      case 'REJECTED': return 'bg-red-100 text-red-700';
+      default: return 'bg-slate-100 text-slate-600';
+    }
+  };
+
+  // Get type icon
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case 'FLIGHT':
+        return (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+          </svg>
+        );
+      case 'HOTEL':
+        return (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+          </svg>
+        );
+      case 'LOGISTICS':
+        return (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+          </svg>
+        );
+      default:
+        return (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          </svg>
+        );
+    }
+  };
+
   return (
     <div className="p-4 sm:p-8">
-      <SectionHeader title="Customer Database" subtitle="Manage your client profiles and traveler information" />
+      <SectionHeader title="CRM" subtitle="Manage customers, requests, and bookings" />
 
+      {/* Subtabs */}
+      <div className="flex gap-1 mb-6 border-b border-slate-200">
+        <button
+          onClick={() => setActiveSubTab('customers')}
+          className={`px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest transition-colors border-b-2 -mb-[2px] ${
+            activeSubTab === 'customers'
+              ? 'text-paragon border-paragon'
+              : 'text-slate-400 border-transparent hover:text-slate-600'
+          }`}
+        >
+          Customers
+        </button>
+        <button
+          onClick={() => setActiveSubTab('my-requests')}
+          className={`px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest transition-colors border-b-2 -mb-[2px] flex items-center gap-2 ${
+            activeSubTab === 'my-requests'
+              ? 'text-paragon border-paragon'
+              : 'text-slate-400 border-transparent hover:text-slate-600'
+          }`}
+        >
+          My Requests
+          {myRequests.length > 0 && (
+            <span className={`px-1.5 py-0.5 rounded text-[9px] ${activeSubTab === 'my-requests' ? 'bg-paragon/10' : 'bg-slate-100'}`}>
+              {myRequests.length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveSubTab('my-bookings')}
+          className={`px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest transition-colors border-b-2 -mb-[2px] flex items-center gap-2 ${
+            activeSubTab === 'my-bookings'
+              ? 'text-paragon border-paragon'
+              : 'text-slate-400 border-transparent hover:text-slate-600'
+          }`}
+        >
+          My Bookings
+          {myBookings.length > 0 && (
+            <span className={`px-1.5 py-0.5 rounded text-[9px] ${activeSubTab === 'my-bookings' ? 'bg-paragon/10' : 'bg-slate-100'}`}>
+              {myBookings.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* My Requests Tab */}
+      {activeSubTab === 'my-requests' && (
+        <div>
+          {myRequests.length === 0 ? (
+            <div className="text-center py-16 text-slate-400">
+              <svg className="w-12 h-12 mx-auto mb-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+              <p className="text-sm font-medium">No active requests</p>
+              <p className="text-xs mt-1">Create requests from Command Center or Operations</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {myRequests.map(request => (
+                <div key={request.id} className="bg-white border border-slate-200 rounded-sm p-4 hover:border-slate-300 transition-colors">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3 flex-1 min-w-0">
+                      <div className="w-8 h-8 rounded bg-slate-100 flex items-center justify-center flex-shrink-0 text-slate-500">
+                        {getTypeIcon(request.type)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-sm text-slate-800">{request.type}</span>
+                          <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${getPriorityColor(request.priority)}`}>
+                            {request.priority}
+                          </span>
+                          <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${getStatusColor(request.status)}`}>
+                            {request.status.replace('_', ' ')}
+                          </span>
+                        </div>
+                        {request.details?.clientName && (
+                          <p className="text-xs text-slate-600 mt-1">Client: {request.details.clientName}</p>
+                        )}
+                        {request.notes && (
+                          <p className="text-xs text-slate-500 mt-1 line-clamp-2">{request.notes}</p>
+                        )}
+                        {request.details && (
+                          <div className="mt-2 text-[10px] text-slate-400 space-y-0.5">
+                            {request.details.origin && request.details.destination && (
+                              <p>{request.details.origin} → {request.details.destination}</p>
+                            )}
+                            {request.details.hotelName && (
+                              <p>{request.details.hotelName}</p>
+                            )}
+                            {request.details.departDate && (
+                              <p>{formatRequestDate(request.details.departDate)}{request.details.returnDate ? ` - ${formatRequestDate(request.details.returnDate)}` : ''}</p>
+                            )}
+                            {request.details.checkIn && (
+                              <p>{formatRequestDate(request.details.checkIn)} - {formatRequestDate(request.details.checkOut)}</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-[10px] text-slate-400">{formatRequestDate(request.timestamp)}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* My Bookings Tab */}
+      {activeSubTab === 'my-bookings' && (
+        <div>
+          {myBookings.length === 0 ? (
+            <div className="text-center py-16 text-slate-400">
+              <svg className="w-12 h-12 mx-auto mb-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-sm font-medium">No completed bookings yet</p>
+              <p className="text-xs mt-1">Bookings will appear here when requests are converted</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {myBookings.map(request => (
+                <div key={request.id} className="bg-white border border-emerald-200 rounded-sm p-4 hover:border-emerald-300 transition-colors">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3 flex-1 min-w-0">
+                      <div className="w-8 h-8 rounded bg-emerald-100 flex items-center justify-center flex-shrink-0 text-emerald-600">
+                        {getTypeIcon(request.type)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-sm text-slate-800">{request.type}</span>
+                          <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">
+                            BOOKED
+                          </span>
+                        </div>
+                        {request.details?.clientName && (
+                          <p className="text-xs text-slate-600 mt-1">Client: {request.details.clientName}</p>
+                        )}
+                        {request.notes && (
+                          <p className="text-xs text-slate-500 mt-1 line-clamp-2">{request.notes}</p>
+                        )}
+                        {request.details && (
+                          <div className="mt-2 text-[10px] text-slate-400 space-y-0.5">
+                            {request.details.origin && request.details.destination && (
+                              <p>{request.details.origin} → {request.details.destination}</p>
+                            )}
+                            {request.details.hotelName && (
+                              <p>{request.details.hotelName}</p>
+                            )}
+                            {request.details.departDate && (
+                              <p>{formatRequestDate(request.details.departDate)}{request.details.returnDate ? ` - ${formatRequestDate(request.details.returnDate)}` : ''}</p>
+                            )}
+                            {request.details.checkIn && (
+                              <p>{formatRequestDate(request.details.checkIn)} - {formatRequestDate(request.details.checkOut)}</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-[10px] text-slate-400">{formatRequestDate(request.timestamp)}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Customers Tab */}
+      {activeSubTab === 'customers' && (
+        <>
       {/* Search and Actions */}
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="flex-1 relative">
@@ -853,6 +1098,8 @@ const CRM: React.FC<CRMProps> = () => {
           onSave={handleSaveCustomer}
           onClose={() => setEditingCustomer(null)}
         />
+      )}
+        </>
       )}
     </div>
   );

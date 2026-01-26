@@ -16,6 +16,7 @@ interface HomeProps {
   onEditAnnouncement?: (id: string, updates: { title: string; content: string; priority: 'LOW' | 'NORMAL' | 'HIGH' }) => void;
   onDeleteAnnouncement?: (announcementId: string) => void;
   onPinAnnouncement?: (id: string) => Promise<void>;
+  onArchiveAnnouncement?: (id: string) => Promise<void>;
   onPinComment?: (commentId: string) => Promise<void>;
   onAddRequest?: (req: any) => void;
   onDeleteRequest?: (requestId: string) => void;
@@ -65,7 +66,7 @@ const WorldClock: React.FC = () => {
   );
 };
 
-const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], onAddComment, onDeleteComment, onAddAnnouncement, onEditAnnouncement, onDeleteAnnouncement, onPinAnnouncement, onPinComment, onAddRequest, onDeleteRequest, requests = [], googleUser }) => {
+const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], onAddComment, onDeleteComment, onAddAnnouncement, onEditAnnouncement, onDeleteAnnouncement, onPinAnnouncement, onArchiveAnnouncement, onPinComment, onAddRequest, onDeleteRequest, requests = [], googleUser }) => {
   const [chatMessage, setChatMessage] = useState('');
   const [messages, setMessages] = useState([
     { id: 1, user: 'Elena Vance', text: 'Anyone have a driver contact for Courchevel tonight?', time: '09:42' },
@@ -853,6 +854,17 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                               >
                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            )}
+                            {isOwnPost && onArchiveAnnouncement && (
+                              <button
+                                onClick={() => onArchiveAnnouncement(a.id)}
+                                className="text-slate-400 hover:text-emerald-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                title="Archive/Resolve post"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
                                 </svg>
                               </button>
                             )}

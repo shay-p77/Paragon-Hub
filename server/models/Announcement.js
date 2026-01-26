@@ -30,6 +30,10 @@ const announcementSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  isArchived: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 module.exports = mongoose.model('Announcement', announcementSchema);
