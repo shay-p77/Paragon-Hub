@@ -98,6 +98,26 @@ bookingRequestSchema.pre('save', function (next) {
   }
 });
 
+// Encrypt sensitive fields before findOneAndUpdate
+bookingRequestSchema.pre('findOneAndUpdate', function (next) {
+  try {
+    const update = this.getUpdate();
+    if (update && update.details && typeof update.details === 'object') {
+      update.details = encryptFields(update.details, SENSITIVE_DETAIL_FIELDS);
+
+      // Also encrypt nested passengers if present
+      if (Array.isArray(update.details.passengers)) {
+        update.details.passengers = update.details.passengers.map((p) =>
+          encryptFields(p, SENSITIVE_DETAIL_FIELDS)
+        );
+      }
+    }
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Decrypt sensitive fields after find
 function decryptDetails(doc) {
   if (!doc || !doc.details) return doc;
