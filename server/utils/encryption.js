@@ -97,6 +97,13 @@ function decrypt(encryptedValue) {
 
   try {
     const key = getEncryptionKey();
+
+    // If no key, can't decrypt - return encrypted value
+    if (!key) {
+      console.warn('Cannot decrypt: ENCRYPTION_KEY not set');
+      return encryptedValue;
+    }
+
     const iv = Buffer.from(ivBase64, 'base64');
     const authTag = Buffer.from(authTagBase64, 'base64');
 

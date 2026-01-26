@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const KnowledgeEntry = require('../models/KnowledgeEntry');
 const Contact = require('../models/Contact');
+const { decrypt } = require('../utils/encryption');
 
 // ========== KNOWLEDGE ENTRIES (Procedures, Locations, Notes) ==========
 
@@ -180,9 +181,9 @@ router.get('/contacts', async (req, res) => {
       role: c.role,
       company: c.company,
       location: c.location,
-      phone: c.phone,
-      email: c.email,
-      notes: c.notes,
+      phone: decrypt(c.phone),
+      email: decrypt(c.email),
+      notes: decrypt(c.notes),
       tags: c.tags,
       createdBy: c.createdBy,
       createdAt: c.createdAt.toISOString(),
@@ -210,15 +211,16 @@ router.post('/contacts', async (req, res) => {
       createdBy,
     });
     await contact.save();
+    // Return original values (pre-encryption) not the encrypted ones
     res.status(201).json({
       id: contact._id.toString(),
       name: contact.name,
       role: contact.role,
       company: contact.company,
       location: contact.location,
-      phone: contact.phone,
-      email: contact.email,
-      notes: contact.notes,
+      phone: phone || '',
+      email: email || '',
+      notes: notes || '',
       tags: contact.tags,
       createdBy: contact.createdBy,
       createdAt: contact.createdAt.toISOString(),
@@ -241,15 +243,16 @@ router.put('/contacts/:id', async (req, res) => {
     if (!contact) {
       return res.status(404).json({ error: 'Contact not found' });
     }
+    // Return original values (pre-encryption) not the encrypted ones
     res.json({
       id: contact._id.toString(),
       name: contact.name,
       role: contact.role,
       company: contact.company,
       location: contact.location,
-      phone: contact.phone,
-      email: contact.email,
-      notes: contact.notes,
+      phone: phone || '',
+      email: email || '',
+      notes: notes || '',
       tags: contact.tags,
       createdBy: contact.createdBy,
       createdAt: contact.createdAt.toISOString(),
