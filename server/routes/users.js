@@ -5,7 +5,10 @@ const User = require('../models/User');
 const router = express.Router();
 
 // Initialize Resend (will be null if no API key)
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+const resendApiKey = process.env.RESEND_API_KEY;
+console.log(`[RESEND INIT] API Key present: ${!!resendApiKey}, Key starts with: ${resendApiKey ? resendApiKey.substring(0, 10) + '...' : 'N/A'}`);
+const resend = resendApiKey ? new Resend(resendApiKey) : null;
+console.log(`[RESEND INIT] Resend client initialized: ${!!resend}`);
 
 // App URL for invite links
 const APP_URL = process.env.APP_URL || 'https://paragon-hub.netlify.app';
@@ -23,8 +26,11 @@ const getRoleDisplayName = (role) => {
 
 // Send invite email
 const sendInviteEmail = async (toEmail, toName, role) => {
+  console.log(`[SEND EMAIL] Attempting to send invite to: ${toEmail}, name: ${toName}, role: ${role}`);
+  console.log(`[SEND EMAIL] Resend client available: ${!!resend}`);
+
   if (!resend) {
-    console.log('Resend not configured - skipping email');
+    console.log('[SEND EMAIL] Resend not configured - skipping email');
     return { success: false, reason: 'Email not configured' };
   }
 
@@ -96,12 +102,14 @@ const sendInviteEmail = async (toEmail, toName, role) => {
       `,
     });
 
+    console.log(`[SEND EMAIL] Resend API response - data: ${JSON.stringify(data)}, error: ${JSON.stringify(error)}`);
+
     if (error) {
-      console.error('Resend error:', error);
+      console.error('[SEND EMAIL] Resend error:', error);
       return { success: false, reason: error.message };
     }
 
-    console.log(`Invite email sent to ${toEmail}, id: ${data.id}`);
+    console.log(`[SEND EMAIL] SUCCESS! Email sent to ${toEmail}, id: ${data.id}`);
     return { success: true, emailId: data.id };
   } catch (error) {
     console.error('Email send error:', error);
