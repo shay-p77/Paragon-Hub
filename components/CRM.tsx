@@ -1,9 +1,9 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { SectionHeader } from './Shared';
-import { MOCK_CUSTOMERS } from '../constants';
 import { Customer, LoyaltyProgram, BookingRequest } from '../types';
 import { GoogleUser } from './Login';
+import { API_URL } from '../config';
 
 interface CRMProps {
   requests?: BookingRequest[];
@@ -686,12 +686,31 @@ const CustomerDetailModal: React.FC<{
 
 const CRM: React.FC<CRMProps> = ({ requests = [], googleUser }) => {
   const [activeSubTab, setActiveSubTab] = useState<'customers' | 'my-requests' | 'my-bookings'>('customers');
-  const [customers, setCustomers] = useState<Customer[]>(MOCK_CUSTOMERS);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Fetch customers from API
+  useEffect(() => {
+    const fetchCustomers = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/customers`);
+        if (res.ok) {
+          const data = await res.json();
+          setCustomers(data);
+        }
+      } catch (error) {
+        console.error('Error fetching customers:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchCustomers();
+  }, []);
 
   // Filter requests for current user (check both googleId and MongoDB id for backwards compatibility)
   const isOwnRequest = (r: { agentId: string }) =>
@@ -723,19 +742,53 @@ const CRM: React.FC<CRMProps> = ({ requests = [], googleUser }) => {
   };
 
   // Handle save (add or edit)
-  const handleSaveCustomer = (customer: Customer) => {
-    const existingIndex = customers.findIndex(c => c.id === customer.id);
-    if (existingIndex >= 0) {
-      // Update existing
-      const updated = [...customers];
-      updated[existingIndex] = customer;
-      setCustomers(updated);
-    } else {
-      // Add new
-      setCustomers([...customers, customer]);
+  const handleSaveCustomer = async (customer: Customer) => {
+    try {
+      const isExisting = customers.some(c => c.id === customer.id);
+
+      if (isExisting) {
+        // Update existing customer
+        const res = await fetch(`${API_URL}/api/customers/${customer.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(customer),
+        });
+
+        if (res.ok) {
+          const updated = await res.json();
+          setCustomers(prev => prev.map(c => c.id === updated.id ? updated : c));
+        } else {
+          const error = await res.json().catch(() => ({}));
+          alert(`Failed to update customer: ${error.error || res.statusText}`);
+          return;
+        }
+      } else {
+        // Create new customer
+        const res = await fetch(`${API_URL}/api/customers`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...customer,
+            createdBy: googleUser?.name || 'Unknown',
+          }),
+        });
+
+        if (res.ok) {
+          const newCustomer = await res.json();
+          setCustomers(prev => [newCustomer, ...prev]);
+        } else {
+          const error = await res.json().catch(() => ({}));
+          alert(`Failed to create customer: ${error.error || res.statusText}`);
+          return;
+        }
+      }
+
+      setShowAddModal(false);
+      setEditingCustomer(null);
+    } catch (error) {
+      console.error('Error saving customer:', error);
+      alert(`Error: ${error instanceof Error ? error.message : 'Failed to save customer'}`);
     }
-    setShowAddModal(false);
-    setEditingCustomer(null);
   };
 
   // Filter customers by search
@@ -1045,7 +1098,11 @@ const CRM: React.FC<CRMProps> = ({ requests = [], googleUser }) => {
         </p>
       </div>
 
-      {filteredCustomers.length === 0 ? (
+      {loading ? (
+        <div className="text-center py-12 text-slate-400">
+          <p className="text-sm">Loading customers...</p>
+        </div>
+      ) : filteredCustomers.length === 0 ? (
         <div className="text-center py-12 text-slate-400">
           <p className="text-sm">{searchQuery ? 'No customers match your search.' : 'No customers yet.'}</p>
           {!searchQuery && (
