@@ -693,13 +693,16 @@ const CRM: React.FC<CRMProps> = ({ requests = [], googleUser }) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Filter requests for current user
+  // Filter requests for current user (check both googleId and MongoDB id for backwards compatibility)
+  const isOwnRequest = (r: { agentId: string }) =>
+    r.agentId === googleUser?.googleId || r.agentId === googleUser?.id;
+
   const myRequests = requests
-    .filter(r => r.agentId === googleUser?.googleId && r.status !== 'CONVERTED')
+    .filter(r => isOwnRequest(r) && r.status !== 'CONVERTED')
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
   const myBookings = requests
-    .filter(r => r.agentId === googleUser?.googleId && r.status === 'CONVERTED')
+    .filter(r => isOwnRequest(r) && r.status === 'CONVERTED')
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
   // Get primary customers (those without a primaryCustomerId)

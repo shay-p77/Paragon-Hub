@@ -1360,10 +1360,10 @@ const Operations: React.FC<OperationsProps> = ({
                   .map(r => {
                     const clientName = r.details?.clientName || MOCK_USERS.find(u => u.id === r.clientId)?.name || '—';
                     const targetDate = r.details?.targetDate ? new Date(r.details.targetDate).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
-                    const agentName = r.details?.agentName || (googleUser && r.agentId === googleUser.googleId ? googleUser.name : (MOCK_USERS.find(u => u.id === r.agentId)?.name || 'Unknown'));
+                    const agentName = r.details?.agentName || (googleUser && (r.agentId === googleUser.googleId || r.agentId === googleUser.id) ? googleUser.name : (MOCK_USERS.find(u => u.id === r.agentId)?.name || 'Unknown'));
                     const isExpanded = expandedItemId === r.id;
                     const isSelected = selectedElementId === r.id;
-                    const isOwnRequest = googleUser ? r.agentId === googleUser.googleId : r.agentId === currentUser.id;
+                    const isOwnRequest = googleUser ? (r.agentId === googleUser.googleId || r.agentId === googleUser.id) : r.agentId === currentUser.id;
 
                     return (
                       <div
@@ -1485,8 +1485,8 @@ const Operations: React.FC<OperationsProps> = ({
                     .map(r => {
                     const clientName = r.details?.clientName || MOCK_USERS.find(u => u.id === r.clientId)?.name || '—';
                     const targetDate = r.details?.targetDate ? new Date(r.details.targetDate).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
-                    const agentName = r.details?.agentName || (googleUser && r.agentId === googleUser.googleId ? googleUser.name : (MOCK_USERS.find(u => u.id === r.agentId)?.name || 'Unknown'));
-                    const isOwnRequest = googleUser ? r.agentId === googleUser.googleId : r.agentId === currentUser.id;
+                    const agentName = r.details?.agentName || (googleUser && (r.agentId === googleUser.googleId || r.agentId === googleUser.id) ? googleUser.name : (MOCK_USERS.find(u => u.id === r.agentId)?.name || 'Unknown'));
+                    const isOwnRequest = googleUser ? (r.agentId === googleUser.googleId || r.agentId === googleUser.id) : r.agentId === currentUser.id;
 
                     return (
                       <tr key={r.id} className={`hover:bg-slate-50 cursor-pointer ${selectedElementId === r.id ? 'bg-paragon-light/30' : ''}`} onClick={() => setSelectedElementId(r.id)}>
