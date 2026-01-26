@@ -105,6 +105,18 @@ const App: React.FC = () => {
       setDataLoading(false);
     }
   }, [googleUser, fetchData]);
+
+  // Set initial tab based on user role
+  useEffect(() => {
+    if (googleUser?.role) {
+      // CLIENT users can ONLY see Client Portal
+      if (googleUser.role === 'CLIENT') {
+        setActiveTab('portal');
+      }
+      // All other roles start at Command Center (home) which is valid for them
+    }
+  }, [googleUser?.role]);
+
   const [convertedFlights, setConvertedFlights] = useState<ConvertedFlight[]>([]);
   const [convertedHotels, setConvertedHotels] = useState<ConvertedHotel[]>([]);
   const [convertedLogistics, setConvertedLogistics] = useState<ConvertedLogistics[]>([]);

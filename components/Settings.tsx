@@ -163,10 +163,10 @@ const EditUserModal: React.FC<{
               onChange={(e) => setRole(e.target.value as UserRole)}
               className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon bg-white"
             >
-              <option value="ADMIN">Admin</option>
-              <option value="OPERATIONS">Operations</option>
-              <option value="SALES">Concierge</option>
-              <option value="ACCOUNTING">Accounting</option>
+              <option value="ADMIN">Admin - Full access</option>
+              <option value="OPERATIONS">Operations - Ops, Command Center, CRM, KB</option>
+              <option value="SALES">Concierge - CRM, Command Center, KB</option>
+              <option value="ACCOUNTING">Accounting - Finance, Command Center, Ops</option>
             </select>
           </div>
 
@@ -227,7 +227,9 @@ const Settings: React.FC = () => {
       const res = await fetch(`${API_URL}/api/users`);
       if (res.ok) {
         const data = await res.json();
-        setUsers(data);
+        // Filter out CLIENT users - they're auto-created and not team members
+        const teamMembers = data.filter((u: TeamMember) => u.role !== 'CLIENT');
+        setUsers(teamMembers);
       }
     } catch (error) {
       console.error('Failed to fetch users:', error);
@@ -306,6 +308,7 @@ const Settings: React.FC = () => {
       case 'OPERATIONS': return 'bg-blue-100 text-blue-700';
       case 'SALES': return 'bg-emerald-100 text-emerald-700';
       case 'ACCOUNTING': return 'bg-amber-100 text-amber-700';
+      case 'CLIENT': return 'bg-slate-100 text-slate-600';
       default: return 'bg-slate-100 text-slate-700';
     }
   };
@@ -313,6 +316,7 @@ const Settings: React.FC = () => {
   const getRoleLabel = (role: string) => {
     switch (role) {
       case 'SALES': return 'Concierge';
+      case 'CLIENT': return 'Client';
       default: return role.charAt(0) + role.slice(1).toLowerCase();
     }
   };
