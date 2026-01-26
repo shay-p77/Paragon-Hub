@@ -3049,7 +3049,7 @@ Room Type: Deluxe King"
                   ) : (
                     <>
                       {/* AI Parse Review */}
-                      <div className="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-sm">
+                      <div className="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-sm flex-shrink-0">
                         <div className="flex items-center gap-2 mb-2">
                           <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -3064,7 +3064,7 @@ Room Type: Deluxe King"
                         </p>
                       </div>
 
-                      <div className="flex-1 overflow-y-auto space-y-3">
+                      <div className="flex-1 overflow-y-auto space-y-3 min-h-0">
                         <div className="p-3 bg-slate-50 border border-slate-200 rounded-sm">
                           <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Booking Type</div>
                           <div className="text-sm font-bold text-slate-900">{aiParsedData?.bookingType || 'Unknown'}</div>
@@ -3126,7 +3126,7 @@ Room Type: Deluxe King"
                         )}
                       </div>
 
-                      <div className="mt-4 flex gap-3">
+                      <div className="mt-4 flex gap-3 flex-shrink-0">
                         <button
                           type="button"
                           onClick={() => { setAiParseStep('input'); setAiParsedData(null); }}
