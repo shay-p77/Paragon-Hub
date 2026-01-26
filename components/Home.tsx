@@ -106,6 +106,8 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [isSavingRequest, setIsSavingRequest] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isParsing, setIsParsing] = useState(false);
+  const [parseResult, setParseResult] = useState<{ confidence?: string; raw?: string } | null>(null);
 
   // Error toast state
   const [errorToast, setErrorToast] = useState<string | null>(null);
@@ -370,6 +372,55 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
     }
   };
 
+  // AI Parse function
+  const handleAIParse = async () => {
+    if (!quickSnippet.trim()) return;
+
+    setIsParsing(true);
+    setParseResult(null);
+    try {
+      const res = await fetch(`${API_URL}/api/ai/parse`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: quickSnippet }),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || 'Failed to parse');
+      }
+
+      const result = await res.json();
+      const data = result.data;
+
+      // Auto-fill the detail form fields
+      if (data.clientName) setDetailClientName(data.clientName);
+      if (data.targetDate) setDetailTargetDate(data.targetDate);
+      if (data.serviceType) setDetailServiceType(data.serviceType as 'FLIGHT' | 'HOTEL' | 'LOGISTICS');
+      if (data.priority) setRequestPriority(data.priority as 'NORMAL' | 'URGENT');
+
+      // Build detailed notes from parsed data
+      const notesParts: string[] = [];
+      if (data.origin && data.destination) notesParts.push(`Route: ${data.origin} → ${data.destination}`);
+      if (data.airline) notesParts.push(`Airline: ${data.airline}`);
+      if (data.flightNumber) notesParts.push(`Flight: ${data.flightNumber}`);
+      if (data.hotelName) notesParts.push(`Hotel: ${data.hotelName}`);
+      if (data.checkIn && data.checkOut) notesParts.push(`Stay: ${data.checkIn} to ${data.checkOut}`);
+      if (data.notes) notesParts.push(data.notes);
+      if (notesParts.length > 0) setDetailSpecs(notesParts.join('\n'));
+
+      // Switch to detail mode to show parsed results
+      setRequestMode('DETAIL');
+      setParseResult({ confidence: data.confidence });
+
+    } catch (error: any) {
+      console.error('AI parse error:', error);
+      setErrorToast(error.message || 'AI parsing failed');
+    } finally {
+      setIsParsing(false);
+    }
+  };
+
   const handleQuickAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!onAddRequest) return;
@@ -421,6 +472,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
         setDetailSpecs('');
       }
       setRequestPriority('NORMAL');
+      setParseResult(null);
       setShowQuickAdd(false);
     } catch (error) {
       setErrorToast('Failed to submit request. Please try again.');
@@ -650,6 +702,28 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                       className="w-full flex-1 p-4 bg-white border border-slate-300 text-sm text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon-gold rounded-sm resize-none"
                       required
                     />
+                    {/* AI Parse Button */}
+                    <button
+                      type="button"
+                      onClick={handleAIParse}
+                      disabled={isParsing || !quickSnippet.trim()}
+                      className="mt-3 w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-2.5 text-[10px] font-bold uppercase tracking-widest hover:from-purple-700 hover:to-indigo-700 transition-all rounded-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {isParsing ? (
+                        <>
+                          <div className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-white"></div>
+                          Parsing with AI...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                          </svg>
+                          Parse with AI
+                        </>
+                      )}
+                    </button>
+                    <p className="text-[9px] text-slate-400 text-center mt-1">AI will extract client, dates, and details automatically</p>
                     <div className="mt-4 flex-shrink-0">
                       <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Priority</label>
                       <div className="flex gap-2">
@@ -694,6 +768,28 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                   </div>
                 ) : (
                   <div className="flex-1 flex flex-col space-y-3">
+                    {/* AI Parse Confidence Indicator */}
+                    {parseResult?.confidence && (
+                      <div className={`flex items-center gap-2 px-3 py-2 rounded-sm text-[10px] font-bold uppercase tracking-wider ${
+                        parseResult.confidence === 'HIGH' ? 'bg-emerald-100 text-emerald-700' :
+                        parseResult.confidence === 'MEDIUM' ? 'bg-amber-100 text-amber-700' :
+                        'bg-red-100 text-red-700'
+                      }`}>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        AI Parsed - {parseResult.confidence} Confidence
+                        <button
+                          type="button"
+                          onClick={() => setParseResult(null)}
+                          className="ml-auto hover:opacity-70"
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    )}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 flex-shrink-0">
                       <div>
                         <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Service Type</label>

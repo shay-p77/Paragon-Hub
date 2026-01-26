@@ -10,6 +10,7 @@ const commentRoutes = require('./routes/comments');
 const requestRoutes = require('./routes/requests');
 const knowledgeRoutes = require('./routes/knowledge');
 const parseRoutes = require('./routes/parse');
+const aiRoutes = require('./routes/ai');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -40,6 +41,7 @@ app.use('/api/comments', commentRoutes);
 app.use('/api/requests', requestRoutes);
 app.use('/api/knowledge', knowledgeRoutes);
 app.use('/api/parse', parseRoutes);
+app.use('/api/ai', aiRoutes);
 
 // Root route
 app.get('/', (req, res) => {
