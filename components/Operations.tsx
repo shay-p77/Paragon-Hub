@@ -3195,47 +3195,114 @@ Room Type: Deluxe King"
                       />
                     </div>
                   </div>
-                  {/* Optional Travel Fields */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Origin <span className="text-slate-400 font-normal">(Optional)</span></label>
-                      <input
-                        type="text"
-                        value={dispatchOrigin}
-                        onChange={(e) => setDispatchOrigin(e.target.value)}
-                        placeholder="e.g. JFK, New York"
-                        className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon rounded-sm"
-                      />
+                  {/* Service-Specific Fields */}
+                  {dispatchServiceType === 'FLIGHT' && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Origin</label>
+                        <input
+                          type="text"
+                          value={dispatchOrigin}
+                          onChange={(e) => setDispatchOrigin(e.target.value)}
+                          placeholder="e.g. JFK, New York"
+                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Destination</label>
+                        <input
+                          type="text"
+                          value={dispatchDestination}
+                          onChange={(e) => setDispatchDestination(e.target.value)}
+                          placeholder="e.g. LAX, Los Angeles"
+                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Depart Date</label>
+                        <input
+                          type="date"
+                          value={dispatchDepartDate}
+                          onChange={(e) => setDispatchDepartDate(e.target.value)}
+                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Return Date</label>
+                        <input
+                          type="date"
+                          value={dispatchReturnDate}
+                          onChange={(e) => setDispatchReturnDate(e.target.value)}
+                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Destination <span className="text-slate-400 font-normal">(Optional)</span></label>
-                      <input
-                        type="text"
-                        value={dispatchDestination}
-                        onChange={(e) => setDispatchDestination(e.target.value)}
-                        placeholder="e.g. LAX, Los Angeles"
-                        className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon rounded-sm"
-                      />
+                  )}
+                  {dispatchServiceType === 'HOTEL' && (
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Hotel / Location</label>
+                        <input
+                          type="text"
+                          value={dispatchDestination}
+                          onChange={(e) => setDispatchDestination(e.target.value)}
+                          placeholder="e.g. Four Seasons NYC"
+                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Check-In Date</label>
+                        <input
+                          type="date"
+                          value={dispatchDepartDate}
+                          onChange={(e) => setDispatchDepartDate(e.target.value)}
+                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Check-Out Date</label>
+                        <input
+                          type="date"
+                          value={dispatchReturnDate}
+                          onChange={(e) => setDispatchReturnDate(e.target.value)}
+                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Depart Date <span className="text-slate-400 font-normal">(Optional)</span></label>
-                      <input
-                        type="date"
-                        value={dispatchDepartDate}
-                        onChange={(e) => setDispatchDepartDate(e.target.value)}
-                        className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon rounded-sm"
-                      />
+                  )}
+                  {dispatchServiceType === 'LOGISTICS' && (
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Pickup Location</label>
+                        <input
+                          type="text"
+                          value={dispatchOrigin}
+                          onChange={(e) => setDispatchOrigin(e.target.value)}
+                          placeholder="e.g. JFK Airport"
+                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Dropoff Location</label>
+                        <input
+                          type="text"
+                          value={dispatchDestination}
+                          onChange={(e) => setDispatchDestination(e.target.value)}
+                          placeholder="e.g. Four Seasons NYC"
+                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Service Date</label>
+                        <input
+                          type="date"
+                          value={dispatchDepartDate}
+                          onChange={(e) => setDispatchDepartDate(e.target.value)}
+                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Return Date <span className="text-slate-400 font-normal">(Optional)</span></label>
-                      <input
-                        type="date"
-                        value={dispatchReturnDate}
-                        onChange={(e) => setDispatchReturnDate(e.target.value)}
-                        className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon rounded-sm"
-                      />
-                    </div>
-                  </div>
+                  )}
                   <div>
                     <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Request Specifications</label>
                     <textarea

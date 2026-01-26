@@ -1120,47 +1120,114 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                         />
                       </div>
                     </div>
-                    {/* Optional Travel Details */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-shrink-0">
-                      <div>
-                        <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Origin</label>
-                        <input
-                          type="text"
-                          value={detailOrigin}
-                          onChange={(e) => setDetailOrigin(e.target.value)}
-                          placeholder="e.g. JFK, NYC"
-                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon-gold rounded-sm"
-                        />
+                    {/* Service-Specific Fields */}
+                    {detailServiceType === 'FLIGHT' && (
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Origin</label>
+                          <input
+                            type="text"
+                            value={detailOrigin}
+                            onChange={(e) => setDetailOrigin(e.target.value)}
+                            placeholder="e.g. JFK, NYC"
+                            className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon-gold rounded-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Destination</label>
+                          <input
+                            type="text"
+                            value={detailDestination}
+                            onChange={(e) => setDetailDestination(e.target.value)}
+                            placeholder="e.g. LAX, Los Angeles"
+                            className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon-gold rounded-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Depart Date</label>
+                          <input
+                            type="date"
+                            value={detailDepartDate}
+                            onChange={(e) => setDetailDepartDate(e.target.value)}
+                            className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon-gold rounded-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Return Date</label>
+                          <input
+                            type="date"
+                            value={detailReturnDate}
+                            onChange={(e) => setDetailReturnDate(e.target.value)}
+                            className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon-gold rounded-sm"
+                          />
+                        </div>
                       </div>
-                      <div>
-                        <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Destination</label>
-                        <input
-                          type="text"
-                          value={detailDestination}
-                          onChange={(e) => setDetailDestination(e.target.value)}
-                          placeholder="e.g. LAX, Los Angeles"
-                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon-gold rounded-sm"
-                        />
+                    )}
+                    {detailServiceType === 'HOTEL' && (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Hotel / Location</label>
+                          <input
+                            type="text"
+                            value={detailDestination}
+                            onChange={(e) => setDetailDestination(e.target.value)}
+                            placeholder="e.g. Four Seasons NYC"
+                            className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon-gold rounded-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Check-In Date</label>
+                          <input
+                            type="date"
+                            value={detailDepartDate}
+                            onChange={(e) => setDetailDepartDate(e.target.value)}
+                            className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon-gold rounded-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Check-Out Date</label>
+                          <input
+                            type="date"
+                            value={detailReturnDate}
+                            onChange={(e) => setDetailReturnDate(e.target.value)}
+                            className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon-gold rounded-sm"
+                          />
+                        </div>
                       </div>
-                      <div>
-                        <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Depart Date</label>
-                        <input
-                          type="date"
-                          value={detailDepartDate}
-                          onChange={(e) => setDetailDepartDate(e.target.value)}
-                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon-gold rounded-sm"
-                        />
+                    )}
+                    {detailServiceType === 'LOGISTICS' && (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Pickup Location</label>
+                          <input
+                            type="text"
+                            value={detailOrigin}
+                            onChange={(e) => setDetailOrigin(e.target.value)}
+                            placeholder="e.g. JFK Airport"
+                            className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon-gold rounded-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Dropoff Location</label>
+                          <input
+                            type="text"
+                            value={detailDestination}
+                            onChange={(e) => setDetailDestination(e.target.value)}
+                            placeholder="e.g. Four Seasons NYC"
+                            className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon-gold rounded-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Service Date</label>
+                          <input
+                            type="date"
+                            value={detailDepartDate}
+                            onChange={(e) => setDetailDepartDate(e.target.value)}
+                            className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon-gold rounded-sm"
+                          />
+                        </div>
                       </div>
-                      <div>
-                        <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Return Date</label>
-                        <input
-                          type="date"
-                          value={detailReturnDate}
-                          onChange={(e) => setDetailReturnDate(e.target.value)}
-                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon-gold rounded-sm"
-                        />
-                      </div>
-                    </div>
+                    )}
                     <div>
                       <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Request Specifications</label>
                       <textarea
