@@ -106,6 +106,52 @@ export interface User {
   email: string;
 }
 
+// Customer (CRM) types
+export interface LoyaltyProgram {
+  program: string; // "United MileagePlus", "Marriott Bonvoy", etc.
+  number: string;
+  status?: string; // "Gold", "Platinum", etc.
+}
+
+export interface CustomerPreferences {
+  seatPreference?: 'aisle' | 'window' | 'middle';
+  dietaryRestrictions?: string[];
+  hotelPreferences?: string;
+  specialRequests?: string;
+}
+
+export interface Customer {
+  id: string;
+  // Basic Info
+  legalFirstName: string;
+  legalLastName: string;
+  displayName: string; // How we refer to them (e.g., "Ushi" instead of "Yehoshua")
+  dateOfBirth?: string;
+  email?: string;
+  phone?: string;
+
+  // Relationship - if set, this customer belongs to a primary
+  primaryCustomerId?: string;
+
+  // Travel Documents
+  passportNumber?: string;
+  passportExpiry?: string;
+  passportCountry?: string;
+
+  // Loyalty Programs
+  loyaltyPrograms?: LoyaltyProgram[];
+
+  // Preferences
+  preferences?: CustomerPreferences;
+
+  // Notes
+  notes?: string;
+
+  // Metadata
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface BookingRequest {
   id: string;
   agentId: string;

@@ -1,131 +1,393 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { SectionHeader, DataTable, Badge } from './Shared';
-import { MOCK_USERS, MOCK_FLIGHTS, MOCK_HOTELS } from '../constants';
-import { User, BookingRequest, Comment } from '../types';
-import Comments from './Comments';
+import React, { useState } from 'react';
+import { SectionHeader } from './Shared';
+import { MOCK_CUSTOMERS } from '../constants';
+import { Customer, LoyaltyProgram } from '../types';
 
 interface CRMProps {
-  currentUser: User;
-  requests: BookingRequest[];
-  comments: Comment[];
-  onAddComment: (text: string, parentId: string) => void;
-  onDeleteComment?: (commentId: string) => void;
 }
 
-// Expandable List Item Component
-const ExpandableRequestItem: React.FC<{
-  request: BookingRequest;
-  clientName: string;
-  isExpanded: boolean;
-  onToggle: () => void;
-  onSelect: () => void;
-  isSelected: boolean;
-}> = ({ request, clientName, isExpanded, onToggle, onSelect, isSelected }) => {
-  const priorityColors: Record<string, string> = {
-    'URGENT': 'bg-red-100 text-red-700 border-red-200',
-    'HIGH': 'bg-orange-100 text-orange-700 border-orange-200',
-    'NORMAL': 'bg-slate-100 text-slate-700 border-slate-200',
-    'LOW': 'bg-slate-50 text-slate-500 border-slate-200',
+// Customer Form Modal Component
+const CustomerFormModal: React.FC<{
+  customer?: Customer;
+  primaryCustomers: Customer[];
+  onSave: (customer: Customer) => void;
+  onClose: () => void;
+}> = ({ customer, primaryCustomers, onSave, onClose }) => {
+  const isEditing = !!customer;
+
+  // Form state
+  const [legalFirstName, setLegalFirstName] = useState(customer?.legalFirstName || '');
+  const [legalLastName, setLegalLastName] = useState(customer?.legalLastName || '');
+  const [displayName, setDisplayName] = useState(customer?.displayName || '');
+  const [dateOfBirth, setDateOfBirth] = useState(customer?.dateOfBirth || '');
+  const [email, setEmail] = useState(customer?.email || '');
+  const [phone, setPhone] = useState(customer?.phone || '');
+  const [primaryCustomerId, setPrimaryCustomerId] = useState(customer?.primaryCustomerId || '');
+  const [passportNumber, setPassportNumber] = useState(customer?.passportNumber || '');
+  const [passportExpiry, setPassportExpiry] = useState(customer?.passportExpiry || '');
+  const [passportCountry, setPassportCountry] = useState(customer?.passportCountry || '');
+  const [seatPreference, setSeatPreference] = useState<'aisle' | 'window' | 'middle' | ''>(customer?.preferences?.seatPreference || '');
+  const [dietaryRestrictions, setDietaryRestrictions] = useState(customer?.preferences?.dietaryRestrictions?.join(', ') || '');
+  const [hotelPreferences, setHotelPreferences] = useState(customer?.preferences?.hotelPreferences || '');
+  const [specialRequests, setSpecialRequests] = useState(customer?.preferences?.specialRequests || '');
+  const [notes, setNotes] = useState(customer?.notes || '');
+  const [loyaltyPrograms, setLoyaltyPrograms] = useState<LoyaltyProgram[]>(customer?.loyaltyPrograms || []);
+
+  // Add loyalty program
+  const addLoyaltyProgram = () => {
+    setLoyaltyPrograms([...loyaltyPrograms, { program: '', number: '', status: '' }]);
   };
 
-  const typeIcons: Record<string, string> = {
-    'FLIGHT': '✈️',
-    'HOTEL': '🏨',
-    'LOGISTICS': '🚗',
-    'PACKAGE': '📦',
+  // Update loyalty program
+  const updateLoyaltyProgram = (index: number, field: keyof LoyaltyProgram, value: string) => {
+    const updated = [...loyaltyPrograms];
+    updated[index] = { ...updated[index], [field]: value };
+    setLoyaltyPrograms(updated);
+  };
+
+  // Remove loyalty program
+  const removeLoyaltyProgram = (index: number) => {
+    setLoyaltyPrograms(loyaltyPrograms.filter((_, i) => i !== index));
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const now = new Date().toISOString();
+    const newCustomer: Customer = {
+      id: customer?.id || `cust-${Date.now()}`,
+      legalFirstName,
+      legalLastName,
+      displayName: displayName || `${legalFirstName} ${legalLastName}`,
+      dateOfBirth: dateOfBirth || undefined,
+      email: email || undefined,
+      phone: phone || undefined,
+      primaryCustomerId: primaryCustomerId || undefined,
+      passportNumber: passportNumber || undefined,
+      passportExpiry: passportExpiry || undefined,
+      passportCountry: passportCountry || undefined,
+      loyaltyPrograms: loyaltyPrograms.filter(lp => lp.program && lp.number),
+      preferences: {
+        seatPreference: seatPreference || undefined,
+        dietaryRestrictions: dietaryRestrictions ? dietaryRestrictions.split(',').map(s => s.trim()).filter(Boolean) : undefined,
+        hotelPreferences: hotelPreferences || undefined,
+        specialRequests: specialRequests || undefined,
+      },
+      notes: notes || undefined,
+      createdAt: customer?.createdAt || now,
+      updatedAt: now,
+    };
+
+    onSave(newCustomer);
   };
 
   return (
-    <div className={`border rounded-sm mb-2 overflow-hidden transition-all ${isSelected ? 'border-paragon bg-paragon-light/20' : 'border-slate-200 bg-white'}`}>
-      {/* Header Row - Always visible */}
+    <div
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 pb-20 md:pb-4 animate-fadeIn"
+      onClick={onClose}
+    >
       <div
-        className="flex items-center justify-between p-3 sm:p-4 cursor-pointer hover:bg-slate-50"
-        onClick={onToggle}
+        className="bg-white w-full max-w-2xl max-h-[70vh] md:max-h-[85vh] flex flex-col rounded-sm shadow-2xl animate-zoomIn overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          <span className="text-lg flex-shrink-0">{typeIcons[request.type] || '📋'}</span>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-bold text-sm text-slate-800 truncate">{clientName}</span>
-              <Badge color="slate">{request.type}</Badge>
-            </div>
-            <p className="text-xs text-slate-500 truncate mt-0.5">{request.notes}</p>
-          </div>
+        {/* Header */}
+        <div className="p-4 sm:p-6 border-b border-slate-200 flex justify-between items-center flex-shrink-0">
+          <h2 className="font-cinzel text-xl font-bold text-slate-900">
+            {isEditing ? 'Edit Customer' : 'Add New Customer'}
+          </h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-          <span className={`text-[9px] font-bold px-2 py-0.5 rounded border ${priorityColors[request.priority] || priorityColors['NORMAL']}`}>
-            {request.priority}
-          </span>
-          <svg
-            className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+
+        {/* Form Content */}
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-6">
+          {/* Basic Info */}
+          <div className="mb-6">
+            <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Basic Information</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Legal First Name *</label>
+                <input
+                  type="text"
+                  value={legalFirstName}
+                  onChange={(e) => setLegalFirstName(e.target.value)}
+                  className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Legal Last Name *</label>
+                <input
+                  type="text"
+                  value={legalLastName}
+                  onChange={(e) => setLegalLastName(e.target.value)}
+                  className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Display Name</label>
+                <input
+                  type="text"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  placeholder={`${legalFirstName} ${legalLastName}`.trim() || 'How you refer to them'}
+                  className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Date of Birth</label>
+                <input
+                  type="date"
+                  value={dateOfBirth}
+                  onChange={(e) => setDateOfBirth(e.target.value)}
+                  className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Email</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Phone</label>
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Link to Primary Customer */}
+          <div className="mb-6">
+            <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Account Association</h3>
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Primary Customer (if this is a sub-customer)</label>
+              <select
+                value={primaryCustomerId}
+                onChange={(e) => setPrimaryCustomerId(e.target.value)}
+                className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon bg-white"
+              >
+                <option value="">— None (This is a primary customer) —</option>
+                {primaryCustomers
+                  .filter(pc => pc.id !== customer?.id)
+                  .map(pc => (
+                    <option key={pc.id} value={pc.id}>{pc.displayName}</option>
+                  ))
+                }
+              </select>
+              <p className="text-[10px] text-slate-400 mt-1">Leave empty if this customer is the account holder</p>
+            </div>
+          </div>
+
+          {/* Travel Documents */}
+          <div className="mb-6">
+            <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Travel Documents</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Passport Number</label>
+                <input
+                  type="text"
+                  value={passportNumber}
+                  onChange={(e) => setPassportNumber(e.target.value)}
+                  className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon font-mono"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Passport Expiry</label>
+                <input
+                  type="date"
+                  value={passportExpiry}
+                  onChange={(e) => setPassportExpiry(e.target.value)}
+                  className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Passport Country</label>
+                <input
+                  type="text"
+                  value={passportCountry}
+                  onChange={(e) => setPassportCountry(e.target.value)}
+                  placeholder="e.g., USA"
+                  className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Loyalty Programs */}
+          <div className="mb-6">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Loyalty Programs</h3>
+              <button
+                type="button"
+                onClick={addLoyaltyProgram}
+                className="text-[10px] text-paragon font-bold hover:text-paragon-dark"
+              >
+                + Add Program
+              </button>
+            </div>
+            {loyaltyPrograms.length === 0 ? (
+              <p className="text-xs text-slate-400 italic">No loyalty programs added</p>
+            ) : (
+              <div className="space-y-3">
+                {loyaltyPrograms.map((lp, idx) => (
+                  <div key={idx} className="grid grid-cols-1 sm:grid-cols-4 gap-2 p-3 bg-slate-50 rounded items-end">
+                    <div>
+                      <label className="block text-[9px] font-bold uppercase text-slate-400 mb-1">Program</label>
+                      <input
+                        type="text"
+                        value={lp.program}
+                        onChange={(e) => updateLoyaltyProgram(idx, 'program', e.target.value)}
+                        placeholder="e.g., United MileagePlus"
+                        className="w-full p-2 border border-slate-200 rounded-sm text-xs outline-none focus:ring-2 focus:ring-paragon"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] font-bold uppercase text-slate-400 mb-1">Number</label>
+                      <input
+                        type="text"
+                        value={lp.number}
+                        onChange={(e) => updateLoyaltyProgram(idx, 'number', e.target.value)}
+                        className="w-full p-2 border border-slate-200 rounded-sm text-xs outline-none focus:ring-2 focus:ring-paragon font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] font-bold uppercase text-slate-400 mb-1">Status</label>
+                      <input
+                        type="text"
+                        value={lp.status || ''}
+                        onChange={(e) => updateLoyaltyProgram(idx, 'status', e.target.value)}
+                        placeholder="e.g., Gold, 1K"
+                        className="w-full p-2 border border-slate-200 rounded-sm text-xs outline-none focus:ring-2 focus:ring-paragon"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeLoyaltyProgram(idx)}
+                      className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Preferences */}
+          <div className="mb-6">
+            <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Preferences</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Seat Preference</label>
+                <select
+                  value={seatPreference}
+                  onChange={(e) => setSeatPreference(e.target.value as any)}
+                  className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon bg-white"
+                >
+                  <option value="">No preference</option>
+                  <option value="aisle">Aisle</option>
+                  <option value="window">Window</option>
+                  <option value="middle">Middle</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Dietary Restrictions</label>
+                <input
+                  type="text"
+                  value={dietaryRestrictions}
+                  onChange={(e) => setDietaryRestrictions(e.target.value)}
+                  placeholder="e.g., Kosher, Vegetarian (comma-separated)"
+                  className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Hotel Preferences</label>
+                <input
+                  type="text"
+                  value={hotelPreferences}
+                  onChange={(e) => setHotelPreferences(e.target.value)}
+                  placeholder="e.g., High floor, king bed, quiet room"
+                  className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Special Requests</label>
+                <input
+                  type="text"
+                  value={specialRequests}
+                  onChange={(e) => setSpecialRequests(e.target.value)}
+                  placeholder="e.g., Always arrange ground transportation"
+                  className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div className="mb-6">
+            <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Notes</h3>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Any important information about this customer..."
+              rows={3}
+              className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon resize-none"
+            />
+          </div>
+        </form>
+
+        {/* Footer */}
+        <div className="p-4 sm:p-6 border-t border-slate-200 flex gap-3 flex-shrink-0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 py-2.5 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-sm"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
+            Cancel
+          </button>
+          <button
+            type="submit"
+            onClick={handleSubmit}
+            className="flex-1 py-2.5 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-sm"
+          >
+            {isEditing ? 'Save Changes' : 'Add Customer'}
+          </button>
         </div>
       </div>
-
-      {/* Expanded Details */}
-      {isExpanded && (
-        <div className="border-t border-slate-100 bg-slate-50/50 p-3 sm:p-4">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-            <div>
-              <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Submitted</p>
-              <p className="text-xs font-semibold text-slate-700">{new Date(request.timestamp).toLocaleDateString()}</p>
-            </div>
-            <div>
-              <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Status</p>
-              <Badge color={request.status === 'CONVERTED' ? 'teal' : request.status === 'PENDING' ? 'gold' : 'slate'}>{request.status}</Badge>
-            </div>
-            <div>
-              <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Priority</p>
-              <p className="text-xs font-semibold text-slate-700">{request.priority}</p>
-            </div>
-            <div>
-              <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Type</p>
-              <p className="text-xs font-semibold text-slate-700">{request.type}</p>
-            </div>
-          </div>
-
-          {request.notes && (
-            <div className="mb-4">
-              <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider mb-1">Notes</p>
-              <p className="text-xs text-slate-600 bg-white p-2 rounded border border-slate-100">{request.notes}</p>
-            </div>
-          )}
-
-          <div className="flex gap-2 flex-wrap">
-            <button
-              onClick={(e) => { e.stopPropagation(); onSelect(); }}
-              className="flex-1 sm:flex-none px-4 py-2 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest rounded-sm hover:bg-paragon-dark transition-colors"
-            >
-              View Details
-            </button>
-            <button className="flex-1 sm:flex-none px-4 py-2 border border-slate-200 text-slate-600 text-[10px] font-bold uppercase tracking-widest rounded-sm hover:bg-slate-50 transition-colors">
-              Edit
-            </button>
-            <button className="flex-1 sm:flex-none px-4 py-2 border border-slate-200 text-slate-600 text-[10px] font-bold uppercase tracking-widest rounded-sm hover:bg-slate-50 transition-colors">
-              Convert
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
 
-// Expandable Booking Item Component
-const ExpandableBookingItem: React.FC<{
-  booking: any;
-  type: 'flight' | 'hotel';
+// Customer List Item Component
+const CustomerListItem: React.FC<{
+  customer: Customer;
+  subCustomers: Customer[];
   isExpanded: boolean;
   onToggle: () => void;
-  onSelect: () => void;
+  onSelect: (customer: Customer) => void;
+  onEdit: (customer: Customer) => void;
   isSelected: boolean;
-}> = ({ booking, type, isExpanded, onToggle, onSelect, isSelected }) => {
+}> = ({ customer, subCustomers, isExpanded, onToggle, onSelect, onEdit, isSelected }) => {
+  const getInitials = (name: string) => {
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  };
+
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return '—';
+    return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
   return (
     <div className={`border rounded-sm mb-2 overflow-hidden transition-all ${isSelected ? 'border-paragon bg-paragon-light/20' : 'border-slate-200 bg-white'}`}>
       {/* Header Row */}
@@ -134,22 +396,27 @@ const ExpandableBookingItem: React.FC<{
         onClick={onToggle}
       >
         <div className="flex items-center gap-3 flex-1 min-w-0">
-          <span className="text-lg flex-shrink-0">{type === 'flight' ? '✈️' : '🏨'}</span>
+          <div className="w-10 h-10 rounded-full bg-paragon/10 flex items-center justify-center flex-shrink-0">
+            <span className="font-bold text-paragon text-sm">{getInitials(customer.displayName)}</span>
+          </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-bold text-sm text-slate-800">{type === 'flight' ? booking.carrier : booking.name}</span>
-              <span className="font-mono text-xs text-paragon font-bold">{type === 'flight' ? booking.pnr : booking.confirmation}</span>
+              <span className="font-bold text-sm text-slate-800">{customer.displayName}</span>
+              {subCustomers.length > 0 && (
+                <span className="text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">
+                  +{subCustomers.length} {subCustomers.length === 1 ? 'traveler' : 'travelers'}
+                </span>
+              )}
             </div>
-            <p className="text-xs text-slate-500 truncate mt-0.5">
-              {type === 'flight'
-                ? booking.segments?.map((s: any) => `${s.from}-${s.to}`).join(', ')
-                : `${booking.checkIn} - ${booking.checkOut}`
-              }
-            </p>
+            <p className="text-xs text-slate-500 mt-0.5">{customer.email || customer.phone || '—'}</p>
           </div>
         </div>
         <div className="flex items-center gap-3 flex-shrink-0 ml-2">
-          <span className="text-sm font-bold text-teal-600">+${booking.markup?.toLocaleString()}</span>
+          {customer.loyaltyPrograms && customer.loyaltyPrograms.length > 0 && (
+            <span className="hidden sm:inline text-[9px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded font-bold">
+              {customer.loyaltyPrograms[0].status || customer.loyaltyPrograms[0].program}
+            </span>
+          )}
           <svg
             className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
             fill="none"
@@ -164,47 +431,90 @@ const ExpandableBookingItem: React.FC<{
       {/* Expanded Details */}
       {isExpanded && (
         <div className="border-t border-slate-100 bg-slate-50/50 p-3 sm:p-4">
+          {/* Customer Info Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
             <div>
-              <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">{type === 'flight' ? 'PNR' : 'Confirmation'}</p>
-              <p className="text-xs font-mono font-bold text-paragon">{type === 'flight' ? booking.pnr : booking.confirmation}</p>
+              <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Legal Name</p>
+              <p className="text-xs font-semibold text-slate-700">{customer.legalFirstName} {customer.legalLastName}</p>
             </div>
             <div>
-              <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Cost</p>
-              <p className="text-xs font-semibold text-slate-700">${booking.cost?.toLocaleString()}</p>
+              <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Date of Birth</p>
+              <p className="text-xs font-semibold text-slate-700">{formatDate(customer.dateOfBirth)}</p>
             </div>
             <div>
-              <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Markup</p>
-              <p className="text-xs font-semibold text-teal-600">${booking.markup?.toLocaleString()}</p>
+              <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Phone</p>
+              <p className="text-xs font-semibold text-slate-700">{customer.phone || '—'}</p>
             </div>
             <div>
-              <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Status</p>
-              <Badge color="teal">CONFIRMED</Badge>
+              <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Seat Pref</p>
+              <p className="text-xs font-semibold text-slate-700 capitalize">{customer.preferences?.seatPreference || '—'}</p>
             </div>
           </div>
 
-          {type === 'flight' && booking.segments && (
+          {/* Loyalty Programs */}
+          {customer.loyaltyPrograms && customer.loyaltyPrograms.length > 0 && (
             <div className="mb-4">
-              <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider mb-2">Segments</p>
-              <div className="space-y-1">
-                {booking.segments.map((seg: any, idx: number) => (
-                  <div key={idx} className="text-xs bg-white p-2 rounded border border-slate-100 flex justify-between">
-                    <span className="font-semibold">{seg.from} → {seg.to}</span>
-                    <span className="text-slate-500">{seg.date} • {seg.time}</span>
+              <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider mb-2">Loyalty Programs</p>
+              <div className="flex flex-wrap gap-2">
+                {customer.loyaltyPrograms.map((lp, idx) => (
+                  <span key={idx} className="text-[10px] bg-white border border-slate-200 px-2 py-1 rounded">
+                    <span className="font-semibold">{lp.program}</span>
+                    {lp.status && <span className="text-amber-600 ml-1">({lp.status})</span>}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Notes */}
+          {customer.notes && (
+            <div className="mb-4">
+              <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider mb-1">Notes</p>
+              <p className="text-xs text-slate-600 bg-white p-2 rounded border border-slate-100">{customer.notes}</p>
+            </div>
+          )}
+
+          {/* Sub-Customers */}
+          {subCustomers.length > 0 && (
+            <div className="mb-4">
+              <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider mb-2">Associated Travelers</p>
+              <div className="space-y-2">
+                {subCustomers.map(sub => (
+                  <div
+                    key={sub.id}
+                    className="flex items-center justify-between bg-white p-2 rounded border border-slate-100 cursor-pointer hover:border-paragon transition-colors"
+                    onClick={(e) => { e.stopPropagation(); onSelect(sub); }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center">
+                        <span className="font-bold text-slate-500 text-[10px]">{getInitials(sub.displayName)}</span>
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-slate-700">{sub.displayName}</p>
+                        <p className="text-[10px] text-slate-400">{sub.preferences?.seatPreference ? `${sub.preferences.seatPreference} seat` : 'No preferences'}</p>
+                      </div>
+                    </div>
+                    <svg className="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
+          {/* Actions */}
           <div className="flex gap-2 flex-wrap">
             <button
-              onClick={(e) => { e.stopPropagation(); onSelect(); }}
+              onClick={(e) => { e.stopPropagation(); onSelect(customer); }}
               className="flex-1 sm:flex-none px-4 py-2 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest rounded-sm hover:bg-paragon-dark transition-colors"
             >
-              View Details
+              View Full Profile
             </button>
-            <button className="flex-1 sm:flex-none px-4 py-2 border border-slate-200 text-slate-600 text-[10px] font-bold uppercase tracking-widest rounded-sm hover:bg-slate-50 transition-colors">
+            <button
+              onClick={(e) => { e.stopPropagation(); onEdit(customer); }}
+              className="flex-1 sm:flex-none px-4 py-2 border border-slate-200 text-slate-600 text-[10px] font-bold uppercase tracking-widest rounded-sm hover:bg-slate-50 transition-colors"
+            >
               Edit
             </button>
           </div>
@@ -214,321 +524,336 @@ const ExpandableBookingItem: React.FC<{
   );
 };
 
-// Expandable Customer Item Component
-const ExpandableCustomerItem: React.FC<{
-  customer: { name: string; status: string; accountType: string; spend: number };
-  isExpanded: boolean;
-  onToggle: () => void;
-  onSelect: () => void;
-  isSelected: boolean;
-}> = ({ customer, isExpanded, onToggle, onSelect, isSelected }) => {
+// Customer Detail Modal
+const CustomerDetailModal: React.FC<{
+  customer: Customer;
+  primaryCustomer?: Customer;
+  onClose: () => void;
+  onEdit: (customer: Customer) => void;
+}> = ({ customer, primaryCustomer, onClose, onEdit }) => {
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return '—';
+    return new Date(dateStr).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  };
+
   return (
-    <div className={`border rounded-sm mb-2 overflow-hidden transition-all ${isSelected ? 'border-paragon bg-paragon-light/20' : 'border-slate-200 bg-white'}`}>
-      {/* Header Row */}
+    <div
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 pb-20 md:pb-4 animate-fadeIn"
+      onClick={onClose}
+    >
       <div
-        className="flex items-center justify-between p-3 sm:p-4 cursor-pointer hover:bg-slate-50"
-        onClick={onToggle}
+        className="bg-white w-full max-w-2xl max-h-[70vh] md:max-h-[80vh] flex flex-col rounded-sm shadow-2xl animate-zoomIn overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          <div className="w-10 h-10 rounded-full bg-paragon-gold/20 flex items-center justify-center flex-shrink-0">
-            <span className="font-bold text-paragon-gold">{customer.name.charAt(0)}</span>
+        {/* Header */}
+        <div className="p-4 sm:p-6 border-b border-slate-200 flex justify-between items-start">
+          <div>
+            <h2 className="font-cinzel text-xl font-bold text-slate-900">{customer.displayName}</h2>
+            <p className="text-xs text-slate-500 mt-1">
+              {customer.legalFirstName} {customer.legalLastName}
+              {primaryCustomer && (
+                <span className="ml-2 text-paragon">• Under {primaryCustomer.displayName}'s account</span>
+              )}
+            </p>
           </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-bold text-sm text-slate-800">{customer.name}</span>
-              <Badge color="teal">{customer.status}</Badge>
-            </div>
-            <p className="text-xs text-slate-500 mt-0.5">{customer.accountType}</p>
-          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
         </div>
-        <div className="flex items-center gap-3 flex-shrink-0 ml-2">
-          <span className="text-sm font-bold text-slate-800">${customer.spend.toLocaleString()}</span>
-          <svg
-            className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </div>
-      </div>
 
-      {/* Expanded Details */}
-      {isExpanded && (
-        <div className="border-t border-slate-100 bg-slate-50/50 p-3 sm:p-4">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-            <div>
-              <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Status</p>
-              <Badge color="teal">{customer.status}</Badge>
-            </div>
-            <div>
-              <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Account Type</p>
-              <p className="text-xs font-semibold text-slate-700">{customer.accountType}</p>
-            </div>
-            <div>
-              <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">YTD Spend</p>
-              <p className="text-xs font-semibold text-slate-700">${customer.spend.toLocaleString()}</p>
-            </div>
-            <div>
-              <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Last Booking</p>
-              <p className="text-xs font-semibold text-slate-700">Dec 15, 2025</p>
-            </div>
-          </div>
-
-          <div className="flex gap-2 flex-wrap">
-            <button
-              onClick={(e) => { e.stopPropagation(); onSelect(); }}
-              className="flex-1 sm:flex-none px-4 py-2 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest rounded-sm hover:bg-paragon-dark transition-colors"
-            >
-              View Profile
-            </button>
-            <button className="flex-1 sm:flex-none px-4 py-2 border border-slate-200 text-slate-600 text-[10px] font-bold uppercase tracking-widest rounded-sm hover:bg-slate-50 transition-colors">
-              New Booking
-            </button>
-            <button className="flex-1 sm:flex-none px-4 py-2 border border-slate-200 text-slate-600 text-[10px] font-bold uppercase tracking-widest rounded-sm hover:bg-slate-50 transition-colors">
-              Contact
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-const CRM: React.FC<CRMProps> = ({ currentUser, requests, comments, onAddComment, onDeleteComment }) => {
-  const [activeSubTab, setActiveSubTab] = useState('customers');
-  const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
-  const [filters, setFilters] = useState({
-    spend: { under50k: false, fiftyTo100k: false, over100k: false },
-    status: { vip: false, active: false, prospect: false, inactive: false },
-    activity: { lastMonth: false, lastQuarter: false, lastYear: false }
-  });
-
-  const filterDropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (filterDropdownRef.current && !filterDropdownRef.current.contains(event.target as Node)) {
-        setShowFilterDropdown(false);
-      }
-    };
-
-    if (showFilterDropdown) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showFilterDropdown]);
-
-  const myRequests = requests.filter(r => r.agentId === currentUser.id);
-  const myFlights = MOCK_FLIGHTS.filter(f => f.agentId === currentUser.id);
-  const myHotels = MOCK_HOTELS.filter(h => h.agentId === currentUser.id);
-  const clients = MOCK_USERS.filter(u => u.role === 'CLIENT');
-
-  // Sample customer data
-  const sampleCustomers = [
-    { id: 'max-power', name: 'Max Power', status: 'VIP GOLD', accountType: 'Direct Private', spend: 145200 },
-    { id: 'jane-doe', name: 'Jane Doe', status: 'VIP', accountType: 'Corporate', spend: 89500 },
-    { id: 'john-smith', name: 'John Smith', status: 'Active', accountType: 'Direct', spend: 34200 },
-  ];
-
-  return (
-    <div className="p-4 sm:p-8">
-      {/* Tab Navigation - Scrollable on mobile */}
-      <div className="flex justify-between items-end mb-6 sm:mb-8 border-b border-slate-200 overflow-x-auto">
-        <div className="flex gap-4 sm:gap-8 min-w-max">
-          {[
-            { id: 'customers', label: 'MY CLIENTS' },
-            { id: 'my-requests', label: 'MY REQUESTS' },
-            { id: 'my-bookings', label: 'MY BOOKINGS' },
-          ].map(t => (
-            <button
-              key={t.id}
-              onClick={() => { setActiveSubTab(t.id); setSelectedElementId(null); setExpandedId(null); }}
-              className={`pb-3 sm:pb-4 text-[10px] sm:text-xs font-bold tracking-widest transition-all whitespace-nowrap ${activeSubTab === t.id ? 'text-paragon border-b-2 border-paragon' : 'text-slate-400 hover:text-slate-600'}`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex flex-col lg:grid lg:grid-cols-12 gap-4 sm:gap-8">
-        <div className={selectedElementId ? 'lg:col-span-8' : 'lg:col-span-12'}>
-
-          {/* Customers Tab */}
-          {activeSubTab === 'customers' && (
-            <div>
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 sm:mb-6">
-                <h3 className="text-sm font-bold text-slate-700">Customer Pipeline</h3>
-                <div className="relative" ref={filterDropdownRef}>
-                  <button
-                    onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-                    className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-white border border-slate-200 rounded-sm text-[10px] font-bold uppercase tracking-widest hover:bg-slate-50 transition-colors"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                    </svg>
-                    Filters
-                  </button>
-
-                  {showFilterDropdown && (
-                    <div className="fixed inset-x-4 top-1/4 sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 w-auto sm:w-72 bg-white border border-slate-200 rounded-sm shadow-lg z-50">
-                      <div className="p-4 space-y-4">
-                        <div>
-                          <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Spend</h4>
-                          <div className="space-y-2">
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <input type="checkbox" checked={filters.spend.under50k} onChange={() => setFilters({...filters, spend: {...filters.spend, under50k: !filters.spend.under50k}})} className="accent-paragon" />
-                              <span className="text-xs">Under $50,000</span>
-                            </label>
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <input type="checkbox" checked={filters.spend.fiftyTo100k} onChange={() => setFilters({...filters, spend: {...filters.spend, fiftyTo100k: !filters.spend.fiftyTo100k}})} className="accent-paragon" />
-                              <span className="text-xs">$50,000 - $100,000</span>
-                            </label>
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <input type="checkbox" checked={filters.spend.over100k} onChange={() => setFilters({...filters, spend: {...filters.spend, over100k: !filters.spend.over100k}})} className="accent-paragon" />
-                              <span className="text-xs">Over $100,000</span>
-                            </label>
-                          </div>
-                        </div>
-                        <div className="border-t border-slate-100 pt-4 flex gap-2">
-                          <button
-                            onClick={() => setFilters({
-                              spend: { under50k: false, fiftyTo100k: false, over100k: false },
-                              status: { vip: false, active: false, prospect: false, inactive: false },
-                              activity: { lastMonth: false, lastQuarter: false, lastYear: false }
-                            })}
-                            className="flex-1 text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-slate-600 py-2"
-                          >
-                            Clear
-                          </button>
-                          <button
-                            onClick={() => setShowFilterDropdown(false)}
-                            className="flex-1 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest py-2 rounded-sm hover:bg-paragon-dark transition-colors"
-                          >
-                            Apply
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+          {/* Basic Info */}
+          <div className="mb-6">
+            <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Personal Information</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="bg-slate-50 p-3 rounded">
+                <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Date of Birth</p>
+                <p className="text-sm font-semibold text-slate-700">{formatDate(customer.dateOfBirth)}</p>
               </div>
+              <div className="bg-slate-50 p-3 rounded">
+                <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Email</p>
+                <p className="text-sm font-semibold text-slate-700">{customer.email || '—'}</p>
+              </div>
+              <div className="bg-slate-50 p-3 rounded">
+                <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Phone</p>
+                <p className="text-sm font-semibold text-slate-700">{customer.phone || '—'}</p>
+              </div>
+              <div className="bg-slate-50 p-3 rounded">
+                <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Passport Country</p>
+                <p className="text-sm font-semibold text-slate-700">{customer.passportCountry || '—'}</p>
+              </div>
+            </div>
+          </div>
 
-              {/* Expandable Customer List */}
-              <div>
-                {sampleCustomers.map(customer => (
-                  <ExpandableCustomerItem
-                    key={customer.id}
-                    customer={customer}
-                    isExpanded={expandedId === customer.id}
-                    onToggle={() => setExpandedId(expandedId === customer.id ? null : customer.id)}
-                    onSelect={() => setSelectedElementId(customer.id)}
-                    isSelected={selectedElementId === customer.id}
-                  />
+          {/* Travel Documents */}
+          <div className="mb-6">
+            <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Travel Documents</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="bg-slate-50 p-3 rounded">
+                <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Passport Number</p>
+                <p className="text-sm font-mono font-semibold text-slate-700">{customer.passportNumber || '—'}</p>
+              </div>
+              <div className="bg-slate-50 p-3 rounded">
+                <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Passport Expiry</p>
+                <p className="text-sm font-semibold text-slate-700">{formatDate(customer.passportExpiry)}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Loyalty Programs */}
+          {customer.loyaltyPrograms && customer.loyaltyPrograms.length > 0 && (
+            <div className="mb-6">
+              <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Loyalty Programs</h3>
+              <div className="space-y-2">
+                {customer.loyaltyPrograms.map((lp, idx) => (
+                  <div key={idx} className="bg-slate-50 p-3 rounded flex justify-between items-center">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-700">{lp.program}</p>
+                      <p className="text-xs font-mono text-slate-500">{lp.number}</p>
+                    </div>
+                    {lp.status && (
+                      <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-1 rounded font-bold">{lp.status}</span>
+                    )}
+                  </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Requests Tab */}
-          {activeSubTab === 'my-requests' && (
-            <div>
-              <h3 className="text-sm font-bold text-slate-700 mb-4 sm:mb-6">My Requests</h3>
-              {myRequests.length === 0 ? (
-                <div className="text-center py-12 text-slate-400">
-                  <p className="text-sm">No requests assigned to you.</p>
+          {/* Preferences */}
+          {customer.preferences && (
+            <div className="mb-6">
+              <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Preferences</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="bg-slate-50 p-3 rounded">
+                  <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Seat Preference</p>
+                  <p className="text-sm font-semibold text-slate-700 capitalize">{customer.preferences.seatPreference || '—'}</p>
                 </div>
-              ) : (
-                myRequests.map(r => (
-                  <ExpandableRequestItem
-                    key={r.id}
-                    request={r}
-                    clientName={clients.find(c => c.id === r.clientId)?.name || 'Unknown Client'}
-                    isExpanded={expandedId === r.id}
-                    onToggle={() => setExpandedId(expandedId === r.id ? null : r.id)}
-                    onSelect={() => setSelectedElementId(r.id)}
-                    isSelected={selectedElementId === r.id}
-                  />
-                ))
-              )}
+                <div className="bg-slate-50 p-3 rounded">
+                  <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Dietary Restrictions</p>
+                  <p className="text-sm font-semibold text-slate-700">
+                    {customer.preferences.dietaryRestrictions?.length ? customer.preferences.dietaryRestrictions.join(', ') : '—'}
+                  </p>
+                </div>
+                {customer.preferences.hotelPreferences && (
+                  <div className="bg-slate-50 p-3 rounded sm:col-span-2">
+                    <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Hotel Preferences</p>
+                    <p className="text-sm text-slate-700">{customer.preferences.hotelPreferences}</p>
+                  </div>
+                )}
+                {customer.preferences.specialRequests && (
+                  <div className="bg-slate-50 p-3 rounded sm:col-span-2">
+                    <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Special Requests</p>
+                    <p className="text-sm text-slate-700">{customer.preferences.specialRequests}</p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
-          {/* Bookings Tab */}
-          {activeSubTab === 'my-bookings' && (
-            <div>
-              <h3 className="text-sm font-bold text-slate-700 mb-4 sm:mb-6">My Bookings</h3>
-
-              {myFlights.length > 0 && (
-                <div className="mb-6">
-                  <p className="text-[10px] uppercase text-slate-400 font-bold tracking-widest mb-3">Flights</p>
-                  {myFlights.map(f => (
-                    <ExpandableBookingItem
-                      key={f.id}
-                      booking={f}
-                      type="flight"
-                      isExpanded={expandedId === f.id}
-                      onToggle={() => setExpandedId(expandedId === f.id ? null : f.id)}
-                      onSelect={() => setSelectedElementId(f.id)}
-                      isSelected={selectedElementId === f.id}
-                    />
-                  ))}
-                </div>
-              )}
-
-              {myHotels.length > 0 && (
-                <div>
-                  <p className="text-[10px] uppercase text-slate-400 font-bold tracking-widest mb-3">Hotels</p>
-                  {myHotels.map(h => (
-                    <ExpandableBookingItem
-                      key={h.id}
-                      booking={h}
-                      type="hotel"
-                      isExpanded={expandedId === h.id}
-                      onToggle={() => setExpandedId(expandedId === h.id ? null : h.id)}
-                      onSelect={() => setSelectedElementId(h.id)}
-                      isSelected={selectedElementId === h.id}
-                    />
-                  ))}
-                </div>
-              )}
-
-              {myFlights.length === 0 && myHotels.length === 0 && (
-                <div className="text-center py-12 text-slate-400">
-                  <p className="text-sm">No bookings yet.</p>
-                </div>
-              )}
+          {/* Notes */}
+          {customer.notes && (
+            <div className="mb-6">
+              <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Notes</h3>
+              <div className="bg-amber-50 border border-amber-200 p-3 rounded">
+                <p className="text-sm text-slate-700 whitespace-pre-wrap">{customer.notes}</p>
+              </div>
             </div>
           )}
-
         </div>
 
-        {/* Collaboration Panel - Slides up on mobile */}
-        {selectedElementId && (
-          <div className="lg:col-span-4 fixed inset-x-0 bottom-0 lg:relative lg:inset-auto lg:sticky lg:top-20 lg:h-fit z-40">
-            <div className="bg-white border-t lg:border border-slate-200 p-4 sm:p-6 rounded-t-lg lg:rounded-sm shadow-lg max-h-[60vh] lg:max-h-none overflow-auto">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xs font-bold uppercase tracking-widest text-paragon">Collaboration Panel</h3>
-                <button onClick={() => setSelectedElementId(null)} className="text-slate-400 hover:text-slate-600 text-xl">&times;</button>
-              </div>
-              <Comments
-                parentId={selectedElementId}
-                currentUser={currentUser}
-                comments={comments}
-                onAddComment={(text) => onAddComment(text, selectedElementId)}
-                onDeleteComment={onDeleteComment}
-              />
-            </div>
-          </div>
-        )}
+        {/* Footer */}
+        <div className="p-4 sm:p-6 border-t border-slate-200 flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-sm"
+          >
+            Close
+          </button>
+          <button
+            onClick={() => { onClose(); onEdit(customer); }}
+            className="flex-1 py-2.5 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-sm"
+          >
+            Edit Customer
+          </button>
+        </div>
       </div>
+    </div>
+  );
+};
+
+const CRM: React.FC<CRMProps> = () => {
+  const [customers, setCustomers] = useState<Customer[]>(MOCK_CUSTOMERS);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Get primary customers (those without a primaryCustomerId)
+  const primaryCustomers = customers.filter(c => !c.primaryCustomerId);
+
+  // Get sub-customers for a primary customer
+  const getSubCustomers = (primaryId: string) => {
+    return customers.filter(c => c.primaryCustomerId === primaryId);
+  };
+
+  // Get primary customer for a sub-customer
+  const getPrimaryCustomer = (customerId: string) => {
+    const customer = customers.find(c => c.id === customerId);
+    if (customer?.primaryCustomerId) {
+      return customers.find(c => c.id === customer.primaryCustomerId);
+    }
+    return undefined;
+  };
+
+  // Handle save (add or edit)
+  const handleSaveCustomer = (customer: Customer) => {
+    const existingIndex = customers.findIndex(c => c.id === customer.id);
+    if (existingIndex >= 0) {
+      // Update existing
+      const updated = [...customers];
+      updated[existingIndex] = customer;
+      setCustomers(updated);
+    } else {
+      // Add new
+      setCustomers([...customers, customer]);
+    }
+    setShowAddModal(false);
+    setEditingCustomer(null);
+  };
+
+  // Filter customers by search
+  const filteredCustomers = primaryCustomers.filter(c => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    const subCustomers = getSubCustomers(c.id);
+    return (
+      c.displayName.toLowerCase().includes(query) ||
+      c.legalFirstName.toLowerCase().includes(query) ||
+      c.legalLastName.toLowerCase().includes(query) ||
+      c.email?.toLowerCase().includes(query) ||
+      subCustomers.some(sub =>
+        sub.displayName.toLowerCase().includes(query) ||
+        sub.legalFirstName.toLowerCase().includes(query) ||
+        sub.legalLastName.toLowerCase().includes(query)
+      )
+    );
+  });
+
+  return (
+    <div className="p-4 sm:p-8">
+      <SectionHeader title="Customer Database" subtitle="Manage your client profiles and traveler information" />
+
+      {/* Search and Actions */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-6">
+        <div className="flex-1 relative">
+          <svg className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input
+            type="text"
+            placeholder="Search customers..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon focus:border-transparent"
+          />
+        </div>
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="px-4 py-2.5 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest rounded-sm hover:bg-paragon-dark transition-colors flex items-center justify-center gap-2"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          Add Customer
+        </button>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-3 mb-6">
+        <div className="bg-white border border-slate-200 p-3 sm:p-4 rounded-sm">
+          <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Accounts</p>
+          <p className="text-xl sm:text-2xl font-bold text-slate-900">{primaryCustomers.length}</p>
+          <p className="text-[9px] text-slate-400 mt-0.5">Primary customers</p>
+        </div>
+        <div className="bg-white border border-slate-200 p-3 sm:p-4 rounded-sm">
+          <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Travelers</p>
+          <p className="text-xl sm:text-2xl font-bold text-slate-900">{customers.length}</p>
+          <p className="text-[9px] text-slate-400 mt-0.5">Including family</p>
+        </div>
+        <div className="bg-white border border-slate-200 p-3 sm:p-4 rounded-sm">
+          <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">With Loyalty</p>
+          <p className="text-xl sm:text-2xl font-bold text-amber-600">
+            {customers.filter(c => c.loyaltyPrograms && c.loyaltyPrograms.length > 0).length}
+          </p>
+          <p className="text-[9px] text-slate-400 mt-0.5">Have programs</p>
+        </div>
+      </div>
+
+      {/* Customer List */}
+      <div className="mb-4">
+        <p className="text-[10px] uppercase text-slate-400 font-bold tracking-widest mb-3">
+          {filteredCustomers.length} {filteredCustomers.length === 1 ? 'Customer' : 'Customers'}
+        </p>
+      </div>
+
+      {filteredCustomers.length === 0 ? (
+        <div className="text-center py-12 text-slate-400">
+          <p className="text-sm">{searchQuery ? 'No customers match your search.' : 'No customers yet.'}</p>
+          {!searchQuery && (
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="mt-4 text-paragon font-bold text-sm hover:text-paragon-dark"
+            >
+              + Add your first customer
+            </button>
+          )}
+        </div>
+      ) : (
+        <div>
+          {filteredCustomers.map(customer => (
+            <CustomerListItem
+              key={customer.id}
+              customer={customer}
+              subCustomers={getSubCustomers(customer.id)}
+              isExpanded={expandedId === customer.id}
+              onToggle={() => setExpandedId(expandedId === customer.id ? null : customer.id)}
+              onSelect={(c) => setSelectedCustomer(c)}
+              onEdit={(c) => setEditingCustomer(c)}
+              isSelected={selectedCustomer?.id === customer.id}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Customer Detail Modal */}
+      {selectedCustomer && (
+        <CustomerDetailModal
+          customer={selectedCustomer}
+          primaryCustomer={getPrimaryCustomer(selectedCustomer.id)}
+          onClose={() => setSelectedCustomer(null)}
+          onEdit={(c) => setEditingCustomer(c)}
+        />
+      )}
+
+      {/* Add Customer Modal */}
+      {showAddModal && (
+        <CustomerFormModal
+          primaryCustomers={primaryCustomers}
+          onSave={handleSaveCustomer}
+          onClose={() => setShowAddModal(false)}
+        />
+      )}
+
+      {/* Edit Customer Modal */}
+      {editingCustomer && (
+        <CustomerFormModal
+          customer={editingCustomer}
+          primaryCustomers={primaryCustomers}
+          onSave={handleSaveCustomer}
+          onClose={() => setEditingCustomer(null)}
+        />
+      )}
     </div>
   );
 };

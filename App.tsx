@@ -7,6 +7,7 @@ import Accounting from './components/Accounting';
 import KnowledgeBase from './components/KnowledgeBase';
 import ClientPortal from './components/ClientPortal';
 import Home from './components/Home';
+import Settings from './components/Settings';
 import NotificationCenter from './components/NotificationCenter';
 import Login, { GoogleUser } from './components/Login';
 import { MOCK_USERS } from './constants';
@@ -475,10 +476,11 @@ const App: React.FC = () => {
     switch (activeTab) {
       case 'home': return <Home currentUser={currentUser} announcements={announcements} comments={comments} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onAddAnnouncement={handleAddAnnouncement} onEditAnnouncement={handleEditAnnouncement} onDeleteAnnouncement={handleDeleteAnnouncement} onPinAnnouncement={handlePinAnnouncement} onPinComment={handlePinComment} onAddRequest={handleAddRequest} onDeleteRequest={handleDeleteRequest} requests={requests} googleUser={googleUser} />;
       case 'ops': return <Operations requests={requests} comments={comments} currentUser={currentUser} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} googleUser={googleUser} convertedFlights={convertedFlights} convertedHotels={convertedHotels} convertedLogistics={convertedLogistics} onConvertToFlight={handleConvertToFlight} onConvertToHotel={handleConvertToHotel} onConvertToLogistics={handleConvertToLogistics} onUpdateFlight={handleUpdateFlight} onUpdateHotel={handleUpdateHotel} onUpdateLogistics={handleUpdateLogistics} onDeleteFlight={handleDeleteFlight} onDeleteHotel={handleDeleteHotel} onDeleteLogistics={handleDeleteLogistics} pipelineTrips={pipelineTrips} onAddPipelineTrip={handleAddPipelineTrip} onUpdatePipelineTrip={handleUpdatePipelineTrip} onDeletePipelineTrip={handleDeletePipelineTrip} onAddRequest={handleAddRequest} />;
-      case 'sales': return <CRM currentUser={currentUser} requests={requests} comments={comments} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} />;
+      case 'sales': return <CRM />;
       case 'accounting': return <Accounting />;
       case 'knowledge': return <KnowledgeBase />;
       case 'portal': return <ClientPortal />;
+      case 'settings': return <Settings />;
       default: return <Home currentUser={currentUser} announcements={announcements} comments={comments} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onAddAnnouncement={handleAddAnnouncement} onEditAnnouncement={handleEditAnnouncement} onDeleteAnnouncement={handleDeleteAnnouncement} onPinAnnouncement={handlePinAnnouncement} onPinComment={handlePinComment} onAddRequest={handleAddRequest} onDeleteRequest={handleDeleteRequest} requests={requests} googleUser={googleUser} />;
     }
   };

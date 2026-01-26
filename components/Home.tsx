@@ -91,6 +91,9 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
   // Delete confirmation state
   const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'post' | 'comment' | 'request'; id: string } | null>(null);
 
+  // Expanded queue item state
+  const [expandedQueueItem, setExpandedQueueItem] = useState<string | null>(null);
+
   // Edit announcement state
   const [editingAnnouncement, setEditingAnnouncement] = useState<Announcement | null>(null);
   const [editTitle, setEditTitle] = useState('');
@@ -1033,41 +1036,107 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
             {requests
               .filter(r => r.status === 'PENDING')
               .sort((a, b) => {
-                // URGENT/CRITICAL items first
                 const aUrgent = a.priority === 'URGENT' || a.priority === 'CRITICAL';
                 const bUrgent = b.priority === 'URGENT' || b.priority === 'CRITICAL';
                 if (aUrgent && !bUrgent) return -1;
                 if (!aUrgent && bUrgent) return 1;
-                // Then by timestamp (newest first)
                 return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
               })
               .map(r => {
+                const clientName = r.details?.clientName || MOCK_USERS.find(u => u.id === r.clientId)?.name || '—';
+                const targetDate = r.details?.targetDate ? new Date(r.details.targetDate).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+                const agentName = r.details?.agentName || (googleUser && r.agentId === googleUser.id ? googleUser.name : (MOCK_USERS.find(u => u.id === r.agentId)?.name || 'Unknown'));
+                const isExpanded = expandedQueueItem === r.id;
                 const isOwnRequest = googleUser ? r.agentId === googleUser.id : r.agentId === currentUser.id;
+
                 return (
-                  <div key={r.id} className={`bg-slate-50 border ${r.priority === 'URGENT' || r.priority === 'CRITICAL' ? 'border-red-300 bg-red-50' : 'border-slate-200'} p-3 rounded-sm hover:border-paragon transition-colors group`}>
-                    <div className="flex justify-between items-start mb-1">
-                      <div className="flex items-center gap-2">
-                        <Badge color={r.type === 'FLIGHT' ? 'red' : r.type === 'HOTEL' ? 'gold' : 'slate'}>{r.type}</Badge>
-                        <span className="text-[10px] text-slate-400">{new Date(r.timestamp).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                  <div
+                    key={r.id}
+                    className={`bg-white border rounded-sm transition-all ${r.priority === 'URGENT' || r.priority === 'CRITICAL' ? 'border-red-300' : 'border-slate-200'}`}
+                  >
+                    {/* Header Row - Always Visible */}
+                    <div
+                      className="p-3 flex items-center gap-3 cursor-pointer"
+                      onClick={() => setExpandedQueueItem(isExpanded ? null : r.id)}
+                    >
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                        r.type === 'FLIGHT' ? 'bg-red-100 text-red-600' :
+                        r.type === 'HOTEL' ? 'bg-amber-100 text-amber-600' :
+                        r.type === 'LOGISTICS' ? 'bg-blue-100 text-blue-600' :
+                        'bg-slate-100 text-slate-600'
+                      }`}>
+                        {r.type === 'FLIGHT' ? (
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                          </svg>
+                        ) : r.type === 'HOTEL' ? (
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                          </svg>
+                        ) : r.type === 'LOGISTICS' ? (
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
+                          </svg>
+                        ) : (
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                          </svg>
+                        )}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge color={r.priority === 'URGENT' || r.priority === 'CRITICAL' ? 'red' : 'slate'}>{r.priority}</Badge>
-                        <div className="w-4">
-                          {isOwnRequest && onDeleteRequest && (
-                            <button
-                              onClick={() => setDeleteConfirm({ type: 'request' as any, id: r.id })}
-                              className="text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                              title="Delete request"
-                            >
-                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                            </button>
-                          )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-xs text-slate-900 truncate">{clientName}</span>
+                          <Badge color={r.type === 'FLIGHT' ? 'red' : r.type === 'HOTEL' ? 'gold' : r.type === 'LOGISTICS' ? 'blue' : 'slate'}>{r.type}</Badge>
                         </div>
+                        <p className="text-[10px] text-slate-500 truncate">{r.notes}</p>
                       </div>
+                      {(r.priority === 'URGENT' || r.priority === 'CRITICAL') && (
+                        <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0"></span>
+                      )}
+                      <svg className={`w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                      </svg>
                     </div>
-                    <p className="text-[11px] text-slate-700 truncate">{r.notes}</p>
+
+                    {/* Expanded Details */}
+                    {isExpanded && (
+                      <div className="px-3 pb-3 border-t border-slate-100">
+                        <div className="grid grid-cols-2 gap-3 pt-3 text-[11px]">
+                          <div>
+                            <span className="text-slate-400 block text-[9px] uppercase tracking-wider">Received</span>
+                            <span className="font-medium text-slate-700">{new Date(r.timestamp).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block text-[9px] uppercase tracking-wider">Target Date</span>
+                            <span className="font-medium text-slate-700">{targetDate}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block text-[9px] uppercase tracking-wider">Agent</span>
+                            <span className="font-medium text-slate-700">{agentName}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block text-[9px] uppercase tracking-wider">Priority</span>
+                            <span className={`font-bold ${r.priority === 'URGENT' || r.priority === 'CRITICAL' ? 'text-red-600' : 'text-slate-600'}`}>{r.priority}</span>
+                          </div>
+                        </div>
+                        {r.notes && (
+                          <div className="mt-3 pt-3 border-t border-slate-100">
+                            <span className="text-slate-400 block text-[9px] uppercase tracking-wider mb-1">Notes</span>
+                            <p className="text-[11px] text-slate-700 whitespace-pre-wrap">{r.notes}</p>
+                          </div>
+                        )}
+                        {isOwnRequest && onDeleteRequest && (
+                          <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ type: 'request', id: r.id }); }}
+                              className="flex-1 bg-red-50 text-red-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-red-100 transition-colors rounded-sm"
+                            >
+                              Delete Request
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}
