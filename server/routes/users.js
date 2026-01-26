@@ -38,7 +38,7 @@ const sendInviteEmail = async (toEmail, toName, role) => {
     const roleDisplay = getRoleDisplayName(role);
 
     const { data, error } = await resend.emails.send({
-      from: 'Paragon Hub <onboarding@resend.dev>',
+      from: 'Paragon Hub <invites@paragonconcierge.com>',
       to: [toEmail],
       subject: "You've been invited to Paragon Hub",
       html: `
