@@ -15,8 +15,9 @@ const CustomerFormModal: React.FC<{
   customer?: Customer;
   primaryCustomers: Customer[];
   onSave: (customer: Customer) => void;
+  onDelete?: (customerId: string) => void;
   onClose: () => void;
-}> = ({ customer, primaryCustomers, onSave, onClose }) => {
+}> = ({ customer, primaryCustomers, onSave, onDelete, onClose }) => {
   const isEditing = !!customer;
 
   // Form state
@@ -352,6 +353,19 @@ const CustomerFormModal: React.FC<{
 
         {/* Footer */}
         <div className="p-4 sm:p-6 border-t border-slate-200 flex gap-3 flex-shrink-0">
+          {isEditing && onDelete && (
+            <button
+              type="button"
+              onClick={() => {
+                if (confirm(`Delete ${customer?.displayName || 'this customer'}? This cannot be undone.`)) {
+                  onDelete(customer!.id);
+                }
+              }}
+              className="py-2.5 px-4 bg-red-50 text-red-600 text-[10px] font-bold uppercase tracking-widest hover:bg-red-100 transition-colors rounded-sm"
+            >
+              Delete
+            </button>
+          )}
           <button
             type="button"
             onClick={onClose}
@@ -380,8 +394,9 @@ const CustomerListItem: React.FC<{
   onToggle: () => void;
   onSelect: (customer: Customer) => void;
   onEdit: (customer: Customer) => void;
+  onDelete: (customerId: string) => void;
   isSelected: boolean;
-}> = ({ customer, subCustomers, isExpanded, onToggle, onSelect, onEdit, isSelected }) => {
+}> = ({ customer, subCustomers, isExpanded, onToggle, onSelect, onEdit, onDelete, isSelected }) => {
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
@@ -485,10 +500,12 @@ const CustomerListItem: React.FC<{
                 {subCustomers.map(sub => (
                   <div
                     key={sub.id}
-                    className="flex items-center justify-between bg-white p-2 rounded border border-slate-100 cursor-pointer hover:border-paragon transition-colors"
-                    onClick={(e) => { e.stopPropagation(); onSelect(sub); }}
+                    className="flex items-center justify-between bg-white p-2 rounded border border-slate-100 hover:border-paragon transition-colors"
                   >
-                    <div className="flex items-center gap-2">
+                    <div
+                      className="flex items-center gap-2 flex-1 cursor-pointer"
+                      onClick={(e) => { e.stopPropagation(); onSelect(sub); }}
+                    >
                       <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center">
                         <span className="font-bold text-slate-500 text-[10px]">{getInitials(sub.displayName)}</span>
                       </div>
@@ -497,9 +514,31 @@ const CustomerListItem: React.FC<{
                         <p className="text-[10px] text-slate-400">{sub.preferences?.seatPreference ? `${sub.preferences.seatPreference} seat` : 'No preferences'}</p>
                       </div>
                     </div>
-                    <svg className="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onEdit(sub); }}
+                        className="p-1.5 text-slate-400 hover:text-paragon hover:bg-slate-100 rounded transition-colors"
+                        title="Edit"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm(`Delete ${sub.displayName}? This cannot be undone.`)) {
+                            onDelete(sub.id);
+                          }
+                        }}
+                        className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                        title="Delete"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -788,6 +827,27 @@ const CRM: React.FC<CRMProps> = ({ requests = [], googleUser }) => {
     } catch (error) {
       console.error('Error saving customer:', error);
       alert(`Error: ${error instanceof Error ? error.message : 'Failed to save customer'}`);
+    }
+  };
+
+  // Handle delete customer
+  const handleDeleteCustomer = async (customerId: string) => {
+    try {
+      const res = await fetch(`${API_URL}/api/customers/${customerId}`, {
+        method: 'DELETE',
+      });
+
+      if (res.ok) {
+        setCustomers(prev => prev.filter(c => c.id !== customerId));
+        setEditingCustomer(null);
+        setSelectedCustomer(null);
+      } else {
+        const error = await res.json().catch(() => ({}));
+        alert(`Failed to delete customer: ${error.error || res.statusText}`);
+      }
+    } catch (error) {
+      console.error('Error deleting customer:', error);
+      alert(`Error: ${error instanceof Error ? error.message : 'Failed to delete customer'}`);
     }
   };
 
@@ -1125,6 +1185,7 @@ const CRM: React.FC<CRMProps> = ({ requests = [], googleUser }) => {
               onToggle={() => setExpandedId(expandedId === customer.id ? null : customer.id)}
               onSelect={(c) => setSelectedCustomer(c)}
               onEdit={(c) => setEditingCustomer(c)}
+              onDelete={handleDeleteCustomer}
               isSelected={selectedCustomer?.id === customer.id}
             />
           ))}
@@ -1156,6 +1217,7 @@ const CRM: React.FC<CRMProps> = ({ requests = [], googleUser }) => {
           customer={editingCustomer}
           primaryCustomers={primaryCustomers}
           onSave={handleSaveCustomer}
+          onDelete={handleDeleteCustomer}
           onClose={() => setEditingCustomer(null)}
         />
       )}
