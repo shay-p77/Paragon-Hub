@@ -50,6 +50,7 @@ const App: React.FC = () => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [teamUsers, setTeamUsers] = useState<Array<{ googleId: string; name: string; email: string; role: string }>>([]);
   const [dataLoading, setDataLoading] = useState(true);
   const [dataError, setDataError] = useState<string | null>(null);
 
@@ -58,10 +59,11 @@ const App: React.FC = () => {
     if (showLoading) setDataLoading(true);
     setDataError(null);
     try {
-      const [announcementsRes, commentsRes, requestsRes] = await Promise.all([
+      const [announcementsRes, commentsRes, requestsRes, usersRes] = await Promise.all([
         fetch(`${API_URL}/api/announcements`),
         fetch(`${API_URL}/api/comments`),
         fetch(`${API_URL}/api/requests`),
+        fetch(`${API_URL}/api/auth/users`),
       ]);
 
       if (announcementsRes.ok) {
@@ -75,6 +77,10 @@ const App: React.FC = () => {
       if (requestsRes.ok) {
         const data = await requestsRes.json();
         setRequests(data);
+      }
+      if (usersRes.ok) {
+        const data = await usersRes.json();
+        setTeamUsers(data);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -216,26 +222,28 @@ const App: React.FC = () => {
         const newComment = await res.json();
         setComments(prev => [...prev, newComment]);
 
-        // Check for tags
-        const tags = text.match(/@u\d+/g);
-        if (tags) {
+        // Check for @mentions (matches @name patterns)
+        const mentionPattern = /@(\w+)/g;
+        const mentions = text.match(mentionPattern);
+        if (mentions) {
           const senderName = googleUser?.name || currentUser.name;
-          const senderId = googleUser?.id || currentUser.id;
-          tags.forEach(tag => {
-            const userId = tag.substring(1);
-            if (userId !== currentUser.id && userId !== senderId) {
-              const targetUser = MOCK_USERS.find(u => u.id === userId);
-              if (targetUser) {
-                setNotifications(prev => [{
-                  id: `n-${Date.now()}`,
-                  userId,
-                  message: `${senderName} tagged you in a comment.`,
-                  type: 'TAG',
-                  read: false,
-                  timestamp: new Date().toISOString(),
-                  link: parentId
-                }, ...prev]);
-              }
+          const senderGoogleId = googleUser?.googleId;
+          mentions.forEach(mention => {
+            const mentionName = mention.substring(1).toLowerCase();
+            // Find user by name (case-insensitive partial match)
+            const targetUser = teamUsers.find(u =>
+              u.name.toLowerCase().includes(mentionName) && u.googleId !== senderGoogleId
+            );
+            if (targetUser) {
+              setNotifications(prev => [{
+                id: `n-${Date.now()}-${targetUser.googleId}`,
+                userId: targetUser.googleId,
+                message: `${senderName} tagged you in a comment.`,
+                type: 'TAG',
+                read: false,
+                timestamp: new Date().toISOString(),
+                link: parentId
+              }, ...prev]);
             }
           });
         }
@@ -471,16 +479,17 @@ const App: React.FC = () => {
         const newReq = await res.json();
         setRequests(prev => [newReq, ...prev]);
 
-        // Notify all users except the author when a new request is created
+        // Notify all team users except the author when a new request is created
         const senderName = googleUser?.name || currentUser.name;
-        const senderId = googleUser?.id || currentUser.id;
+        const senderGoogleId = googleUser?.googleId;
         const priorityText = newReq.priority === 'URGENT' || newReq.priority === 'CRITICAL' ? ' (URGENT)' : '';
 
-        MOCK_USERS.forEach(u => {
-          if (u.id !== currentUser.id && u.id !== senderId) {
+        teamUsers.forEach(u => {
+          // Don't notify the sender, and only notify non-CLIENT users
+          if (u.googleId !== senderGoogleId && u.role !== 'CLIENT') {
             setNotifications(prev => [{
-              id: `n-${Date.now()}-${u.id}`,
-              userId: u.id,
+              id: `n-${Date.now()}-${u.googleId}`,
+              userId: u.googleId,
               message: `New ${newReq.type.toLowerCase()} request from ${senderName}${priorityText}`,
               type: 'ASSIGN',
               read: false,
@@ -501,7 +510,7 @@ const App: React.FC = () => {
 
   const clearAll = () => setNotifications([]);
 
-  const userNotifications = notifications.filter(n => n.userId === currentUser.id);
+  const userNotifications = notifications.filter(n => n.userId === googleUser?.googleId);
   const unreadCount = userNotifications.filter(n => !n.read).length;
 
   const renderContent = () => {
