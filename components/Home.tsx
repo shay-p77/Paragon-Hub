@@ -94,6 +94,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
   const [aiParseStep, setAiParseStep] = useState<'input' | 'review'>('input');
   const [aiParsedData, setAiParsedData] = useState<any>(null);
   const [aiParseError, setAiParseError] = useState<string | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Delete confirmation state
   const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'post' | 'comment' | 'request'; id: string } | null>(null);
@@ -456,6 +457,94 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
       setAiParseError(error.message || 'Failed to parse confirmation');
     } finally {
       setIsParsing(false);
+    }
+  };
+
+  // AI Parse function - parse PDF
+  const handleAiParsePdf = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsParsing(true);
+    setAiParseError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('pdf', file);
+
+      const response = await fetch(`${API_URL}/api/parse/pdf`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to parse PDF');
+      }
+
+      setAiParsedData(result.data);
+      setAiParseStep('review');
+
+      // Pre-fill the detail form (same logic as text parse)
+      if (result.data.bookingType) {
+        setDetailServiceType(result.data.bookingType as 'FLIGHT' | 'HOTEL' | 'LOGISTICS');
+      }
+      if (result.data.clientName) {
+        setDetailClientName(result.data.clientName);
+      }
+
+      let specs = '';
+      if (result.data.bookingType === 'FLIGHT' && result.data.flight) {
+        const f = result.data.flight;
+        specs = [
+          f.pnr ? `PNR: ${f.pnr}` : '',
+          f.airline ? `Airline: ${f.airline}` : '',
+          f.routes ? `Routes: ${f.routes}` : '',
+          f.dates ? `Dates: ${f.dates}` : '',
+          f.passengerCount ? `Passengers: ${f.passengerCount}` : '',
+          f.flightNumbers?.length ? `Flights: ${f.flightNumbers.join(', ')}` : '',
+        ].filter(Boolean).join('\n');
+        if (f.dates) setDetailTargetDate(f.dates.split(',')[0].trim());
+      } else if (result.data.bookingType === 'HOTEL' && result.data.hotel) {
+        const h = result.data.hotel;
+        specs = [
+          h.confirmationNumber ? `Confirmation: ${h.confirmationNumber}` : '',
+          h.hotelName ? `Hotel: ${h.hotelName}` : '',
+          h.roomType ? `Room: ${h.roomType}` : '',
+          h.checkIn ? `Check-in: ${h.checkIn}` : '',
+          h.checkOut ? `Check-out: ${h.checkOut}` : '',
+          h.guestCount ? `Guests: ${h.guestCount}` : '',
+        ].filter(Boolean).join('\n');
+        if (h.checkIn) setDetailTargetDate(h.checkIn);
+      } else if (result.data.bookingType === 'LOGISTICS' && result.data.logistics) {
+        const l = result.data.logistics;
+        specs = [
+          l.confirmationNumber ? `Confirmation: ${l.confirmationNumber}` : '',
+          l.serviceType ? `Service: ${l.serviceType}` : '',
+          l.provider ? `Provider: ${l.provider}` : '',
+          l.date ? `Date: ${l.date}` : '',
+          l.time ? `Time: ${l.time}` : '',
+          l.pickupLocation ? `Pickup: ${l.pickupLocation}` : '',
+          l.dropoffLocation ? `Dropoff: ${l.dropoffLocation}` : '',
+        ].filter(Boolean).join('\n');
+        if (l.date) setDetailTargetDate(l.date);
+      }
+
+      if (result.data.notes) {
+        specs += specs ? `\n\nNotes: ${result.data.notes}` : `Notes: ${result.data.notes}`;
+      }
+
+      setDetailSpecs(specs);
+
+    } catch (error: any) {
+      setAiParseError(error.message || 'Failed to parse PDF');
+    } finally {
+      setIsParsing(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
@@ -829,26 +918,56 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                           </div>
                         )}
 
-                        <button
-                          type="button"
-                          onClick={handleAiParseText}
-                          disabled={isParsing || !aiParseText.trim()}
-                          className="mt-4 w-full py-3 bg-amber-500 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-amber-600 transition-colors rounded-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                        >
-                          {isParsing ? (
-                            <>
-                              <div className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-white"></div>
-                              Parsing...
-                            </>
-                          ) : (
-                            <>
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                              </svg>
-                              Parse with AI
-                            </>
-                          )}
-                        </button>
+                        <div className="mt-4 flex gap-3">
+                          <button
+                            type="button"
+                            onClick={handleAiParseText}
+                            disabled={isParsing || !aiParseText.trim()}
+                            className="flex-1 py-3 bg-amber-500 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-amber-600 transition-colors rounded-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                          >
+                            {isParsing ? (
+                              <>
+                                <div className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-white"></div>
+                                Parsing...
+                              </>
+                            ) : (
+                              <>
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                </svg>
+                                Parse Text
+                              </>
+                            )}
+                          </button>
+
+                          <input
+                            type="file"
+                            ref={fileInputRef}
+                            accept=".pdf"
+                            onChange={handleAiParsePdf}
+                            className="hidden"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={isParsing}
+                            className="flex-1 py-3 bg-slate-700 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-slate-800 transition-colors rounded-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                          >
+                            {isParsing ? (
+                              <>
+                                <div className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-white"></div>
+                                Parsing...
+                              </>
+                            ) : (
+                              <>
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                </svg>
+                                Upload PDF
+                              </>
+                            )}
+                          </button>
+                        </div>
                       </>
                     ) : (
                       <>
