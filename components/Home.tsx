@@ -81,13 +81,19 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
 
   // Quick Add state
   const [showQuickAdd, setShowQuickAdd] = useState(false);
-  const [requestMode, setRequestMode] = useState<'QUICK' | 'DETAIL'>('QUICK');
+  const [requestMode, setRequestMode] = useState<'QUICK' | 'AI_PARSE' | 'DETAIL'>('QUICK');
   const [quickSnippet, setQuickSnippet] = useState('');
   const [detailServiceType, setDetailServiceType] = useState<'FLIGHT' | 'HOTEL' | 'LOGISTICS'>('FLIGHT');
   const [detailClientName, setDetailClientName] = useState('');
   const [detailTargetDate, setDetailTargetDate] = useState('');
   const [detailSpecs, setDetailSpecs] = useState('');
   const [requestPriority, setRequestPriority] = useState<'NORMAL' | 'URGENT'>('NORMAL');
+
+  // AI Parse state
+  const [aiParseText, setAiParseText] = useState('');
+  const [aiParseStep, setAiParseStep] = useState<'input' | 'review'>('input');
+  const [aiParsedData, setAiParsedData] = useState<any>(null);
+  const [aiParseError, setAiParseError] = useState<string | null>(null);
 
   // Delete confirmation state
   const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'post' | 'comment' | 'request'; id: string } | null>(null);
@@ -107,7 +113,6 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
   const [isSavingRequest, setIsSavingRequest] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
-  const [parseResult, setParseResult] = useState<{ confidence?: string; raw?: string } | null>(null);
 
   // Error toast state
   const [errorToast, setErrorToast] = useState<string | null>(null);
@@ -372,53 +377,92 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
     }
   };
 
-  // AI Parse function
-  const handleAIParse = async () => {
-    if (!quickSnippet.trim()) return;
+  // AI Parse function - parse text
+  const handleAiParseText = async () => {
+    if (!aiParseText.trim()) return;
 
     setIsParsing(true);
-    setParseResult(null);
+    setAiParseError(null);
+
     try {
-      const res = await fetch(`${API_URL}/api/ai/parse`, {
+      const response = await fetch(`${API_URL}/api/parse/text`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: quickSnippet }),
+        body: JSON.stringify({ text: aiParseText }),
       });
 
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || 'Failed to parse');
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to parse text');
       }
 
-      const result = await res.json();
-      const data = result.data;
+      setAiParsedData(result.data);
+      setAiParseStep('review');
 
-      // Auto-fill the detail form fields
-      if (data.clientName) setDetailClientName(data.clientName);
-      if (data.targetDate) setDetailTargetDate(data.targetDate);
-      if (data.serviceType) setDetailServiceType(data.serviceType as 'FLIGHT' | 'HOTEL' | 'LOGISTICS');
-      if (data.priority) setRequestPriority(data.priority as 'NORMAL' | 'URGENT');
+      // Pre-fill the detail form based on parsed data
+      if (result.data.bookingType) {
+        setDetailServiceType(result.data.bookingType as 'FLIGHT' | 'HOTEL' | 'LOGISTICS');
+      }
+      if (result.data.clientName) {
+        setDetailClientName(result.data.clientName);
+      }
 
-      // Build detailed notes from parsed data
-      const notesParts: string[] = [];
-      if (data.origin && data.destination) notesParts.push(`Route: ${data.origin} → ${data.destination}`);
-      if (data.airline) notesParts.push(`Airline: ${data.airline}`);
-      if (data.flightNumber) notesParts.push(`Flight: ${data.flightNumber}`);
-      if (data.hotelName) notesParts.push(`Hotel: ${data.hotelName}`);
-      if (data.checkIn && data.checkOut) notesParts.push(`Stay: ${data.checkIn} to ${data.checkOut}`);
-      if (data.notes) notesParts.push(data.notes);
-      if (notesParts.length > 0) setDetailSpecs(notesParts.join('\n'));
+      // Build specs from parsed data
+      let specs = '';
+      if (result.data.bookingType === 'FLIGHT' && result.data.flight) {
+        const f = result.data.flight;
+        specs = [
+          f.pnr ? `PNR: ${f.pnr}` : '',
+          f.airline ? `Airline: ${f.airline}` : '',
+          f.routes ? `Routes: ${f.routes}` : '',
+          f.dates ? `Dates: ${f.dates}` : '',
+          f.passengerCount ? `Passengers: ${f.passengerCount}` : '',
+          f.flightNumbers?.length ? `Flights: ${f.flightNumbers.join(', ')}` : '',
+        ].filter(Boolean).join('\n');
+        if (f.dates) setDetailTargetDate(f.dates.split(',')[0].trim());
+      } else if (result.data.bookingType === 'HOTEL' && result.data.hotel) {
+        const h = result.data.hotel;
+        specs = [
+          h.confirmationNumber ? `Confirmation: ${h.confirmationNumber}` : '',
+          h.hotelName ? `Hotel: ${h.hotelName}` : '',
+          h.roomType ? `Room: ${h.roomType}` : '',
+          h.checkIn ? `Check-in: ${h.checkIn}` : '',
+          h.checkOut ? `Check-out: ${h.checkOut}` : '',
+          h.guestCount ? `Guests: ${h.guestCount}` : '',
+        ].filter(Boolean).join('\n');
+        if (h.checkIn) setDetailTargetDate(h.checkIn);
+      } else if (result.data.bookingType === 'LOGISTICS' && result.data.logistics) {
+        const l = result.data.logistics;
+        specs = [
+          l.confirmationNumber ? `Confirmation: ${l.confirmationNumber}` : '',
+          l.serviceType ? `Service: ${l.serviceType}` : '',
+          l.provider ? `Provider: ${l.provider}` : '',
+          l.date ? `Date: ${l.date}` : '',
+          l.time ? `Time: ${l.time}` : '',
+          l.pickupLocation ? `Pickup: ${l.pickupLocation}` : '',
+          l.dropoffLocation ? `Dropoff: ${l.dropoffLocation}` : '',
+        ].filter(Boolean).join('\n');
+        if (l.date) setDetailTargetDate(l.date);
+      }
 
-      // Switch to detail mode to show parsed results
-      setRequestMode('DETAIL');
-      setParseResult({ confidence: data.confidence });
+      if (result.data.notes) {
+        specs += specs ? `\n\nNotes: ${result.data.notes}` : `Notes: ${result.data.notes}`;
+      }
+
+      setDetailSpecs(specs);
 
     } catch (error: any) {
-      console.error('AI parse error:', error);
-      setErrorToast(error.message || 'AI parsing failed');
+      setAiParseError(error.message || 'Failed to parse confirmation');
     } finally {
       setIsParsing(false);
     }
+  };
+
+  // Use parsed data and switch to detail mode
+  const handleAiParseSubmit = () => {
+    setRequestMode('DETAIL');
+    setAiParseStep('input');
   };
 
   const handleQuickAddSubmit = async (e: React.FormEvent) => {
@@ -472,7 +516,9 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
         setDetailSpecs('');
       }
       setRequestPriority('NORMAL');
-      setParseResult(null);
+      setAiParsedData(null);
+      setAiParseText('');
+      setAiParseStep('input');
       setShowQuickAdd(false);
     } catch (error) {
       setErrorToast('Failed to submit request. Please try again.');
@@ -658,36 +704,45 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                   </svg>
                   <h3 className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-paragon-gold">Operational Dispatch</h3>
                 </div>
-                <div className="flex gap-2 w-full sm:w-auto">
+                <div className="flex gap-1 sm:gap-0 w-full sm:w-auto border border-slate-600 rounded-sm overflow-hidden">
                   <button
                     onClick={() => {
                       setRequestMode('QUICK');
-                      // Clear detail fields when switching to quick
-                      setDetailClientName('');
-                      setDetailTargetDate('');
-                      setDetailSpecs('');
+                      setAiParseStep('input');
                     }}
-                    className={`flex-1 sm:flex-initial px-3 sm:px-4 py-2 text-[9px] sm:text-[10px] font-bold uppercase tracking-widest transition-all rounded-sm ${
+                    className={`flex-1 sm:flex-initial px-2 sm:px-4 py-2 text-[9px] sm:text-[10px] font-bold uppercase tracking-widest transition-all ${
                       requestMode === 'QUICK'
                         ? 'bg-paragon-gold text-slate-900'
-                        : 'bg-slate-700 text-slate-400 hover:text-white hover:bg-slate-600'
+                        : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'
                     }`}
                   >
-                    QUICK ADD
+                    Quick
+                  </button>
+                  <button
+                    onClick={() => {
+                      setRequestMode('AI_PARSE');
+                      setAiParseStep('input');
+                    }}
+                    className={`flex-1 sm:flex-initial px-2 sm:px-4 py-2 text-[9px] sm:text-[10px] font-bold uppercase tracking-widest transition-all ${
+                      requestMode === 'AI_PARSE'
+                        ? 'bg-amber-500 text-white'
+                        : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'
+                    }`}
+                  >
+                    AI Parse
                   </button>
                   <button
                     onClick={() => {
                       setRequestMode('DETAIL');
-                      // Clear quick field when switching to detail
-                      setQuickSnippet('');
+                      setAiParseStep('input');
                     }}
-                    className={`flex-1 sm:flex-initial px-3 sm:px-4 py-2 text-[9px] sm:text-[10px] font-bold uppercase tracking-widest transition-all rounded-sm ${
+                    className={`flex-1 sm:flex-initial px-2 sm:px-4 py-2 text-[9px] sm:text-[10px] font-bold uppercase tracking-widest transition-all ${
                       requestMode === 'DETAIL'
                         ? 'bg-paragon-gold text-slate-900'
-                        : 'bg-slate-700 text-slate-400 hover:text-white hover:bg-slate-600'
+                        : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'
                     }`}
                   >
-                    DETAIL ADD
+                    Detailed
                   </button>
                 </div>
               </div>
@@ -699,31 +754,9 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                       value={quickSnippet}
                       onChange={(e) => setQuickSnippet(e.target.value)}
                       placeholder="Paste a request snippet, PNR, or client note here..."
-                      className="w-full flex-1 p-4 bg-white border border-slate-300 text-sm text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon-gold rounded-sm resize-none"
+                      className="w-full flex-1 p-4 bg-white border border-slate-300 text-sm text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon-gold rounded-sm resize-none min-h-[120px]"
                       required
                     />
-                    {/* AI Parse Button */}
-                    <button
-                      type="button"
-                      onClick={handleAIParse}
-                      disabled={isParsing || !quickSnippet.trim()}
-                      className="mt-3 w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-2.5 text-[10px] font-bold uppercase tracking-widest hover:from-purple-700 hover:to-indigo-700 transition-all rounded-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                    >
-                      {isParsing ? (
-                        <>
-                          <div className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-white"></div>
-                          Parsing with AI...
-                        </>
-                      ) : (
-                        <>
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                          </svg>
-                          Parse with AI
-                        </>
-                      )}
-                    </button>
-                    <p className="text-[9px] text-slate-400 text-center mt-1">AI will extract client, dates, and details automatically</p>
                     <div className="mt-4 flex-shrink-0">
                       <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Priority</label>
                       <div className="flex gap-2">
@@ -754,34 +787,165 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                     <button
                       type="submit"
                       disabled={isSavingRequest}
-                      className="mt-4 w-full bg-paragon-gold text-slate-900 py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-amber-500 transition-colors flex-shrink-0 rounded-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      className="mt-4 w-full bg-paragon text-white py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors flex-shrink-0 rounded-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                       {isSavingRequest ? (
                         <>
-                          <div className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-slate-900"></div>
+                          <div className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-white"></div>
                           Submitting...
                         </>
                       ) : (
-                        'Confirm Quick Request'
+                        'Submit Request'
                       )}
                     </button>
                   </div>
+                ) : requestMode === 'AI_PARSE' ? (
+                  <div className="flex-1 flex flex-col">
+                    {aiParseStep === 'input' ? (
+                      <>
+                        {/* AI Parse Input */}
+                        <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-sm">
+                          <div className="flex items-center gap-2 mb-1">
+                            <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                            <span className="text-[10px] font-bold text-amber-800 uppercase tracking-widest">AI-Powered Parsing</span>
+                          </div>
+                          <p className="text-[10px] text-amber-700">
+                            Paste a booking confirmation, email, or itinerary. AI will extract all details.
+                          </p>
+                        </div>
+
+                        <textarea
+                          value={aiParseText}
+                          onChange={(e) => setAiParseText(e.target.value)}
+                          placeholder="Paste your booking confirmation, itinerary, or PNR details here..."
+                          className="w-full flex-1 p-4 bg-white border border-slate-300 text-sm text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-amber-400 rounded-sm resize-none min-h-[120px]"
+                        />
+
+                        {aiParseError && (
+                          <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-sm">
+                            <p className="text-xs text-red-700">{aiParseError}</p>
+                          </div>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={handleAiParseText}
+                          disabled={isParsing || !aiParseText.trim()}
+                          className="mt-4 w-full py-3 bg-amber-500 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-amber-600 transition-colors rounded-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                          {isParsing ? (
+                            <>
+                              <div className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-white"></div>
+                              Parsing...
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                              </svg>
+                              Parse with AI
+                            </>
+                          )}
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        {/* AI Parse Review */}
+                        <div className="mb-3 p-3 bg-emerald-50 border border-emerald-200 rounded-sm">
+                          <div className="flex items-center gap-2 mb-1">
+                            <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-widest">Parsed Successfully</span>
+                            {aiParsedData?.confidence && (
+                              <span className="ml-auto text-[10px] text-emerald-600 font-semibold">{aiParsedData.confidence}% confidence</span>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-emerald-700">
+                            Review below. Click "Use This Data" to fill the form.
+                          </p>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto space-y-2">
+                          <div className="p-2 bg-slate-50 border border-slate-200 rounded-sm">
+                            <div className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1">Booking Type</div>
+                            <div className="text-xs font-bold text-slate-900">{aiParsedData?.bookingType || 'Unknown'}</div>
+                          </div>
+
+                          {aiParsedData?.clientName && (
+                            <div className="p-2 bg-slate-50 border border-slate-200 rounded-sm">
+                              <div className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1">Client Name</div>
+                              <div className="text-xs text-slate-900">{aiParsedData.clientName}</div>
+                            </div>
+                          )}
+
+                          {aiParsedData?.bookingType === 'FLIGHT' && aiParsedData.flight && (
+                            <div className="p-2 bg-blue-50 border border-blue-200 rounded-sm">
+                              <div className="text-[9px] font-bold text-blue-600 uppercase tracking-widest mb-1">Flight Details</div>
+                              <div className="grid grid-cols-2 gap-1 text-[11px]">
+                                {aiParsedData.flight.pnr && <div><span className="text-slate-500">PNR:</span> <span className="font-mono font-bold">{aiParsedData.flight.pnr}</span></div>}
+                                {aiParsedData.flight.airline && <div><span className="text-slate-500">Airline:</span> {aiParsedData.flight.airline}</div>}
+                                {aiParsedData.flight.routes && <div className="col-span-2"><span className="text-slate-500">Routes:</span> {aiParsedData.flight.routes}</div>}
+                                {aiParsedData.flight.dates && <div><span className="text-slate-500">Dates:</span> {aiParsedData.flight.dates}</div>}
+                              </div>
+                            </div>
+                          )}
+
+                          {aiParsedData?.bookingType === 'HOTEL' && aiParsedData.hotel && (
+                            <div className="p-2 bg-amber-50 border border-amber-200 rounded-sm">
+                              <div className="text-[9px] font-bold text-amber-600 uppercase tracking-widest mb-1">Hotel Details</div>
+                              <div className="grid grid-cols-2 gap-1 text-[11px]">
+                                {aiParsedData.hotel.hotelName && <div className="col-span-2"><span className="text-slate-500">Hotel:</span> {aiParsedData.hotel.hotelName}</div>}
+                                {aiParsedData.hotel.checkIn && <div><span className="text-slate-500">Check-in:</span> {aiParsedData.hotel.checkIn}</div>}
+                                {aiParsedData.hotel.checkOut && <div><span className="text-slate-500">Check-out:</span> {aiParsedData.hotel.checkOut}</div>}
+                              </div>
+                            </div>
+                          )}
+
+                          {aiParsedData?.bookingType === 'LOGISTICS' && aiParsedData.logistics && (
+                            <div className="p-2 bg-purple-50 border border-purple-200 rounded-sm">
+                              <div className="text-[9px] font-bold text-purple-600 uppercase tracking-widest mb-1">Logistics Details</div>
+                              <div className="grid grid-cols-2 gap-1 text-[11px]">
+                                {aiParsedData.logistics.serviceType && <div><span className="text-slate-500">Service:</span> {aiParsedData.logistics.serviceType}</div>}
+                                {aiParsedData.logistics.date && <div><span className="text-slate-500">Date:</span> {aiParsedData.logistics.date}</div>}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="mt-3 flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => { setAiParseStep('input'); setAiParsedData(null); }}
+                            className="flex-1 py-2.5 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-sm"
+                          >
+                            Back
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleAiParseSubmit}
+                            className="flex-1 py-2.5 bg-emerald-500 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-emerald-600 transition-colors rounded-sm"
+                          >
+                            Use This Data
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 ) : (
-                  <div className="flex-1 flex flex-col space-y-3">
-                    {/* AI Parse Confidence Indicator */}
-                    {parseResult?.confidence && (
-                      <div className={`flex items-center gap-2 px-3 py-2 rounded-sm text-[10px] font-bold uppercase tracking-wider ${
-                        parseResult.confidence === 'HIGH' ? 'bg-emerald-100 text-emerald-700' :
-                        parseResult.confidence === 'MEDIUM' ? 'bg-amber-100 text-amber-700' :
-                        'bg-red-100 text-red-700'
-                      }`}>
+                  <div className="flex-1 flex flex-col space-y-3 overflow-y-auto">
+                    {/* AI Parsed indicator */}
+                    {aiParsedData && (
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-sm text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-700">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                         </svg>
-                        AI Parsed - {parseResult.confidence} Confidence
+                        AI Parsed - Fields Pre-filled
                         <button
                           type="button"
-                          onClick={() => setParseResult(null)}
+                          onClick={() => setAiParsedData(null)}
                           className="ml-auto hover:opacity-70"
                         >
                           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
