@@ -2957,7 +2957,7 @@ const Operations: React.FC<OperationsProps> = ({
                   </button>
                 </div>
               ) : dispatchMode === 'AI_PARSE' ? (
-                <div className="flex-1 flex flex-col">
+                <div className="flex-1 flex flex-col overflow-hidden min-h-0">
                   {aiParseStep === 'input' ? (
                     <>
                       {/* AI Parse Input */}
@@ -3047,7 +3047,7 @@ Room Type: Deluxe King"
                       </div>
                     </>
                   ) : (
-                    <>
+                    <div className="flex-1 flex flex-col overflow-hidden min-h-0">
                       {/* AI Parse Review */}
                       <div className="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-sm flex-shrink-0">
                         <div className="flex items-center gap-2 mb-2">
@@ -3142,7 +3142,7 @@ Room Type: Deluxe King"
                           Use This Data
                         </button>
                       </div>
-                    </>
+                    </div>
                   )}
                 </div>
               ) : (

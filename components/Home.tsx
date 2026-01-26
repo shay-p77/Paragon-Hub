@@ -889,7 +889,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                     </button>
                   </div>
                 ) : requestMode === 'AI_PARSE' ? (
-                  <div className="flex-1 flex flex-col">
+                  <div className="flex-1 flex flex-col overflow-hidden min-h-0">
                     {aiParseStep === 'input' ? (
                       <>
                         {/* AI Parse Input */}
@@ -970,9 +970,9 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                         </div>
                       </>
                     ) : (
-                      <>
+                      <div className="flex-1 flex flex-col overflow-hidden min-h-0">
                         {/* AI Parse Review */}
-                        <div className="mb-3 p-3 bg-emerald-50 border border-emerald-200 rounded-sm">
+                        <div className="mb-3 p-3 bg-emerald-50 border border-emerald-200 rounded-sm flex-shrink-0">
                           <div className="flex items-center gap-2 mb-1">
                             <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -987,7 +987,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                           </p>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto space-y-2">
+                        <div className="flex-1 overflow-y-auto space-y-2 min-h-0">
                           <div className="p-2 bg-slate-50 border border-slate-200 rounded-sm">
                             <div className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1">Booking Type</div>
                             <div className="text-xs font-bold text-slate-900">{aiParsedData?.bookingType || 'Unknown'}</div>
@@ -1034,7 +1034,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                           )}
                         </div>
 
-                        <div className="mt-3 flex gap-2">
+                        <div className="mt-3 flex gap-2 flex-shrink-0">
                           <button
                             type="button"
                             onClick={() => { setAiParseStep('input'); setAiParsedData(null); }}
@@ -1050,7 +1050,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                             Use This Data
                           </button>
                         </div>
-                      </>
+                      </div>
                     )}
                   </div>
                 ) : (
