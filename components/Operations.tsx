@@ -1486,6 +1486,7 @@ const Operations: React.FC<OperationsProps> = ({
                     const clientName = r.details?.clientName || MOCK_USERS.find(u => u.id === r.clientId)?.name || '—';
                     const targetDate = r.details?.targetDate ? new Date(r.details.targetDate).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
                     const agentName = r.details?.agentName || (googleUser && r.agentId === googleUser.googleId ? googleUser.name : (MOCK_USERS.find(u => u.id === r.agentId)?.name || 'Unknown'));
+                    const isOwnRequest = googleUser ? r.agentId === googleUser.googleId : r.agentId === currentUser.id;
 
                     return (
                       <tr key={r.id} className={`hover:bg-slate-50 cursor-pointer ${selectedElementId === r.id ? 'bg-paragon-light/30' : ''}`} onClick={() => setSelectedElementId(r.id)}>
@@ -1505,6 +1506,14 @@ const Operations: React.FC<OperationsProps> = ({
                           >
                             COMPLETE
                           </button>
+                          {isOwnRequest && onDeleteRequest && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); if (confirm('Delete this request?')) onDeleteRequest(r.id); }}
+                              className="text-red-600 font-bold text-[10px] hover:text-red-700"
+                            >
+                              DELETE
+                            </button>
+                          )}
                         </td>
                       </tr>
                     );
