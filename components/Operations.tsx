@@ -31,6 +31,7 @@ interface OperationsProps {
   onUpdatePipelineTrip: (id: string, updates: Partial<PipelineTrip>) => void;
   onDeletePipelineTrip: (id: string) => void;
   onAddRequest?: (req: Partial<BookingRequest>) => void;
+  onDeleteRequest?: (requestId: string) => void;
 }
 
 const Operations: React.FC<OperationsProps> = ({
@@ -40,7 +41,7 @@ const Operations: React.FC<OperationsProps> = ({
   onUpdateFlight, onUpdateHotel, onUpdateLogistics,
   onDeleteFlight, onDeleteHotel, onDeleteLogistics,
   pipelineTrips, onAddPipelineTrip, onUpdatePipelineTrip, onDeletePipelineTrip,
-  onAddRequest
+  onAddRequest, onDeleteRequest
 }) => {
   const [subTab, setSubTab] = useState('flights');
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
@@ -1362,6 +1363,7 @@ const Operations: React.FC<OperationsProps> = ({
                     const agentName = r.details?.agentName || (googleUser && r.agentId === googleUser.googleId ? googleUser.name : (MOCK_USERS.find(u => u.id === r.agentId)?.name || 'Unknown'));
                     const isExpanded = expandedItemId === r.id;
                     const isSelected = selectedElementId === r.id;
+                    const isOwnRequest = googleUser ? r.agentId === googleUser.googleId : r.agentId === currentUser.id;
 
                     return (
                       <div
@@ -1447,6 +1449,14 @@ const Operations: React.FC<OperationsProps> = ({
                               >
                                 Discuss
                               </button>
+                              {isOwnRequest && onDeleteRequest && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); if (confirm('Delete this request?')) onDeleteRequest(r.id); }}
+                                  className="bg-red-100 text-red-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-red-200 transition-colors rounded-sm"
+                                >
+                                  Delete
+                                </button>
+                              )}
                             </div>
                           </div>
                         )}

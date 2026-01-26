@@ -407,19 +407,49 @@ const App: React.FC = () => {
     }
   };
 
-  const handleConvertToFlight = (flight: ConvertedFlight, requestId: string) => {
+  const handleConvertToFlight = async (flight: ConvertedFlight, requestId: string) => {
     setConvertedFlights(prev => [flight, ...prev]);
-    setRequests(prev => prev.filter(r => r.id !== requestId));
+    // Mark request as CONVERTED in state and database
+    setRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: 'CONVERTED' as const } : r));
+    try {
+      await fetch(`${API_URL}/api/requests/${requestId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'CONVERTED' }),
+      });
+    } catch (error) {
+      console.error('Error updating request status:', error);
+    }
   };
 
-  const handleConvertToHotel = (hotel: ConvertedHotel, requestId: string) => {
+  const handleConvertToHotel = async (hotel: ConvertedHotel, requestId: string) => {
     setConvertedHotels(prev => [hotel, ...prev]);
-    setRequests(prev => prev.filter(r => r.id !== requestId));
+    // Mark request as CONVERTED in state and database
+    setRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: 'CONVERTED' as const } : r));
+    try {
+      await fetch(`${API_URL}/api/requests/${requestId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'CONVERTED' }),
+      });
+    } catch (error) {
+      console.error('Error updating request status:', error);
+    }
   };
 
-  const handleConvertToLogistics = (logistics: ConvertedLogistics, requestId: string) => {
+  const handleConvertToLogistics = async (logistics: ConvertedLogistics, requestId: string) => {
     setConvertedLogistics(prev => [logistics, ...prev]);
-    setRequests(prev => prev.filter(r => r.id !== requestId));
+    // Mark request as CONVERTED in state and database
+    setRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: 'CONVERTED' as const } : r));
+    try {
+      await fetch(`${API_URL}/api/requests/${requestId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'CONVERTED' }),
+      });
+    } catch (error) {
+      console.error('Error updating request status:', error);
+    }
   };
 
   const handleUpdateFlight = (id: string, updates: Partial<ConvertedFlight>) => {
@@ -516,7 +546,7 @@ const App: React.FC = () => {
   const renderContent = () => {
     switch (activeTab) {
       case 'home': return <Home currentUser={currentUser} announcements={announcements} comments={comments} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onAddAnnouncement={handleAddAnnouncement} onEditAnnouncement={handleEditAnnouncement} onDeleteAnnouncement={handleDeleteAnnouncement} onPinAnnouncement={handlePinAnnouncement} onArchiveAnnouncement={handleArchiveAnnouncement} onPinComment={handlePinComment} onAddRequest={handleAddRequest} onDeleteRequest={handleDeleteRequest} requests={requests} googleUser={googleUser} />;
-      case 'ops': return <Operations requests={requests} comments={comments} currentUser={currentUser} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} googleUser={googleUser} convertedFlights={convertedFlights} convertedHotels={convertedHotels} convertedLogistics={convertedLogistics} onConvertToFlight={handleConvertToFlight} onConvertToHotel={handleConvertToHotel} onConvertToLogistics={handleConvertToLogistics} onUpdateFlight={handleUpdateFlight} onUpdateHotel={handleUpdateHotel} onUpdateLogistics={handleUpdateLogistics} onDeleteFlight={handleDeleteFlight} onDeleteHotel={handleDeleteHotel} onDeleteLogistics={handleDeleteLogistics} pipelineTrips={pipelineTrips} onAddPipelineTrip={handleAddPipelineTrip} onUpdatePipelineTrip={handleUpdatePipelineTrip} onDeletePipelineTrip={handleDeletePipelineTrip} onAddRequest={handleAddRequest} />;
+      case 'ops': return <Operations requests={requests} comments={comments} currentUser={currentUser} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} googleUser={googleUser} convertedFlights={convertedFlights} convertedHotels={convertedHotels} convertedLogistics={convertedLogistics} onConvertToFlight={handleConvertToFlight} onConvertToHotel={handleConvertToHotel} onConvertToLogistics={handleConvertToLogistics} onUpdateFlight={handleUpdateFlight} onUpdateHotel={handleUpdateHotel} onUpdateLogistics={handleUpdateLogistics} onDeleteFlight={handleDeleteFlight} onDeleteHotel={handleDeleteHotel} onDeleteLogistics={handleDeleteLogistics} pipelineTrips={pipelineTrips} onAddPipelineTrip={handleAddPipelineTrip} onUpdatePipelineTrip={handleUpdatePipelineTrip} onDeletePipelineTrip={handleDeletePipelineTrip} onAddRequest={handleAddRequest} onDeleteRequest={handleDeleteRequest} />;
       case 'sales': return <CRM requests={requests} googleUser={googleUser} />;
       case 'accounting': return <Accounting />;
       case 'knowledge': return <KnowledgeBase />;
