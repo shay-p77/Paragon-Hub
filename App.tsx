@@ -44,7 +44,7 @@ const App: React.FC = () => {
     }
   };
 
-  const [currentUser, setCurrentUser] = useState<User>(MOCK_USERS[0]); // Default Admin
+  const [currentUser] = useState<User>(MOCK_USERS[0]); // Fallback user data
   const [activeTab, setActiveTab] = useState('home');
   const [requests, setRequests] = useState<BookingRequest[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -523,25 +523,6 @@ const App: React.FC = () => {
             </div>
           </div>
           <div className="flex gap-2 sm:gap-6 items-center">
-             {/* Role switcher - Hidden on mobile */}
-             <div className="hidden lg:flex text-[10px] font-bold text-slate-500 uppercase gap-3">
-                <span className="text-slate-300">Switch Role:</span>
-                {MOCK_USERS.map(u => (
-                   <button
-                     key={u.id}
-                     onClick={() => {
-                       setCurrentUser(u);
-                       if (u.role === 'CLIENT') setActiveTab('portal');
-                       else if (u.role === 'SALES') setActiveTab('sales');
-                       else setActiveTab('home');
-                     }}
-                     className={`hover:text-paragon transition-colors ${currentUser.id === u.id ? 'text-paragon border-b-2 border-paragon pb-0.5' : ''}`}
-                   >
-                     {u.role}
-                   </button>
-                ))}
-             </div>
-             <div className="hidden lg:block h-8 w-[1px] bg-slate-200"></div>
              <div className="relative" ref={notificationRef}>
                 <button
                   onClick={() => setShowNotifications(!showNotifications)}
@@ -562,7 +543,7 @@ const App: React.FC = () => {
                    />
                 )}
              </div>
-             {currentUser.role === 'ADMIN' && (
+             {googleUser?.role === 'ADMIN' && (
                <button
                  onClick={() => setActiveTab('settings')}
                  className={`p-2 transition-colors ${activeTab === 'settings' ? 'text-paragon' : 'text-slate-400 hover:text-paragon'}`}

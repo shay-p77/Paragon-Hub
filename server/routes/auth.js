@@ -26,37 +26,7 @@ router.post('/google', async (req, res) => {
     // Check if user exists by googleId (returning user) or email (invited user)
     let user = await User.findOne({ googleId });
 
-    if (!user) {
-      // Check if user was invited by email
-      user = await User.findOne({ email: email.toLowerCase() });
-
-      if (!user) {
-        // User not invited - reject login
-        return res.status(403).json({
-          error: 'Access denied',
-          message: 'You have not been invited to this system. Please contact an administrator.'
-        });
-      }
-
-      // First login for invited user - update with Google info
-      const avatarColor = user.avatarColor || await User.getNextAvatarColor();
-      user.googleId = googleId;
-      user.name = name;
-      user.picture = picture;
-      user.avatarColor = avatarColor;
-      user.lastLogin = new Date();
-      user.status = 'AVAILABLE';
-
-      // Migrate legacy roles to valid ones
-      const validRoles = ['ADMIN', 'OPERATIONS', 'SALES', 'ACCOUNTING', 'CLIENT'];
-      if (!validRoles.includes(user.role)) {
-        console.log(`Migrating legacy role '${user.role}' to 'ADMIN' for ${email}`);
-        user.role = 'ADMIN';
-      }
-
-      await user.save();
-      console.log(`Invited user first login: ${email}`);
-    } else {
+    if (user) {
       // Returning user - update last login
       user.lastLogin = new Date();
       user.status = 'AVAILABLE';
@@ -69,6 +39,46 @@ router.post('/google', async (req, res) => {
       }
 
       await user.save();
+    } else {
+      // Check if user was invited by email
+      user = await User.findOne({ email: email.toLowerCase() });
+
+      if (user) {
+        // First login for invited user - update with Google info
+        const avatarColor = user.avatarColor || await User.getNextAvatarColor();
+        user.googleId = googleId;
+        user.name = name;
+        user.picture = picture;
+        user.avatarColor = avatarColor;
+        user.lastLogin = new Date();
+        user.status = 'AVAILABLE';
+
+        // Migrate legacy roles to valid ones
+        const validRoles = ['ADMIN', 'OPERATIONS', 'SALES', 'ACCOUNTING', 'CLIENT'];
+        if (!validRoles.includes(user.role)) {
+          console.log(`Migrating legacy role '${user.role}' to 'ADMIN' for ${email}`);
+          user.role = 'ADMIN';
+        }
+
+        await user.save();
+        console.log(`Invited user first login: ${email}`);
+      } else {
+        // User not invited - create as CLIENT with limited access (Client Portal only)
+        const avatarColor = await User.getNextAvatarColor();
+        user = new User({
+          googleId,
+          email: email.toLowerCase(),
+          name,
+          picture,
+          avatarColor,
+          role: 'CLIENT',
+          status: 'AVAILABLE',
+          isActive: true,
+          lastLogin: new Date(),
+        });
+        await user.save();
+        console.log(`New client user auto-created: ${email}`);
+      }
     }
 
     // Check if user is active

@@ -84,7 +84,9 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
     { id: 'portal', label: 'CLIENT PORTAL', roles: ['ADMIN', 'CLIENT'] },
   ];
 
-  const visibleTabs = tabs.filter(t => t.roles.includes(currentUser.role));
+  // Use googleUser's role (from database) for tab filtering, fallback to currentUser
+  const userRole = googleUser?.role || currentUser.role;
+  const visibleTabs = tabs.filter(t => t.roles.includes(userRole));
 
   return (
     <div className="flex h-screen w-full bg-slate-50">
