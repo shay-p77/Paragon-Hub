@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const encryptionPlugin = require('../utils/encryptionPlugin');
 
 const contactSchema = new mongoose.Schema({
   name: {
@@ -40,6 +41,11 @@ const contactSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+});
+
+// Encrypt sensitive PII fields
+contactSchema.plugin(encryptionPlugin, {
+  fields: ['phone', 'email', 'notes'],
 });
 
 module.exports = mongoose.model('Contact', contactSchema);

@@ -1,5 +1,6 @@
 const express = require('express');
 const Anthropic = require('@anthropic-ai/sdk').default;
+const { sanitizeText, logPIIWarning } = require('../utils/sanitize');
 
 const router = express.Router();
 
@@ -23,6 +24,19 @@ router.post('/parse', async (req, res) => {
         message: 'ANTHROPIC_API_KEY not set'
       });
     }
+
+    // Log PII detection for audit purposes
+    logPIIWarning(text, '/api/ai/parse');
+
+    // Sanitize sensitive data before sending to external AI
+    const sanitizedText = sanitizeText(text, {
+      maskPassport: true,
+      maskSSN: true,
+      maskCreditCard: true,
+      maskDOB: true,
+      maskPhone: false,
+      maskEmail: false,
+    });
 
     const systemPrompt = `You are a travel concierge assistant that extracts structured data from booking requests, PNRs, emails, and client notes.
 
@@ -58,7 +72,7 @@ Rules:
       messages: [
         {
           role: 'user',
-          content: `Parse this booking request:\n\n${text}`
+          content: `Parse this booking request:\n\n${sanitizedText}`
         }
       ],
       system: systemPrompt

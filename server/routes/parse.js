@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
+const { sanitizeText, logPIIWarning } = require('../utils/sanitize');
 
 // Lazy load these to avoid startup issues
 let Anthropic;
@@ -110,6 +111,19 @@ router.post('/text', async (req, res) => {
       return res.status(400).json({ error: 'Please provide booking confirmation text (at least 20 characters)' });
     }
 
+    // Log PII detection for audit purposes
+    logPIIWarning(text, '/api/parse/text');
+
+    // Sanitize sensitive data before sending to external AI
+    const sanitizedText = sanitizeText(text, {
+      maskPassport: true,
+      maskSSN: true,
+      maskCreditCard: true,
+      maskDOB: true,
+      maskPhone: false, // Keep phone for booking contact
+      maskEmail: false, // Keep email for booking contact
+    });
+
     const anthropic = getAnthropicClient();
 
     const message = await anthropic.messages.create({
@@ -119,7 +133,7 @@ router.post('/text', async (req, res) => {
       messages: [
         {
           role: 'user',
-          content: `Please extract the booking information from the following confirmation:\n\n${text}`
+          content: `Please extract the booking information from the following confirmation:\n\n${sanitizedText}`
         }
       ]
     });
@@ -169,6 +183,19 @@ router.post('/pdf', upload.single('pdf'), async (req, res) => {
       return res.status(400).json({ error: 'Could not extract enough text from PDF. The file may be image-based or empty.' });
     }
 
+    // Log PII detection for audit purposes
+    logPIIWarning(extractedText, '/api/parse/pdf');
+
+    // Sanitize sensitive data before sending to external AI
+    const sanitizedText = sanitizeText(extractedText, {
+      maskPassport: true,
+      maskSSN: true,
+      maskCreditCard: true,
+      maskDOB: true,
+      maskPhone: false,
+      maskEmail: false,
+    });
+
     const anthropic = getAnthropicClient();
 
     const message = await anthropic.messages.create({
@@ -178,7 +205,7 @@ router.post('/pdf', upload.single('pdf'), async (req, res) => {
       messages: [
         {
           role: 'user',
-          content: `Please extract the booking information from the following confirmation (extracted from PDF):\n\n${extractedText}`
+          content: `Please extract the booking information from the following confirmation (extracted from PDF):\n\n${sanitizedText}`
         }
       ]
     });
