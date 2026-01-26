@@ -22,7 +22,8 @@ function getEncryptionKey() {
   const key = process.env.ENCRYPTION_KEY;
 
   if (!key) {
-    throw new Error('ENCRYPTION_KEY environment variable is not set. Generate one with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"');
+    console.warn('ENCRYPTION_KEY not set - encryption disabled');
+    return null;
   }
 
   // Support both hex (64 chars) and base64 (44 chars) encoded keys
@@ -34,7 +35,8 @@ function getEncryptionKey() {
     return Buffer.from(key, 'utf8');
   }
 
-  throw new Error('ENCRYPTION_KEY must be 32 bytes (64 hex chars, 44 base64 chars, or 32 raw chars)');
+  console.warn('ENCRYPTION_KEY invalid length - encryption disabled');
+  return null;
 }
 
 /**
@@ -51,6 +53,11 @@ function encrypt(plaintext) {
   const text = String(plaintext);
 
   const key = getEncryptionKey();
+
+  // If no key, return plaintext (encryption disabled)
+  if (!key) {
+    return text;
+  }
   const iv = crypto.randomBytes(IV_LENGTH);
 
   const cipher = crypto.createCipheriv(ALGORITHM, key, iv);

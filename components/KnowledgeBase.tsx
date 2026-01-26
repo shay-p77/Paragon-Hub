@@ -558,6 +558,11 @@ const KnowledgeBase: React.FC = () => {
             setNotes(prev => [newEntry, ...prev]);
             setActiveTab('notes');
           }
+        } else {
+          const errorData = await res.json().catch(() => ({}));
+          console.error('Failed to save entry:', res.status, errorData);
+          alert(`Failed to save: ${errorData.error || res.statusText}`);
+          return;
         }
       } else if (quickAddCategory === 'CONTACT') {
         const contactData = {
@@ -582,10 +587,17 @@ const KnowledgeBase: React.FC = () => {
           const newContact = await res.json();
           setContacts(prev => [newContact, ...prev]);
           setActiveTab('contacts');
+        } else {
+          const errorData = await res.json().catch(() => ({}));
+          console.error('Failed to save contact:', res.status, errorData);
+          alert(`Failed to save contact: ${errorData.error || res.statusText}`);
+          return;
         }
       }
     } catch (error) {
       console.error('Error saving entry:', error);
+      alert(`Error: ${error instanceof Error ? error.message : 'Failed to save'}`);
+      return;
     }
 
     setShowQuickAdd(false);
