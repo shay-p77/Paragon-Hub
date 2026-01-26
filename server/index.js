@@ -23,8 +23,10 @@ app.use(cors({
     'http://127.0.0.1:5173',
     'http://127.0.0.1:3000',
     'https://paragon-hub.netlify.app',
+    'https://hub.paragonconcierge.com',
     /\.netlify\.app$/,
-    /\.railway\.app$/
+    /\.railway\.app$/,
+    /\.paragonconcierge\.com$/
   ],
   credentials: true,
 }));
