@@ -324,7 +324,7 @@ const Operations: React.FC<OperationsProps> = ({
     e.preventDefault();
     if (!onAddRequest) return;
 
-    const agentId = googleUser?.id || currentUser.id;
+    const agentId = googleUser?.googleId || currentUser.id;
     const agentName = googleUser?.name || currentUser.name;
 
     if (dispatchMode === 'QUICK') {
@@ -1359,7 +1359,7 @@ const Operations: React.FC<OperationsProps> = ({
                   .map(r => {
                     const clientName = r.details?.clientName || MOCK_USERS.find(u => u.id === r.clientId)?.name || '—';
                     const targetDate = r.details?.targetDate ? new Date(r.details.targetDate).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
-                    const agentName = r.details?.agentName || (googleUser && r.agentId === googleUser.id ? googleUser.name : (MOCK_USERS.find(u => u.id === r.agentId)?.name || 'Unknown'));
+                    const agentName = r.details?.agentName || (googleUser && r.agentId === googleUser.googleId ? googleUser.name : (MOCK_USERS.find(u => u.id === r.agentId)?.name || 'Unknown'));
                     const isExpanded = expandedItemId === r.id;
                     const isSelected = selectedElementId === r.id;
 
@@ -1475,7 +1475,7 @@ const Operations: React.FC<OperationsProps> = ({
                     .map(r => {
                     const clientName = r.details?.clientName || MOCK_USERS.find(u => u.id === r.clientId)?.name || '—';
                     const targetDate = r.details?.targetDate ? new Date(r.details.targetDate).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
-                    const agentName = r.details?.agentName || (googleUser && r.agentId === googleUser.id ? googleUser.name : (MOCK_USERS.find(u => u.id === r.agentId)?.name || 'Unknown'));
+                    const agentName = r.details?.agentName || (googleUser && r.agentId === googleUser.googleId ? googleUser.name : (MOCK_USERS.find(u => u.id === r.agentId)?.name || 'Unknown'));
 
                     return (
                       <tr key={r.id} className={`hover:bg-slate-50 cursor-pointer ${selectedElementId === r.id ? 'bg-paragon-light/30' : ''}`} onClick={() => setSelectedElementId(r.id)}>

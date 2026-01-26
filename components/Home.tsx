@@ -374,7 +374,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
     e.preventDefault();
     if (!onAddRequest) return;
 
-    const agentId = googleUser?.id || currentUser.id;
+    const agentId = googleUser?.googleId || currentUser.id;
     const agentName = googleUser?.name || currentUser.name;
 
     setIsSavingRequest(true);
@@ -1057,9 +1057,9 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
               .map(r => {
                 const clientName = r.details?.clientName || MOCK_USERS.find(u => u.id === r.clientId)?.name || '—';
                 const targetDate = r.details?.targetDate ? new Date(r.details.targetDate).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
-                const agentName = r.details?.agentName || (googleUser && r.agentId === googleUser.id ? googleUser.name : (MOCK_USERS.find(u => u.id === r.agentId)?.name || 'Unknown'));
+                const agentName = r.details?.agentName || (googleUser && r.agentId === googleUser.googleId ? googleUser.name : (MOCK_USERS.find(u => u.id === r.agentId)?.name || 'Unknown'));
                 const isExpanded = expandedQueueItem === r.id;
-                const isOwnRequest = googleUser ? r.agentId === googleUser.id : r.agentId === currentUser.id;
+                const isOwnRequest = googleUser ? r.agentId === googleUser.googleId : r.agentId === currentUser.id;
 
                 return (
                   <div
