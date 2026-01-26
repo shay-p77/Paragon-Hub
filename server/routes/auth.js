@@ -46,12 +46,28 @@ router.post('/google', async (req, res) => {
       user.avatarColor = avatarColor;
       user.lastLogin = new Date();
       user.status = 'AVAILABLE';
+
+      // Migrate legacy roles to valid ones
+      const validRoles = ['ADMIN', 'OPERATIONS', 'SALES', 'ACCOUNTING', 'CLIENT'];
+      if (!validRoles.includes(user.role)) {
+        console.log(`Migrating legacy role '${user.role}' to 'ADMIN' for ${email}`);
+        user.role = 'ADMIN';
+      }
+
       await user.save();
       console.log(`Invited user first login: ${email}`);
     } else {
       // Returning user - update last login
       user.lastLogin = new Date();
       user.status = 'AVAILABLE';
+
+      // Migrate legacy roles to valid ones
+      const validRoles = ['ADMIN', 'OPERATIONS', 'SALES', 'ACCOUNTING', 'CLIENT'];
+      if (!validRoles.includes(user.role)) {
+        console.log(`Migrating legacy role '${user.role}' to 'ADMIN' for ${email}`);
+        user.role = 'ADMIN';
+      }
+
       await user.save();
     }
 
