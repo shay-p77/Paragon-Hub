@@ -1,7 +1,113 @@
 const express = require('express');
+const { Resend } = require('resend');
 const User = require('../models/User');
 
 const router = express.Router();
+
+// Initialize Resend (will be null if no API key)
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+
+// App URL for invite links
+const APP_URL = process.env.APP_URL || 'https://paragon-hub.netlify.app';
+
+// Role display names
+const getRoleDisplayName = (role) => {
+  switch (role) {
+    case 'ADMIN': return 'Administrator';
+    case 'OPERATIONS': return 'Operations';
+    case 'SALES': return 'Concierge';
+    case 'ACCOUNTING': return 'Accounting';
+    default: return role;
+  }
+};
+
+// Send invite email
+const sendInviteEmail = async (toEmail, toName, role) => {
+  if (!resend) {
+    console.log('Resend not configured - skipping email');
+    return { success: false, reason: 'Email not configured' };
+  }
+
+  try {
+    const roleDisplay = getRoleDisplayName(role);
+
+    const { data, error } = await resend.emails.send({
+      from: 'Paragon Hub <onboarding@resend.dev>',
+      to: [toEmail],
+      subject: "You've been invited to Paragon Hub",
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f8fafc;">
+          <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f8fafc; padding: 40px 20px;">
+            <tr>
+              <td align="center">
+                <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 500px; background-color: #ffffff; border-radius: 4px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                  <!-- Header -->
+                  <tr>
+                    <td style="background-color: #1e293b; padding: 30px 40px; text-align: center;">
+                      <h1 style="margin: 0; font-family: 'Cinzel', Georgia, serif; font-size: 28px; font-weight: bold; letter-spacing: 4px; color: #C5A059;">PARAGON</h1>
+                      <p style="margin: 8px 0 0 0; font-size: 10px; text-transform: uppercase; letter-spacing: 3px; color: #94a3b8;">Hub Enterprise OS</p>
+                    </td>
+                  </tr>
+
+                  <!-- Content -->
+                  <tr>
+                    <td style="padding: 40px;">
+                      <h2 style="margin: 0 0 20px 0; font-size: 20px; color: #1e293b;">Welcome to the team, ${toName}!</h2>
+
+                      <p style="margin: 0 0 20px 0; font-size: 15px; line-height: 1.6; color: #475569;">
+                        You've been invited to join <strong>Paragon Hub</strong> as a team member with the following role:
+                      </p>
+
+                      <div style="background-color: #f1f5f9; border-radius: 4px; padding: 16px 20px; margin-bottom: 24px;">
+                        <p style="margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #64748b; font-weight: bold;">Your Role</p>
+                        <p style="margin: 8px 0 0 0; font-size: 18px; font-weight: bold; color: #7C3732;">${roleDisplay}</p>
+                      </div>
+
+                      <p style="margin: 0 0 24px 0; font-size: 15px; line-height: 1.6; color: #475569;">
+                        Click the button below to sign in with your Google account (<strong>${toEmail}</strong>) and get started.
+                      </p>
+
+                      <a href="${APP_URL}" style="display: inline-block; background-color: #7C3732; color: #ffffff; text-decoration: none; font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; padding: 14px 28px; border-radius: 4px;">
+                        Sign In to Paragon Hub
+                      </a>
+                    </td>
+                  </tr>
+
+                  <!-- Footer -->
+                  <tr>
+                    <td style="padding: 20px 40px; background-color: #f8fafc; border-top: 1px solid #e2e8f0;">
+                      <p style="margin: 0; font-size: 12px; color: #94a3b8; text-align: center;">
+                        This invitation was sent from Paragon Hub. If you didn't expect this email, you can safely ignore it.
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+      `,
+    });
+
+    if (error) {
+      console.error('Resend error:', error);
+      return { success: false, reason: error.message };
+    }
+
+    console.log(`Invite email sent to ${toEmail}, id: ${data.id}`);
+    return { success: true, emailId: data.id };
+  } catch (error) {
+    console.error('Email send error:', error);
+    return { success: false, reason: error.message };
+  }
+};
 
 // GET /api/users - Get all users (for admin user management)
 router.get('/', async (req, res) => {
@@ -52,6 +158,9 @@ router.post('/invite', async (req, res) => {
     await user.save();
     console.log(`User invited: ${email} as ${role}`);
 
+    // Send invite email
+    const emailResult = await sendInviteEmail(email, name, role);
+
     res.status(201).json({
       id: user._id,
       email: user.email,
@@ -59,6 +168,7 @@ router.post('/invite', async (req, res) => {
       role: user.role,
       isActive: user.isActive,
       invitedAt: user.invitedAt,
+      emailSent: emailResult.success,
     });
 
   } catch (error) {
