@@ -421,13 +421,30 @@ const App: React.FC = () => {
 
   const handleConvertToFlight = async (flight: ConvertedFlight, requestId: string) => {
     setConvertedFlights(prev => [flight, ...prev]);
-    // Mark request as CONVERTED in state and database
-    setRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: 'CONVERTED' as const } : r));
+    // Build booking details to persist
+    const bookingDetails = {
+      pnr: flight.pnr,
+      airline: flight.airline,
+      flights: flight.flights,
+      passengerCount: flight.passengerCount,
+      dates: flight.dates,
+      bookingAgent: flight.agent,
+      profitLoss: flight.profitLoss,
+      paymentStatus: flight.paymentStatus,
+      bookingStatus: flight.status,
+      convertedBookingId: flight.id,
+    };
+    // Mark request as CONVERTED in state with booking details
+    setRequests(prev => prev.map(r => r.id === requestId ? {
+      ...r,
+      status: 'CONVERTED' as const,
+      details: { ...r.details, ...bookingDetails }
+    } : r));
     try {
       await fetch(`${API_URL}/api/requests/${requestId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'CONVERTED' }),
+        body: JSON.stringify({ status: 'CONVERTED', details: bookingDetails }),
       });
     } catch (error) {
       console.error('Error updating request status:', error);
@@ -436,13 +453,31 @@ const App: React.FC = () => {
 
   const handleConvertToHotel = async (hotel: ConvertedHotel, requestId: string) => {
     setConvertedHotels(prev => [hotel, ...prev]);
-    // Mark request as CONVERTED in state and database
-    setRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: 'CONVERTED' as const } : r));
+    // Build booking details to persist
+    const bookingDetails = {
+      confirmationNumber: hotel.confirmationNumber,
+      hotelName: hotel.hotelName,
+      roomType: hotel.roomType,
+      guestCount: hotel.guestCount,
+      checkIn: hotel.checkIn,
+      checkOut: hotel.checkOut,
+      bookingAgent: hotel.agent,
+      profitLoss: hotel.profitLoss,
+      paymentStatus: hotel.paymentStatus,
+      bookingStatus: hotel.status,
+      convertedBookingId: hotel.id,
+    };
+    // Mark request as CONVERTED in state with booking details
+    setRequests(prev => prev.map(r => r.id === requestId ? {
+      ...r,
+      status: 'CONVERTED' as const,
+      details: { ...r.details, ...bookingDetails }
+    } : r));
     try {
       await fetch(`${API_URL}/api/requests/${requestId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'CONVERTED' }),
+        body: JSON.stringify({ status: 'CONVERTED', details: bookingDetails }),
       });
     } catch (error) {
       console.error('Error updating request status:', error);
@@ -451,29 +486,132 @@ const App: React.FC = () => {
 
   const handleConvertToLogistics = async (logistics: ConvertedLogistics, requestId: string) => {
     setConvertedLogistics(prev => [logistics, ...prev]);
-    // Mark request as CONVERTED in state and database
-    setRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: 'CONVERTED' as const } : r));
+    // Build booking details to persist
+    const bookingDetails = {
+      confirmationNumber: logistics.confirmationNumber,
+      serviceType: logistics.serviceType,
+      logisticsDetails: logistics.details,
+      date: logistics.date,
+      bookingAgent: logistics.agent,
+      profitLoss: logistics.profitLoss,
+      paymentStatus: logistics.paymentStatus,
+      bookingStatus: logistics.status,
+      convertedBookingId: logistics.id,
+    };
+    // Mark request as CONVERTED in state with booking details
+    setRequests(prev => prev.map(r => r.id === requestId ? {
+      ...r,
+      status: 'CONVERTED' as const,
+      details: { ...r.details, ...bookingDetails }
+    } : r));
     try {
       await fetch(`${API_URL}/api/requests/${requestId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'CONVERTED' }),
+        body: JSON.stringify({ status: 'CONVERTED', details: bookingDetails }),
       });
     } catch (error) {
       console.error('Error updating request status:', error);
     }
   };
 
-  const handleUpdateFlight = (id: string, updates: Partial<ConvertedFlight>) => {
+  const handleUpdateFlight = async (id: string, updates: Partial<ConvertedFlight>) => {
     setConvertedFlights(prev => prev.map(f => f.id === id ? { ...f, ...updates } : f));
+    // Find the original request and update it in DB
+    const flight = convertedFlights.find(f => f.id === id);
+    if (flight?.originalRequestId) {
+      const bookingDetails = {
+        pnr: updates.pnr ?? flight.pnr,
+        airline: updates.airline ?? flight.airline,
+        flights: updates.flights ?? flight.flights,
+        passengerCount: updates.passengerCount ?? flight.passengerCount,
+        dates: updates.dates ?? flight.dates,
+        bookingAgent: updates.agent ?? flight.agent,
+        profitLoss: updates.profitLoss ?? flight.profitLoss,
+        paymentStatus: updates.paymentStatus ?? flight.paymentStatus,
+        bookingStatus: updates.status ?? flight.status,
+      };
+      // Update request in state
+      setRequests(prev => prev.map(r => r.id === flight.originalRequestId ? {
+        ...r,
+        details: { ...r.details, ...bookingDetails }
+      } : r));
+      try {
+        await fetch(`${API_URL}/api/requests/${flight.originalRequestId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ details: bookingDetails }),
+        });
+      } catch (error) {
+        console.error('Error updating request:', error);
+      }
+    }
   };
 
-  const handleUpdateHotel = (id: string, updates: Partial<ConvertedHotel>) => {
+  const handleUpdateHotel = async (id: string, updates: Partial<ConvertedHotel>) => {
     setConvertedHotels(prev => prev.map(h => h.id === id ? { ...h, ...updates } : h));
+    // Find the original request and update it in DB
+    const hotel = convertedHotels.find(h => h.id === id);
+    if (hotel?.originalRequestId) {
+      const bookingDetails = {
+        confirmationNumber: updates.confirmationNumber ?? hotel.confirmationNumber,
+        hotelName: updates.hotelName ?? hotel.hotelName,
+        roomType: updates.roomType ?? hotel.roomType,
+        guestCount: updates.guestCount ?? hotel.guestCount,
+        checkIn: updates.checkIn ?? hotel.checkIn,
+        checkOut: updates.checkOut ?? hotel.checkOut,
+        bookingAgent: updates.agent ?? hotel.agent,
+        profitLoss: updates.profitLoss ?? hotel.profitLoss,
+        paymentStatus: updates.paymentStatus ?? hotel.paymentStatus,
+        bookingStatus: updates.status ?? hotel.status,
+      };
+      // Update request in state
+      setRequests(prev => prev.map(r => r.id === hotel.originalRequestId ? {
+        ...r,
+        details: { ...r.details, ...bookingDetails }
+      } : r));
+      try {
+        await fetch(`${API_URL}/api/requests/${hotel.originalRequestId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ details: bookingDetails }),
+        });
+      } catch (error) {
+        console.error('Error updating request:', error);
+      }
+    }
   };
 
-  const handleUpdateLogistics = (id: string, updates: Partial<ConvertedLogistics>) => {
+  const handleUpdateLogistics = async (id: string, updates: Partial<ConvertedLogistics>) => {
     setConvertedLogistics(prev => prev.map(l => l.id === id ? { ...l, ...updates } : l));
+    // Find the original request and update it in DB
+    const logistics = convertedLogistics.find(l => l.id === id);
+    if (logistics?.originalRequestId) {
+      const bookingDetails = {
+        confirmationNumber: updates.confirmationNumber ?? logistics.confirmationNumber,
+        serviceType: updates.serviceType ?? logistics.serviceType,
+        logisticsDetails: updates.details ?? logistics.details,
+        date: updates.date ?? logistics.date,
+        bookingAgent: updates.agent ?? logistics.agent,
+        profitLoss: updates.profitLoss ?? logistics.profitLoss,
+        paymentStatus: updates.paymentStatus ?? logistics.paymentStatus,
+        bookingStatus: updates.status ?? logistics.status,
+      };
+      // Update request in state
+      setRequests(prev => prev.map(r => r.id === logistics.originalRequestId ? {
+        ...r,
+        details: { ...r.details, ...bookingDetails }
+      } : r));
+      try {
+        await fetch(`${API_URL}/api/requests/${logistics.originalRequestId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ details: bookingDetails }),
+        });
+      } catch (error) {
+        console.error('Error updating request:', error);
+      }
+    }
   };
 
   const handleDeleteFlight = (id: string) => {
@@ -559,7 +697,7 @@ const App: React.FC = () => {
     switch (activeTab) {
       case 'home': return <Home currentUser={currentUser} announcements={announcements} comments={comments} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onAddAnnouncement={handleAddAnnouncement} onEditAnnouncement={handleEditAnnouncement} onDeleteAnnouncement={handleDeleteAnnouncement} onPinAnnouncement={handlePinAnnouncement} onArchiveAnnouncement={handleArchiveAnnouncement} onPinComment={handlePinComment} onAddRequest={handleAddRequest} onDeleteRequest={handleDeleteRequest} requests={requests} googleUser={googleUser} />;
       case 'ops': return <Operations requests={requests} comments={comments} currentUser={currentUser} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} googleUser={googleUser} convertedFlights={convertedFlights} convertedHotels={convertedHotels} convertedLogistics={convertedLogistics} onConvertToFlight={handleConvertToFlight} onConvertToHotel={handleConvertToHotel} onConvertToLogistics={handleConvertToLogistics} onUpdateFlight={handleUpdateFlight} onUpdateHotel={handleUpdateHotel} onUpdateLogistics={handleUpdateLogistics} onDeleteFlight={handleDeleteFlight} onDeleteHotel={handleDeleteHotel} onDeleteLogistics={handleDeleteLogistics} pipelineTrips={pipelineTrips} onAddPipelineTrip={handleAddPipelineTrip} onUpdatePipelineTrip={handleUpdatePipelineTrip} onDeletePipelineTrip={handleDeletePipelineTrip} onAddRequest={handleAddRequest} onDeleteRequest={handleDeleteRequest} />;
-      case 'sales': return <CRM requests={requests} googleUser={googleUser} />;
+      case 'sales': return <CRM requests={requests} googleUser={googleUser} onDeleteRequest={handleDeleteRequest} />;
       case 'accounting': return <Accounting />;
       case 'knowledge': return <KnowledgeBase />;
       case 'portal': return <ClientPortal />;

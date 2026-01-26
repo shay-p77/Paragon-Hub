@@ -13,6 +13,13 @@ const SENSITIVE_DETAIL_FIELDS = [
   'email',
   'passengerPhone',
   'passengerEmail',
+  // Booking confirmation fields
+  'confirmationNumber',
+  'pnr',
+  'recordLocator',
+  'ticketNumber',
+  'bookingReference',
+  'loyaltyNumber',
 ];
 
 const bookingRequestSchema = new mongoose.Schema({

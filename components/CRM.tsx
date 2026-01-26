@@ -8,6 +8,7 @@ import { API_URL } from '../config';
 interface CRMProps {
   requests?: BookingRequest[];
   googleUser?: GoogleUser | null;
+  onDeleteRequest?: (requestId: string) => void;
 }
 
 // Customer Form Modal Component
@@ -723,7 +724,7 @@ const CustomerDetailModal: React.FC<{
   );
 };
 
-const CRM: React.FC<CRMProps> = ({ requests = [], googleUser }) => {
+const CRM: React.FC<CRMProps> = ({ requests = [], googleUser, onDeleteRequest }) => {
   const [activeSubTab, setActiveSubTab] = useState<'customers' | 'my-requests' | 'my-bookings'>('customers');
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -732,6 +733,8 @@ const CRM: React.FC<CRMProps> = ({ requests = [], googleUser }) => {
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [expandedBookingId, setExpandedBookingId] = useState<string | null>(null);
+  const [expandedRequestId, setExpandedRequestId] = useState<string | null>(null);
 
   // Fetch customers from API
   useEffect(() => {
@@ -988,53 +991,197 @@ const CRM: React.FC<CRMProps> = ({ requests = [], googleUser }) => {
             </div>
           ) : (
             <div className="space-y-3">
-              {myRequests.map(request => (
-                <div key={request.id} className="bg-white border border-slate-200 rounded-sm p-4 hover:border-slate-300 transition-colors">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-start gap-3 flex-1 min-w-0">
-                      <div className="w-8 h-8 rounded bg-slate-100 flex items-center justify-center flex-shrink-0 text-slate-500">
-                        {getTypeIcon(request.type)}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-bold text-sm text-slate-800">{request.type}</span>
-                          <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${getPriorityColor(request.priority)}`}>
-                            {request.priority}
-                          </span>
-                          <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${getStatusColor(request.status)}`}>
-                            {request.status.replace('_', ' ')}
-                          </span>
-                        </div>
-                        {request.details?.clientName && (
-                          <p className="text-xs text-slate-600 mt-1">Client: {request.details.clientName}</p>
-                        )}
-                        {request.notes && (
-                          <p className="text-xs text-slate-500 mt-1 line-clamp-2">{request.notes}</p>
-                        )}
-                        {request.details && (
-                          <div className="mt-2 text-[10px] text-slate-400 space-y-0.5">
-                            {request.details.origin && request.details.destination && (
-                              <p>{request.details.origin} → {request.details.destination}</p>
+              {myRequests.map(request => {
+                const isExpanded = expandedRequestId === request.id;
+                return (
+                  <div key={request.id} className={`bg-white border rounded-sm overflow-hidden transition-all ${isExpanded ? 'border-paragon' : 'border-slate-200 hover:border-slate-300'}`}>
+                    {/* Header - Always visible */}
+                    <div
+                      className="p-4 cursor-pointer"
+                      onClick={() => setExpandedRequestId(isExpanded ? null : request.id)}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-start gap-3 flex-1 min-w-0">
+                          <div className="w-8 h-8 rounded bg-slate-100 flex items-center justify-center flex-shrink-0 text-slate-500">
+                            {getTypeIcon(request.type)}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-sm text-slate-800">{request.type}</span>
+                              <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${getPriorityColor(request.priority)}`}>
+                                {request.priority}
+                              </span>
+                              <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${getStatusColor(request.status)}`}>
+                                {request.status.replace('_', ' ')}
+                              </span>
+                            </div>
+                            {request.details?.clientName && (
+                              <p className="text-xs text-slate-600 mt-1">Client: {request.details.clientName}</p>
                             )}
-                            {request.details.hotelName && (
-                              <p>{request.details.hotelName}</p>
-                            )}
-                            {request.details.departDate && (
-                              <p>{formatRequestDate(request.details.departDate)}{request.details.returnDate ? ` - ${formatRequestDate(request.details.returnDate)}` : ''}</p>
-                            )}
-                            {request.details.checkIn && (
-                              <p>{formatRequestDate(request.details.checkIn)} - {formatRequestDate(request.details.checkOut)}</p>
+                            {!isExpanded && request.details && (
+                              <div className="mt-1 text-[10px] text-slate-400">
+                                {request.details.origin && request.details.destination && (
+                                  <span>{request.details.origin} → {request.details.destination}</span>
+                                )}
+                                {request.details.hotelName && (
+                                  <span>{request.details.hotelName}</span>
+                                )}
+                              </div>
                             )}
                           </div>
-                        )}
+                        </div>
+                        <div className="flex items-center gap-3 flex-shrink-0">
+                          <p className="text-[10px] text-slate-400">{formatRequestDate(request.timestamp)}</p>
+                          <svg
+                            className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </div>
                       </div>
                     </div>
-                    <div className="text-right flex-shrink-0">
-                      <p className="text-[10px] text-slate-400">{formatRequestDate(request.timestamp)}</p>
-                    </div>
+
+                    {/* Expanded Details */}
+                    {isExpanded && (
+                      <div className="border-t border-slate-100 bg-slate-50/50 p-4">
+                        {/* Travel Details Grid */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                          {request.type === 'FLIGHT' && (
+                            <>
+                              <div>
+                                <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Origin</p>
+                                <p className="text-xs font-semibold text-slate-700">{request.details?.origin || '—'}</p>
+                              </div>
+                              <div>
+                                <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Destination</p>
+                                <p className="text-xs font-semibold text-slate-700">{request.details?.destination || '—'}</p>
+                              </div>
+                              <div>
+                                <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Depart Date</p>
+                                <p className="text-xs font-semibold text-slate-700">{request.details?.departDate ? formatRequestDate(request.details.departDate) : '—'}</p>
+                              </div>
+                              <div>
+                                <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Return Date</p>
+                                <p className="text-xs font-semibold text-slate-700">{request.details?.returnDate ? formatRequestDate(request.details.returnDate) : '—'}</p>
+                              </div>
+                              {request.details?.airline && (
+                                <div>
+                                  <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Airline</p>
+                                  <p className="text-xs font-semibold text-slate-700">{request.details.airline}</p>
+                                </div>
+                              )}
+                              {request.details?.flightNumber && (
+                                <div>
+                                  <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Flight #</p>
+                                  <p className="text-xs font-semibold text-slate-700">{request.details.flightNumber}</p>
+                                </div>
+                              )}
+                              {request.details?.cabinClass && (
+                                <div>
+                                  <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Cabin Class</p>
+                                  <p className="text-xs font-semibold text-slate-700 capitalize">{request.details.cabinClass}</p>
+                                </div>
+                              )}
+                              {request.details?.passengers && (
+                                <div>
+                                  <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Passengers</p>
+                                  <p className="text-xs font-semibold text-slate-700">{request.details.passengers}</p>
+                                </div>
+                              )}
+                            </>
+                          )}
+                          {request.type === 'HOTEL' && (
+                            <>
+                              <div className="sm:col-span-2">
+                                <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Hotel</p>
+                                <p className="text-xs font-semibold text-slate-700">{request.details?.hotelName || '—'}</p>
+                              </div>
+                              <div>
+                                <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Check-In</p>
+                                <p className="text-xs font-semibold text-slate-700">{request.details?.checkIn ? formatRequestDate(request.details.checkIn) : '—'}</p>
+                              </div>
+                              <div>
+                                <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Check-Out</p>
+                                <p className="text-xs font-semibold text-slate-700">{request.details?.checkOut ? formatRequestDate(request.details.checkOut) : '—'}</p>
+                              </div>
+                              {request.details?.roomType && (
+                                <div>
+                                  <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Room Type</p>
+                                  <p className="text-xs font-semibold text-slate-700">{request.details.roomType}</p>
+                                </div>
+                              )}
+                              {request.details?.guests && (
+                                <div>
+                                  <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Guests</p>
+                                  <p className="text-xs font-semibold text-slate-700">{request.details.guests}</p>
+                                </div>
+                              )}
+                            </>
+                          )}
+                          {request.type === 'LOGISTICS' && (
+                            <>
+                              <div>
+                                <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Pickup</p>
+                                <p className="text-xs font-semibold text-slate-700">{request.details?.origin || request.details?.pickupLocation || '—'}</p>
+                              </div>
+                              <div>
+                                <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Drop-off</p>
+                                <p className="text-xs font-semibold text-slate-700">{request.details?.destination || request.details?.dropoffLocation || '—'}</p>
+                              </div>
+                              <div>
+                                <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Date</p>
+                                <p className="text-xs font-semibold text-slate-700">{request.details?.departDate ? formatRequestDate(request.details.departDate) : '—'}</p>
+                              </div>
+                              {request.details?.vehicleType && (
+                                <div>
+                                  <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Vehicle</p>
+                                  <p className="text-xs font-semibold text-slate-700">{request.details.vehicleType}</p>
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </div>
+
+                        {/* Notes */}
+                        {request.notes && (
+                          <div className="mb-4">
+                            <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider mb-1">Notes</p>
+                            <p className="text-xs text-slate-600 bg-white p-2 rounded border border-slate-100 whitespace-pre-wrap">{request.notes}</p>
+                          </div>
+                        )}
+
+                        {/* Footer with status info */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${getStatusColor(request.status)}`}>
+                              {request.status.replace('_', ' ')}
+                            </span>
+                            <span className="text-[10px] text-slate-400">
+                              Created: {formatRequestDate(request.timestamp)}
+                            </span>
+                          </div>
+                          {onDeleteRequest && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (confirm(`Delete this request? This cannot be undone.`)) {
+                                  onDeleteRequest(request.id);
+                                }
+                              }}
+                              className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-red-600 bg-red-50 hover:bg-red-100 rounded-sm transition-colors"
+                            >
+                              Delete Request
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -1053,50 +1200,265 @@ const CRM: React.FC<CRMProps> = ({ requests = [], googleUser }) => {
             </div>
           ) : (
             <div className="space-y-3">
-              {myBookings.map(request => (
-                <div key={request.id} className="bg-white border border-emerald-200 rounded-sm p-4 hover:border-emerald-300 transition-colors">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-start gap-3 flex-1 min-w-0">
-                      <div className="w-8 h-8 rounded bg-emerald-100 flex items-center justify-center flex-shrink-0 text-emerald-600">
-                        {getTypeIcon(request.type)}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-bold text-sm text-slate-800">{request.type}</span>
-                          <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">
-                            BOOKED
-                          </span>
-                        </div>
-                        {request.details?.clientName && (
-                          <p className="text-xs text-slate-600 mt-1">Client: {request.details.clientName}</p>
-                        )}
-                        {request.notes && (
-                          <p className="text-xs text-slate-500 mt-1 line-clamp-2">{request.notes}</p>
-                        )}
-                        {request.details && (
-                          <div className="mt-2 text-[10px] text-slate-400 space-y-0.5">
-                            {request.details.origin && request.details.destination && (
-                              <p>{request.details.origin} → {request.details.destination}</p>
+              {myBookings.map(request => {
+                const isExpanded = expandedBookingId === request.id;
+                return (
+                  <div key={request.id} className={`bg-white border rounded-sm overflow-hidden transition-all ${isExpanded ? 'border-emerald-400' : 'border-emerald-200 hover:border-emerald-300'}`}>
+                    {/* Header - Always visible */}
+                    <div
+                      className="p-4 cursor-pointer"
+                      onClick={() => setExpandedBookingId(isExpanded ? null : request.id)}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-start gap-3 flex-1 min-w-0">
+                          <div className="w-8 h-8 rounded bg-emerald-100 flex items-center justify-center flex-shrink-0 text-emerald-600">
+                            {getTypeIcon(request.type)}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-sm text-slate-800">{request.type}</span>
+                              <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">
+                                BOOKED
+                              </span>
+                            </div>
+                            {request.details?.clientName && (
+                              <p className="text-xs text-slate-600 mt-1">Client: {request.details.clientName}</p>
                             )}
-                            {request.details.hotelName && (
-                              <p>{request.details.hotelName}</p>
-                            )}
-                            {request.details.departDate && (
-                              <p>{formatRequestDate(request.details.departDate)}{request.details.returnDate ? ` - ${formatRequestDate(request.details.returnDate)}` : ''}</p>
-                            )}
-                            {request.details.checkIn && (
-                              <p>{formatRequestDate(request.details.checkIn)} - {formatRequestDate(request.details.checkOut)}</p>
+                            {!isExpanded && request.details && (
+                              <div className="mt-1 text-[10px] text-slate-400">
+                                {request.details.origin && request.details.destination && (
+                                  <span>{request.details.origin} → {request.details.destination}</span>
+                                )}
+                                {request.details.hotelName && (
+                                  <span>{request.details.hotelName}</span>
+                                )}
+                              </div>
                             )}
                           </div>
-                        )}
+                        </div>
+                        <div className="flex items-center gap-3 flex-shrink-0">
+                          <p className="text-[10px] text-slate-400">{formatRequestDate(request.timestamp)}</p>
+                          <svg
+                            className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </div>
                       </div>
                     </div>
-                    <div className="text-right flex-shrink-0">
-                      <p className="text-[10px] text-slate-400">{formatRequestDate(request.timestamp)}</p>
-                    </div>
+
+                    {/* Expanded Details */}
+                    {isExpanded && (
+                      <div className="border-t border-emerald-100 bg-emerald-50/30 p-4">
+                        {/* Travel Details Grid */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                          {request.type === 'FLIGHT' && (
+                            <>
+                              {/* Booking Confirmation Info */}
+                              {request.details?.pnr && (
+                                <div className="sm:col-span-2 bg-white p-2 rounded border border-emerald-200">
+                                  <p className="text-[9px] uppercase text-emerald-600 font-bold tracking-wider">PNR / Record Locator</p>
+                                  <p className="text-sm font-mono font-bold text-slate-800">{request.details.pnr}</p>
+                                </div>
+                              )}
+                              <div>
+                                <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Origin</p>
+                                <p className="text-xs font-semibold text-slate-700">{request.details?.origin || '—'}</p>
+                              </div>
+                              <div>
+                                <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Destination</p>
+                                <p className="text-xs font-semibold text-slate-700">{request.details?.destination || '—'}</p>
+                              </div>
+                              <div>
+                                <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Flights</p>
+                                <p className="text-xs font-semibold text-slate-700">{request.details?.flights || `${request.details?.origin || ''} → ${request.details?.destination || ''}` || '—'}</p>
+                              </div>
+                              <div>
+                                <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Dates</p>
+                                <p className="text-xs font-semibold text-slate-700">{request.details?.dates || (request.details?.departDate ? formatRequestDate(request.details.departDate) : '—')}</p>
+                              </div>
+                              {request.details?.airline && (
+                                <div>
+                                  <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Airline</p>
+                                  <p className="text-xs font-semibold text-slate-700">{request.details.airline}</p>
+                                </div>
+                              )}
+                              {(request.details?.passengerCount || request.details?.passengers) && (
+                                <div>
+                                  <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Passengers</p>
+                                  <p className="text-xs font-semibold text-slate-700">{request.details.passengerCount || request.details.passengers}</p>
+                                </div>
+                              )}
+                              {request.details?.cabinClass && (
+                                <div>
+                                  <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Cabin Class</p>
+                                  <p className="text-xs font-semibold text-slate-700 capitalize">{request.details.cabinClass}</p>
+                                </div>
+                              )}
+                              {request.details?.paymentStatus && (
+                                <div>
+                                  <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Payment</p>
+                                  <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${request.details.paymentStatus === 'PAID' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                                    {request.details.paymentStatus}
+                                  </span>
+                                </div>
+                              )}
+                              {request.details?.bookingStatus && (
+                                <div>
+                                  <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Booking Status</p>
+                                  <p className="text-xs font-semibold text-slate-700">{request.details.bookingStatus}</p>
+                                </div>
+                              )}
+                            </>
+                          )}
+                          {request.type === 'HOTEL' && (
+                            <>
+                              {/* Booking Confirmation Info */}
+                              {request.details?.confirmationNumber && (
+                                <div className="sm:col-span-2 bg-white p-2 rounded border border-emerald-200">
+                                  <p className="text-[9px] uppercase text-emerald-600 font-bold tracking-wider">Confirmation Number</p>
+                                  <p className="text-sm font-mono font-bold text-slate-800">{request.details.confirmationNumber}</p>
+                                </div>
+                              )}
+                              <div className="sm:col-span-2">
+                                <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Hotel</p>
+                                <p className="text-xs font-semibold text-slate-700">{request.details?.hotelName || '—'}</p>
+                              </div>
+                              <div>
+                                <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Check-In</p>
+                                <p className="text-xs font-semibold text-slate-700">{request.details?.checkIn ? formatRequestDate(request.details.checkIn) : '—'}</p>
+                              </div>
+                              <div>
+                                <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Check-Out</p>
+                                <p className="text-xs font-semibold text-slate-700">{request.details?.checkOut ? formatRequestDate(request.details.checkOut) : '—'}</p>
+                              </div>
+                              {request.details?.roomType && (
+                                <div>
+                                  <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Room Type</p>
+                                  <p className="text-xs font-semibold text-slate-700">{request.details.roomType}</p>
+                                </div>
+                              )}
+                              {(request.details?.guestCount || request.details?.guests) && (
+                                <div>
+                                  <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Guests</p>
+                                  <p className="text-xs font-semibold text-slate-700">{request.details.guestCount || request.details.guests}</p>
+                                </div>
+                              )}
+                              {request.details?.paymentStatus && (
+                                <div>
+                                  <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Payment</p>
+                                  <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${request.details.paymentStatus === 'PAID' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                                    {request.details.paymentStatus}
+                                  </span>
+                                </div>
+                              )}
+                              {request.details?.bookingStatus && (
+                                <div>
+                                  <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Booking Status</p>
+                                  <p className="text-xs font-semibold text-slate-700">{request.details.bookingStatus}</p>
+                                </div>
+                              )}
+                            </>
+                          )}
+                          {request.type === 'LOGISTICS' && (
+                            <>
+                              {/* Booking Confirmation Info */}
+                              {request.details?.confirmationNumber && (
+                                <div className="sm:col-span-2 bg-white p-2 rounded border border-emerald-200">
+                                  <p className="text-[9px] uppercase text-emerald-600 font-bold tracking-wider">Confirmation Number</p>
+                                  <p className="text-sm font-mono font-bold text-slate-800">{request.details.confirmationNumber}</p>
+                                </div>
+                              )}
+                              {request.details?.serviceType && (
+                                <div>
+                                  <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Service Type</p>
+                                  <p className="text-xs font-semibold text-slate-700">{request.details.serviceType}</p>
+                                </div>
+                              )}
+                              <div>
+                                <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Pickup</p>
+                                <p className="text-xs font-semibold text-slate-700">{request.details?.origin || request.details?.pickupLocation || '—'}</p>
+                              </div>
+                              <div>
+                                <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Drop-off</p>
+                                <p className="text-xs font-semibold text-slate-700">{request.details?.destination || request.details?.dropoffLocation || '—'}</p>
+                              </div>
+                              <div>
+                                <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Date</p>
+                                <p className="text-xs font-semibold text-slate-700">{request.details?.date || (request.details?.departDate ? formatRequestDate(request.details.departDate) : '—')}</p>
+                              </div>
+                              {request.details?.logisticsDetails && (
+                                <div className="sm:col-span-2">
+                                  <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Details</p>
+                                  <p className="text-xs font-semibold text-slate-700">{request.details.logisticsDetails}</p>
+                                </div>
+                              )}
+                              {request.details?.paymentStatus && (
+                                <div>
+                                  <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Payment</p>
+                                  <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${request.details.paymentStatus === 'PAID' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                                    {request.details.paymentStatus}
+                                  </span>
+                                </div>
+                              )}
+                              {request.details?.bookingStatus && (
+                                <div>
+                                  <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Booking Status</p>
+                                  <p className="text-xs font-semibold text-slate-700">{request.details.bookingStatus}</p>
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </div>
+
+                        {/* Booking Agent */}
+                        {request.details?.bookingAgent && (
+                          <div className="mb-4">
+                            <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider mb-1">Booked By</p>
+                            <p className="text-xs font-semibold text-slate-700">{request.details.bookingAgent}</p>
+                          </div>
+                        )}
+
+                        {/* Notes */}
+                        {request.notes && (
+                          <div className="mb-4">
+                            <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider mb-1">Notes</p>
+                            <p className="text-xs text-slate-600 bg-white p-2 rounded border border-slate-100 whitespace-pre-wrap">{request.notes}</p>
+                          </div>
+                        )}
+
+                        {/* Priority */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${getPriorityColor(request.priority)}`}>
+                              {request.priority}
+                            </span>
+                            <span className="text-[10px] text-slate-400">
+                              Created: {formatRequestDate(request.timestamp)}
+                            </span>
+                          </div>
+                          {onDeleteRequest && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (confirm(`Delete this booking? This cannot be undone.`)) {
+                                  onDeleteRequest(request.id);
+                                }
+                              }}
+                              className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-red-600 bg-red-50 hover:bg-red-100 rounded-sm transition-colors"
+                            >
+                              Delete Booking
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
