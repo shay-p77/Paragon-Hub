@@ -1066,7 +1066,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                     )}
                   </div>
                 ) : (
-                  <div className="flex-1 flex flex-col space-y-3 overflow-y-auto">
+                  <div className="flex flex-col gap-4 overflow-y-auto">
                     {/* AI Parsed indicator */}
                     {aiParsedData && (
                       <div className="flex items-center gap-2 px-3 py-2 rounded-sm text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-700">
@@ -1161,17 +1161,17 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                         />
                       </div>
                     </div>
-                    <div className="flex-1 flex flex-col min-h-0">
-                      <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2 flex-shrink-0">Request Specifications</label>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Request Specifications</label>
                       <textarea
                         value={detailSpecs}
                         onChange={(e) => setDetailSpecs(e.target.value)}
                         placeholder="Enter detailed flight numbers, hotel preferences, or special instructions..."
-                        className="w-full flex-1 p-3 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon-gold resize-none rounded-sm"
+                        className="w-full p-3 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon-gold resize-none rounded-sm min-h-[80px]"
                         required
                       />
                     </div>
-                    <div className="flex-shrink-0">
+                    <div>
                       <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Priority</label>
                       <div className="flex gap-2">
                         <button
@@ -1201,7 +1201,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                     <button
                       type="submit"
                       disabled={isSavingRequest}
-                      className="w-full bg-paragon-gold text-slate-900 py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-amber-500 transition-colors flex-shrink-0 rounded-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      className="w-full bg-paragon-gold text-slate-900 py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-amber-500 transition-colors rounded-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                       {isSavingRequest ? (
                         <>

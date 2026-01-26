@@ -44,6 +44,79 @@ const App: React.FC = () => {
     }
   };
 
+  // Inactivity timeout (15 minutes = 900000ms, warning at 14 minutes)
+  const INACTIVITY_TIMEOUT = 15 * 60 * 1000; // 15 minutes
+  const WARNING_BEFORE = 60 * 1000; // Show warning 1 minute before logout
+  const [showTimeoutWarning, setShowTimeoutWarning] = useState(false);
+  const [timeoutCountdown, setTimeoutCountdown] = useState(60);
+  const inactivityTimer = useRef<NodeJS.Timeout | null>(null);
+  const warningTimer = useRef<NodeJS.Timeout | null>(null);
+  const countdownInterval = useRef<NodeJS.Timeout | null>(null);
+
+  const resetInactivityTimer = useCallback(() => {
+    // Clear existing timers
+    if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
+    if (warningTimer.current) clearTimeout(warningTimer.current);
+    if (countdownInterval.current) clearInterval(countdownInterval.current);
+
+    // Hide warning if showing
+    setShowTimeoutWarning(false);
+    setTimeoutCountdown(60);
+
+    if (!googleUser) return;
+
+    // Set warning timer (fires 1 minute before logout)
+    warningTimer.current = setTimeout(() => {
+      setShowTimeoutWarning(true);
+      setTimeoutCountdown(60);
+      // Start countdown
+      countdownInterval.current = setInterval(() => {
+        setTimeoutCountdown(prev => {
+          if (prev <= 1) {
+            if (countdownInterval.current) clearInterval(countdownInterval.current);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }, INACTIVITY_TIMEOUT - WARNING_BEFORE);
+
+    // Set logout timer
+    inactivityTimer.current = setTimeout(() => {
+      setShowTimeoutWarning(false);
+      handleLogout();
+    }, INACTIVITY_TIMEOUT);
+  }, [googleUser]);
+
+  // Set up activity listeners
+  useEffect(() => {
+    if (!googleUser) return;
+
+    const activityEvents = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
+
+    const handleActivity = () => {
+      resetInactivityTimer();
+    };
+
+    // Add listeners
+    activityEvents.forEach(event => {
+      document.addEventListener(event, handleActivity);
+    });
+
+    // Start initial timer
+    resetInactivityTimer();
+
+    // Cleanup
+    return () => {
+      activityEvents.forEach(event => {
+        document.removeEventListener(event, handleActivity);
+      });
+      if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
+      if (warningTimer.current) clearTimeout(warningTimer.current);
+      if (countdownInterval.current) clearInterval(countdownInterval.current);
+    };
+  }, [googleUser, resetInactivityTimer]);
+
   const [currentUser] = useState<User>(MOCK_USERS[0]); // Fallback user data
   const [activeTab, setActiveTab] = useState('home');
   const [requests, setRequests] = useState<BookingRequest[]>([]);
@@ -931,6 +1004,35 @@ const App: React.FC = () => {
                 Log Out
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Inactivity Timeout Warning Modal */}
+      {showTimeoutWarning && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-fadeIn">
+          <div className="bg-white rounded-sm shadow-2xl w-full max-w-sm mx-4 p-6 animate-zoomIn">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Session Timeout Warning</h3>
+                <p className="text-xs text-slate-500">You will be logged out due to inactivity</p>
+              </div>
+            </div>
+            <div className="bg-slate-100 rounded-sm p-4 mb-4 text-center">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">Time Remaining</p>
+              <p className="text-3xl font-bold text-slate-900 font-mono">{timeoutCountdown}s</p>
+            </div>
+            <button
+              onClick={resetInactivityTimer}
+              className="w-full py-3 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-sm"
+            >
+              Stay Logged In
+            </button>
           </div>
         </div>
       )}

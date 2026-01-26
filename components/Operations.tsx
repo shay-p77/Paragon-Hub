@@ -3159,8 +3159,8 @@ Room Type: Deluxe King"
                   )}
                 </div>
               ) : (
-                <div className="flex-1 flex flex-col space-y-3">
-                  <div className="grid grid-cols-3 gap-4 flex-shrink-0">
+                <div className="flex flex-col gap-4 overflow-y-auto">
+                  <div className="grid grid-cols-3 gap-4">
                     <div>
                       <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Service Type</label>
                       <select
@@ -3236,17 +3236,17 @@ Room Type: Deluxe King"
                       />
                     </div>
                   </div>
-                  <div className="flex-1 flex flex-col min-h-0">
-                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2 flex-shrink-0">Request Specifications</label>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Request Specifications</label>
                     <textarea
                       value={dispatchSpecs}
                       onChange={(e) => setDispatchSpecs(e.target.value)}
                       placeholder="Enter detailed flight numbers, hotel preferences, or special instructions..."
-                      className="w-full flex-1 p-3 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon resize-none rounded-sm min-h-[100px]"
+                      className="w-full p-3 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon resize-none rounded-sm min-h-[100px]"
                       required
                     />
                   </div>
-                  <div className="flex-shrink-0">
+                  <div>
                     <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Priority</label>
                     <div className="flex gap-2">
                       <button
