@@ -49,6 +49,10 @@ const customerSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  legalMiddleName: {
+    type: String,
+    default: '',
+  },
   legalLastName: {
     type: String,
     required: true,

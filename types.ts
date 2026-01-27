@@ -124,6 +124,7 @@ export interface Customer {
   id: string;
   // Basic Info
   legalFirstName: string;
+  legalMiddleName?: string;
   legalLastName: string;
   displayName: string; // How we refer to them (e.g., "Ushi" instead of "Yehoshua")
   dateOfBirth?: string;

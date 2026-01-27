@@ -23,6 +23,7 @@ const CustomerFormModal: React.FC<{
 
   // Form state
   const [legalFirstName, setLegalFirstName] = useState(customer?.legalFirstName || '');
+  const [legalMiddleName, setLegalMiddleName] = useState(customer?.legalMiddleName || '');
   const [legalLastName, setLegalLastName] = useState(customer?.legalLastName || '');
   const [displayName, setDisplayName] = useState(customer?.displayName || '');
   const [dateOfBirth, setDateOfBirth] = useState(customer?.dateOfBirth || '');
@@ -63,6 +64,7 @@ const CustomerFormModal: React.FC<{
     const newCustomer: Customer = {
       id: customer?.id || `cust-${Date.now()}`,
       legalFirstName,
+      legalMiddleName: legalMiddleName || undefined,
       legalLastName,
       displayName: displayName || `${legalFirstName} ${legalLastName}`,
       dateOfBirth: dateOfBirth || undefined,
@@ -109,7 +111,7 @@ const CustomerFormModal: React.FC<{
           {/* Basic Info */}
           <div className="mb-6">
             <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Basic Information</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Legal First Name *</label>
                 <input
@@ -118,6 +120,16 @@ const CustomerFormModal: React.FC<{
                   onChange={(e) => setLegalFirstName(e.target.value)}
                   className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon"
                   required
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Legal Middle Name</label>
+                <input
+                  type="text"
+                  value={legalMiddleName}
+                  onChange={(e) => setLegalMiddleName(e.target.value)}
+                  placeholder="Optional"
+                  className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon"
                 />
               </div>
               <div>
@@ -130,6 +142,8 @@ const CustomerFormModal: React.FC<{
                   required
                 />
               </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
               <div>
                 <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Display Name</label>
                 <input
@@ -454,7 +468,7 @@ const CustomerListItem: React.FC<{
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
             <div>
               <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Legal Name</p>
-              <p className="text-xs font-semibold text-slate-700">{customer.legalFirstName} {customer.legalLastName}</p>
+              <p className="text-xs font-semibold text-slate-700">{customer.legalFirstName} {customer.legalMiddleName ? `${customer.legalMiddleName} ` : ''}{customer.legalLastName}</p>
             </div>
             <div>
               <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Date of Birth</p>
@@ -593,7 +607,7 @@ const CustomerDetailModal: React.FC<{
           <div>
             <h2 className="font-cinzel text-xl font-bold text-slate-900">{customer.displayName}</h2>
             <p className="text-xs text-slate-500 mt-1">
-              {customer.legalFirstName} {customer.legalLastName}
+              {customer.legalFirstName} {customer.legalMiddleName ? `${customer.legalMiddleName} ` : ''}{customer.legalLastName}
               {primaryCustomer && (
                 <span className="ml-2 text-paragon">• Under {primaryCustomer.displayName}'s account</span>
               )}

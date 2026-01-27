@@ -50,6 +50,12 @@ const PortalIcon = () => (
   </svg>
 );
 
+const DatabaseIcon = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+  </svg>
+);
+
 const getTabIcon = (tabId: string) => {
   switch (tabId) {
     case 'home': return <HomeIcon />;
@@ -58,6 +64,7 @@ const getTabIcon = (tabId: string) => {
     case 'accounting': return <AccountingIcon />;
     case 'knowledge': return <KnowledgeIcon />;
     case 'portal': return <PortalIcon />;
+    case 'clientdb': return <DatabaseIcon />;
     default: return <HomeIcon />;
   }
 };
@@ -70,6 +77,7 @@ const getTabShortLabel = (tabId: string) => {
     case 'accounting': return 'Finance';
     case 'knowledge': return 'KB';
     case 'portal': return 'Portal';
+    case 'clientdb': return 'Clients';
     default: return 'Home';
   }
 };
@@ -79,6 +87,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
     { id: 'home', label: 'COMMAND CENTER', roles: ['ADMIN', 'OPERATIONS', 'SALES', 'ACCOUNTING'] },
     { id: 'ops', label: 'OPERATIONS', roles: ['ADMIN', 'OPERATIONS', 'ACCOUNTING'] },
     { id: 'sales', label: 'CRM', roles: ['ADMIN', 'OPERATIONS', 'SALES'] },
+    { id: 'clientdb', label: 'CLIENT DATABASE', roles: ['ADMIN', 'OPERATIONS', 'ACCOUNTING'] },
     { id: 'accounting', label: 'ACCOUNTING', roles: ['ADMIN', 'ACCOUNTING'] },
     { id: 'knowledge', label: 'KNOWLEDGE BASE', roles: ['ADMIN', 'OPERATIONS', 'SALES'] },
     { id: 'portal', label: 'CLIENT PORTAL', roles: ['ADMIN', 'CLIENT'] },

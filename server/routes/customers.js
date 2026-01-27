@@ -9,6 +9,7 @@ function formatCustomer(c) {
   return {
     id: c._id.toString(),
     legalFirstName: c.legalFirstName,
+    legalMiddleName: c.legalMiddleName || '',
     legalLastName: c.legalLastName,
     displayName: c.displayName || '',
     dateOfBirth: decrypt(c.dateOfBirth) || '',
@@ -89,6 +90,7 @@ router.post('/', async (req, res) => {
   try {
     const {
       legalFirstName,
+      legalMiddleName,
       legalLastName,
       displayName,
       dateOfBirth,
@@ -110,6 +112,7 @@ router.post('/', async (req, res) => {
 
     const customer = new Customer({
       legalFirstName,
+      legalMiddleName: legalMiddleName || '',
       legalLastName,
       displayName: displayName || `${legalFirstName} ${legalLastName}`,
       dateOfBirth: dateOfBirth || '',
@@ -141,6 +144,7 @@ router.post('/', async (req, res) => {
     res.status(201).json({
       id: customer._id.toString(),
       legalFirstName,
+      legalMiddleName: legalMiddleName || '',
       legalLastName,
       displayName: displayName || `${legalFirstName} ${legalLastName}`,
       dateOfBirth: dateOfBirth || '',
@@ -167,6 +171,7 @@ router.put('/:id', async (req, res) => {
   try {
     const {
       legalFirstName,
+      legalMiddleName,
       legalLastName,
       displayName,
       dateOfBirth,
@@ -189,6 +194,7 @@ router.put('/:id', async (req, res) => {
 
     // Update fields
     if (legalFirstName !== undefined) customer.legalFirstName = legalFirstName;
+    if (legalMiddleName !== undefined) customer.legalMiddleName = legalMiddleName;
     if (legalLastName !== undefined) customer.legalLastName = legalLastName;
     if (displayName !== undefined) customer.displayName = displayName;
     if (dateOfBirth !== undefined) customer.dateOfBirth = dateOfBirth;
@@ -218,6 +224,7 @@ router.put('/:id', async (req, res) => {
     res.json({
       id: customer._id.toString(),
       legalFirstName: legalFirstName ?? customer.legalFirstName,
+      legalMiddleName: legalMiddleName ?? customer.legalMiddleName ?? '',
       legalLastName: legalLastName ?? customer.legalLastName,
       displayName: displayName ?? customer.displayName,
       dateOfBirth: dateOfBirth ?? '',
