@@ -1,6 +1,7 @@
 const express = require('express');
 const { Resend } = require('resend');
 const User = require('../models/User');
+const { logAudit } = require('../utils/auditLogger');
 
 const router = express.Router();
 
@@ -166,6 +167,17 @@ router.post('/invite', async (req, res) => {
     await user.save();
     console.log(`User invited: ${email} as ${role}`);
 
+    // Log audit
+    await logAudit({
+      user: { id: invitedById },
+      action: 'INVITE_USER',
+      resourceType: 'User',
+      resourceId: user._id,
+      resourceName: email,
+      details: { role, name },
+      req
+    });
+
     // Send invite email
     const emailResult = await sendInviteEmail(email, name, role);
 
@@ -218,6 +230,16 @@ router.put('/:id', async (req, res) => {
 
     console.log(`User updated: ${user.email} - ${JSON.stringify(updateFields)}`);
 
+    // Log audit
+    await logAudit({
+      action: 'UPDATE_USER',
+      resourceType: 'User',
+      resourceId: user._id,
+      resourceName: user.email,
+      details: { changes: updateFields },
+      req
+    });
+
     res.json(user);
 
   } catch (error) {
@@ -238,6 +260,16 @@ router.delete('/:id', async (req, res) => {
     }
 
     console.log(`User deleted: ${user.email}`);
+
+    // Log audit
+    await logAudit({
+      action: 'DELETE_USER',
+      resourceType: 'User',
+      resourceId: user._id,
+      resourceName: user.email,
+      details: { deletedUserRole: user.role },
+      req
+    });
 
     res.json({ message: 'User deleted successfully' });
 

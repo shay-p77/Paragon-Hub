@@ -1,6 +1,7 @@
 const express = require('express');
 const { OAuth2Client } = require('google-auth-library');
 const User = require('../models/User');
+const { logAudit } = require('../utils/auditLogger');
 
 const router = express.Router();
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -83,11 +84,31 @@ router.post('/google', async (req, res) => {
 
     // Check if user is active
     if (!user.isActive) {
+      await logAudit({
+        user,
+        action: 'FAILED_LOGIN',
+        resourceType: 'User',
+        resourceId: user._id,
+        details: { reason: 'Account deactivated' },
+        req,
+        success: false,
+        errorMessage: 'Account disabled'
+      });
       return res.status(403).json({
         error: 'Account disabled',
         message: 'Your account has been deactivated. Please contact an administrator.'
       });
     }
+
+    // Log successful login
+    await logAudit({
+      user,
+      action: 'LOGIN',
+      resourceType: 'User',
+      resourceId: user._id,
+      resourceName: user.email,
+      req
+    });
 
     // Return user data
     res.json({
@@ -104,6 +125,13 @@ router.post('/google', async (req, res) => {
 
   } catch (error) {
     console.error('Auth error:', error);
+    await logAudit({
+      action: 'FAILED_LOGIN',
+      details: { error: error.message },
+      req,
+      success: false,
+      errorMessage: 'Invalid token'
+    });
     res.status(401).json({ error: 'Invalid token' });
   }
 });

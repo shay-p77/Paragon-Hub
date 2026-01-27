@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const BookingRequest = require('../models/BookingRequest');
+const { logAudit } = require('../utils/auditLogger');
 
 // GET all requests
 router.get('/', async (req, res) => {
@@ -66,6 +67,17 @@ router.post('/', async (req, res) => {
       details: details || {},
     });
     await request.save();
+
+    // Log audit
+    await logAudit({
+      action: 'CREATE_BOOKING',
+      resourceType: 'BookingRequest',
+      resourceId: request._id,
+      resourceName: `${type} - ${clientName || 'No client'}`,
+      details: { agentId, type, priority },
+      req
+    });
+
     res.status(201).json({
       id: request._id.toString(),
       agentId: request.agentId,
@@ -115,6 +127,19 @@ router.put('/:id', async (req, res) => {
       { new: true }
     );
 
+    // Log audit
+    await logAudit({
+      action: 'UPDATE_BOOKING',
+      resourceType: 'BookingRequest',
+      resourceId: request._id,
+      resourceName: `${request.type} - ${request.clientName || 'No client'}`,
+      details: {
+        statusChange: status ? `-> ${status}` : null,
+        detailsUpdated: !!details
+      },
+      req
+    });
+
     res.json({
       id: request._id.toString(),
       agentId: request.agentId,
@@ -137,7 +162,22 @@ router.put('/:id', async (req, res) => {
 // DELETE request
 router.delete('/:id', async (req, res) => {
   try {
+    const request = await BookingRequest.findById(req.params.id);
+    if (!request) {
+      return res.status(404).json({ error: 'Request not found' });
+    }
+
     await BookingRequest.findByIdAndDelete(req.params.id);
+
+    // Log audit
+    await logAudit({
+      action: 'DELETE_BOOKING',
+      resourceType: 'BookingRequest',
+      resourceId: request._id,
+      resourceName: `${request.type} - ${request.clientName || 'No client'}`,
+      req
+    });
+
     res.json({ success: true });
   } catch (error) {
     console.error('Error deleting request:', error);

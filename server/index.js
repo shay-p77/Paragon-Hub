@@ -2,7 +2,11 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 
+const { auditMiddleware } = require('./utils/auditLogger');
+const { ipAllowlistMiddleware } = require('./utils/ipAllowlist');
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const announcementRoutes = require('./routes/announcements');
@@ -16,27 +20,75 @@ const customerRoutes = require('./routes/customers');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Security headers (helmet)
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  contentSecurityPolicy: false, // Disable CSP for API-only server
+}));
+
+// Rate limiting for auth routes (prevent brute force)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // 10 attempts per window
+  message: { error: 'Too many login attempts, please try again in 15 minutes' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// General API rate limiting
+const apiLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 100, // 100 requests per minute
+  message: { error: 'Too many requests, please slow down' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Allowed origins - ONLY specific trusted domains (no wildcards)
+const allowedOrigins = [
+  // Development
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:3000',
+  // Production - add your specific domains here
+  'https://paragon-hub.netlify.app',
+  'https://hub.paragonconcierge.com',
+  'https://www.paragonconcierge.com',
+];
+
+// Add any additional allowed origins from environment variable
+if (process.env.ALLOWED_ORIGINS) {
+  process.env.ALLOWED_ORIGINS.split(',').forEach(origin => {
+    allowedOrigins.push(origin.trim());
+  });
+}
+
 // Middleware
 app.use(cors({
-  origin: [
-    'http://localhost:3000',
-    'http://localhost:5173',
-    'http://localhost:5174',
-    'http://127.0.0.1:5173',
-    'http://127.0.0.1:3000',
-    'https://paragon-hub.netlify.app',
-    'https://hub.paragonconcierge.com',
-    /\.netlify\.app$/,
-    /\.railway\.app$/,
-    /\.paragonconcierge\.com$/
-  ],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.warn(`[CORS] Blocked request from unauthorized origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
 }));
 app.use(express.json());
 
+// Audit logging middleware
+app.use(auditMiddleware);
+
 // Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
+app.use('/api/auth', authLimiter, authRoutes); // Strict rate limiting on auth
+app.use('/api', apiLimiter); // General rate limiting on all API routes
+app.use('/api/users', ipAllowlistMiddleware, userRoutes); // IP restricted admin routes
 app.use('/api/announcements', announcementRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/requests', requestRoutes);

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Customer = require('../models/Customer');
 const { decrypt } = require('../utils/encryption');
+const { logAudit } = require('../utils/auditLogger');
 
 // Helper to format customer for API response (with decryption)
 function formatCustomer(c) {
@@ -53,6 +54,17 @@ router.get('/:id', async (req, res) => {
     if (!customer) {
       return res.status(404).json({ error: 'Customer not found' });
     }
+
+    // Log PII access
+    await logAudit({
+      action: 'VIEW_CUSTOMER',
+      resourceType: 'Customer',
+      resourceId: customer._id,
+      resourceName: `${customer.legalFirstName} ${customer.legalLastName}`,
+      details: { hasPII: !!customer.passportNumber || !!customer.dateOfBirth },
+      req
+    });
+
     res.json(formatCustomer(customer));
   } catch (error) {
     console.error('Error fetching customer:', error);
@@ -114,6 +126,16 @@ router.post('/', async (req, res) => {
     });
 
     await customer.save();
+
+    // Log audit
+    await logAudit({
+      action: 'CREATE_CUSTOMER',
+      resourceType: 'Customer',
+      resourceId: customer._id,
+      resourceName: `${legalFirstName} ${legalLastName}`,
+      details: { createdBy },
+      req
+    });
 
     // Return original values (pre-encryption)
     res.status(201).json({
@@ -182,6 +204,16 @@ router.put('/:id', async (req, res) => {
 
     await customer.save();
 
+    // Log audit
+    await logAudit({
+      action: 'UPDATE_CUSTOMER',
+      resourceType: 'Customer',
+      resourceId: customer._id,
+      resourceName: `${customer.legalFirstName} ${customer.legalLastName}`,
+      details: { fieldsUpdated: Object.keys(req.body) },
+      req
+    });
+
     // Return original values (pre-encryption)
     res.json({
       id: customer._id.toString(),
@@ -220,6 +252,16 @@ router.delete('/:id', async (req, res) => {
     if (!customer) {
       return res.status(404).json({ error: 'Customer not found' });
     }
+
+    // Log audit
+    await logAudit({
+      action: 'DELETE_CUSTOMER',
+      resourceType: 'Customer',
+      resourceId: customer._id,
+      resourceName: `${customer.legalFirstName} ${customer.legalLastName}`,
+      req
+    });
+
     res.json({ success: true, message: 'Customer deleted' });
   } catch (error) {
     console.error('Error deleting customer:', error);
