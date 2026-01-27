@@ -31,15 +31,18 @@ function formatCustomer(c) {
       specialRequests: c.preferences.specialRequests || '',
     } : null,
     notes: decrypt(c.notes) || '',
+    agentId: c.agentId || '',
     createdAt: c.createdAt ? c.createdAt.toISOString() : new Date().toISOString(),
     updatedAt: c.updatedAt ? c.updatedAt.toISOString() : new Date().toISOString(),
   };
 }
 
-// GET all customers
+// GET all customers (optionally filter by agentId)
 router.get('/', async (req, res) => {
   try {
-    const customers = await Customer.find().sort({ createdAt: -1 });
+    const { agentId } = req.query;
+    const query = agentId ? { agentId } : {};
+    const customers = await Customer.find(query).sort({ createdAt: -1 });
     const formatted = customers.map(formatCustomer);
     res.json(formatted);
   } catch (error) {
@@ -104,6 +107,7 @@ router.post('/', async (req, res) => {
       preferences,
       notes,
       createdBy,
+      agentId,
     } = req.body;
 
     if (!legalFirstName || !legalLastName) {
@@ -126,6 +130,7 @@ router.post('/', async (req, res) => {
       preferences: preferences || {},
       notes: notes || '',
       createdBy: createdBy || '',
+      agentId: agentId || '',
     });
 
     await customer.save();
@@ -157,6 +162,7 @@ router.post('/', async (req, res) => {
       loyaltyPrograms: loyaltyPrograms || [],
       preferences: preferences || {},
       notes: notes || '',
+      agentId: agentId || '',
       createdAt: customer.createdAt.toISOString(),
       updatedAt: customer.updatedAt.toISOString(),
     });
@@ -237,6 +243,7 @@ router.put('/:id', async (req, res) => {
       loyaltyPrograms: loyaltyPrograms ?? customer.loyaltyPrograms,
       preferences: preferences ?? customer.preferences,
       notes: notes ?? '',
+      agentId: customer.agentId || '',
       createdAt: customer.createdAt.toISOString(),
       updatedAt: customer.updatedAt.toISOString(),
     });

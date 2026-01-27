@@ -120,6 +120,12 @@ const customerSchema = new mongoose.Schema({
     type: String,
     default: '',
   },
+  // Agent who owns this customer (for CRM filtering)
+  agentId: {
+    type: String,
+    default: '',
+    index: true,
+  },
 });
 
 // Encrypt sensitive PII fields automatically

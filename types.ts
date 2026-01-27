@@ -151,6 +151,9 @@ export interface Customer {
   // Metadata
   createdAt: string;
   updatedAt: string;
+
+  // Agent ownership (for CRM filtering)
+  agentId?: string;
 }
 
 export interface BookingRequest {

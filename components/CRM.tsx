@@ -750,11 +750,16 @@ const CRM: React.FC<CRMProps> = ({ requests = [], googleUser, onDeleteRequest })
   const [expandedBookingId, setExpandedBookingId] = useState<string | null>(null);
   const [expandedRequestId, setExpandedRequestId] = useState<string | null>(null);
 
-  // Fetch customers from API
+  // Fetch customers from API - filter by current agent's ID
   useEffect(() => {
     const fetchCustomers = async () => {
       try {
-        const res = await fetch(`${API_URL}/api/customers`);
+        const agentId = googleUser?.googleId || googleUser?.id;
+        if (!agentId) {
+          setLoading(false);
+          return;
+        }
+        const res = await fetch(`${API_URL}/api/customers?agentId=${encodeURIComponent(agentId)}`);
         if (res.ok) {
           const data = await res.json();
           setCustomers(data);
@@ -766,7 +771,7 @@ const CRM: React.FC<CRMProps> = ({ requests = [], googleUser, onDeleteRequest })
       }
     };
     fetchCustomers();
-  }, []);
+  }, [googleUser]);
 
   // Filter requests for current user (check both googleId and MongoDB id for backwards compatibility)
   const isOwnRequest = (r: { agentId: string }) =>
@@ -826,6 +831,7 @@ const CRM: React.FC<CRMProps> = ({ requests = [], googleUser, onDeleteRequest })
           body: JSON.stringify({
             ...customer,
             createdBy: googleUser?.name || 'Unknown',
+            agentId: googleUser?.googleId || googleUser?.id || '',
           }),
         });
 
