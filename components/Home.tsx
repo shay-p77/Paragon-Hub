@@ -706,8 +706,8 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
 
       {/* On Duty Now - Expandable Indicator */}
       {(() => {
-        // Filter users who are not OFFLINE (on duty)
-        const onDutyUsers = allUsers.filter(u => u.status !== 'OFFLINE');
+        // Filter users who are not OFFLINE and not CLIENT role (staff only)
+        const onDutyUsers = allUsers.filter(u => u.status !== 'OFFLINE' && u.role !== 'CLIENT');
         const getInitials = (name: string) => name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
         const getStatusColor = (status: string) => {
           switch (status) {
@@ -719,9 +719,11 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
         };
         const getRoleLabel = (role: string) => {
           switch (role) {
-            case 'admin': return 'Administrator';
-            case 'manager': return 'Manager';
-            default: return 'Concierge Agent';
+            case 'ADMIN': return 'Administrator';
+            case 'OPERATIONS': return 'Operations';
+            case 'SALES': return 'Concierge';
+            case 'ACCOUNTING': return 'Accounting';
+            default: return 'Team Member';
           }
         };
 

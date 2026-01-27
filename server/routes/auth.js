@@ -28,8 +28,9 @@ router.post('/google', async (req, res) => {
     let user = await User.findOne({ googleId });
 
     if (user) {
-      // Returning user - update last login
+      // Returning user - update last login and lastSeen
       user.lastLogin = new Date();
+      user.lastSeen = new Date();
       user.status = 'AVAILABLE';
 
       // Migrate legacy roles to valid ones
@@ -52,6 +53,7 @@ router.post('/google', async (req, res) => {
         user.picture = picture;
         user.avatarColor = avatarColor;
         user.lastLogin = new Date();
+        user.lastSeen = new Date();
         user.status = 'AVAILABLE';
 
         // Migrate legacy roles to valid ones
@@ -76,6 +78,7 @@ router.post('/google', async (req, res) => {
           status: 'AVAILABLE',
           isActive: true,
           lastLogin: new Date(),
+          lastSeen: new Date(),
         });
         await user.save();
         console.log(`New client user auto-created: ${email}`);
@@ -147,7 +150,7 @@ router.put('/status', async (req, res) => {
 
     const user = await User.findOneAndUpdate(
       { googleId },
-      { status },
+      { status, lastSeen: new Date() },
       { new: true }
     );
 
@@ -162,6 +165,27 @@ router.put('/status', async (req, res) => {
   }
 });
 
+// PUT /api/auth/heartbeat - Update lastSeen timestamp (called periodically by frontend)
+router.put('/heartbeat', async (req, res) => {
+  try {
+    const { googleId } = req.body;
+
+    if (!googleId) {
+      return res.status(400).json({ error: 'Missing googleId' });
+    }
+
+    await User.findOneAndUpdate(
+      { googleId },
+      { lastSeen: new Date() }
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Heartbeat error:', error);
+    res.status(500).json({ error: 'Failed to update heartbeat' });
+  }
+});
+
 // GET /api/auth/users - Get all users (for "On Duty" display)
 router.get('/users', async (req, res) => {
   try {
@@ -172,9 +196,28 @@ router.get('/users', async (req, res) => {
       avatarColor: 1,
       role: 1,
       status: 1,
+      lastSeen: 1,
     });
 
-    res.json(users);
+    // Check for stale users - if lastSeen > 5 minutes ago, treat as OFFLINE
+    const STALE_THRESHOLD = 5 * 60 * 1000; // 5 minutes
+    const now = Date.now();
+
+    const usersWithStatus = users.map(user => {
+      const userObj = user.toObject();
+      // If user has a lastSeen and it's stale, override status to OFFLINE
+      if (userObj.lastSeen && userObj.status !== 'OFFLINE') {
+        const lastSeenTime = new Date(userObj.lastSeen).getTime();
+        if (now - lastSeenTime > STALE_THRESHOLD) {
+          userObj.status = 'OFFLINE';
+        }
+      }
+      // Remove lastSeen from response (internal use only)
+      delete userObj.lastSeen;
+      return userObj;
+    });
+
+    res.json(usersWithStatus);
   } catch (error) {
     console.error('Get users error:', error);
     res.status(500).json({ error: 'Failed to get users' });

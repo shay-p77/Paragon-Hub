@@ -36,7 +36,19 @@ const App: React.FC = () => {
     setGoogleUser(user);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    // Set status to OFFLINE before logging out
+    if (googleUser?.googleId) {
+      try {
+        await fetch(`${API_URL}/api/auth/status`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ googleId: googleUser.googleId, status: 'OFFLINE' }),
+        });
+      } catch (error) {
+        console.error('Failed to set offline status:', error);
+      }
+    }
     setGoogleUser(null);
     localStorage.removeItem('paragon_user');
     if (window.google?.accounts?.id) {
@@ -116,6 +128,31 @@ const App: React.FC = () => {
       if (countdownInterval.current) clearInterval(countdownInterval.current);
     };
   }, [googleUser, resetInactivityTimer]);
+
+  // Heartbeat - tell server user is still active (every 2 minutes)
+  useEffect(() => {
+    if (!googleUser?.googleId) return;
+
+    const sendHeartbeat = async () => {
+      try {
+        await fetch(`${API_URL}/api/auth/heartbeat`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ googleId: googleUser.googleId }),
+        });
+      } catch (error) {
+        console.error('Heartbeat failed:', error);
+      }
+    };
+
+    // Send immediately on login
+    sendHeartbeat();
+
+    // Then every 2 minutes
+    const heartbeatInterval = setInterval(sendHeartbeat, 2 * 60 * 1000);
+
+    return () => clearInterval(heartbeatInterval);
+  }, [googleUser?.googleId]);
 
   const [currentUser] = useState<User>(MOCK_USERS[0]); // Fallback user data
   const [activeTab, setActiveTab] = useState('home');

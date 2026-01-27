@@ -72,6 +72,9 @@ const userSchema = new mongoose.Schema({
   lastLogin: {
     type: Date,
   },
+  lastSeen: {
+    type: Date,
+  },
 });
 
 // Static method to get next available avatar color
