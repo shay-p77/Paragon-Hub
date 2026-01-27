@@ -20,19 +20,23 @@ const customerRoutes = require('./routes/customers');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Trust proxy (required for Railway, Heroku, etc. to get real client IP)
+app.set('trust proxy', 1);
+
 // Security headers (helmet)
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
   contentSecurityPolicy: false, // Disable CSP for API-only server
 }));
 
-// Rate limiting for auth routes (prevent brute force)
-const authLimiter = rateLimit({
+// Rate limiting for login only (prevent brute force)
+const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // 10 attempts per window
+  max: 10, // 10 login attempts per window
   message: { error: 'Too many login attempts, please try again in 15 minutes' },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => req.method !== 'POST' || req.path !== '/google', // Only limit POST /google
 });
 
 // General API rate limiting
@@ -86,7 +90,7 @@ app.use(express.json());
 app.use(auditMiddleware);
 
 // Routes
-app.use('/api/auth', authLimiter, authRoutes); // Strict rate limiting on auth
+app.use('/api/auth', loginLimiter, authRoutes); // Rate limit login attempts only
 app.use('/api', apiLimiter); // General rate limiting on all API routes
 app.use('/api/users', ipAllowlistMiddleware, userRoutes); // IP restricted admin routes
 app.use('/api/announcements', announcementRoutes);
