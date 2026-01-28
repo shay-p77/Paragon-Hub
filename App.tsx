@@ -193,11 +193,12 @@ const App: React.FC = () => {
     if (showLoading) setDataLoading(true);
     setDataError(null);
     try {
-      const [announcementsRes, commentsRes, requestsRes, usersRes] = await Promise.all([
+      const [announcementsRes, commentsRes, requestsRes, usersRes, pipelineRes] = await Promise.all([
         fetch(`${API_URL}/api/announcements`),
         fetch(`${API_URL}/api/comments`),
         fetch(`${API_URL}/api/requests`),
         fetch(`${API_URL}/api/auth/users`),
+        fetch(`${API_URL}/api/pipeline`),
       ]);
 
       if (announcementsRes.ok) {
@@ -282,6 +283,10 @@ const App: React.FC = () => {
         const data = await usersRes.json();
         setTeamUsers(data);
       }
+      if (pipelineRes.ok) {
+        const data = await pipelineRes.json();
+        setPipelineTrips(data);
+      }
 
       // Fetch notifications for current user
       if (googleUser?.googleId) {
@@ -333,54 +338,7 @@ const App: React.FC = () => {
   const [convertedFlights, setConvertedFlights] = useState<ConvertedFlight[]>([]);
   const [convertedHotels, setConvertedHotels] = useState<ConvertedHotel[]>([]);
   const [convertedLogistics, setConvertedLogistics] = useState<ConvertedLogistics[]>([]);
-  const [pipelineTrips, setPipelineTrips] = useState<PipelineTrip[]>([
-    // Sample data matching the screenshot
-    {
-      id: 'pt-1',
-      name: 'Aman Tokyo Anniversary...',
-      clientName: 'Alice Johnson',
-      stage: 'NEW',
-      hasFlights: false,
-      hasHotels: false,
-      hasLogistics: false,
-      isUrgent: false,
-      tasks: [],
-      agent: 'Elena Vance',
-      createdAt: new Date().toISOString()
-    },
-    {
-      id: 'pt-2',
-      name: 'Formula 1 Paddock Club -...',
-      clientName: 'Charlie Davis',
-      stage: 'PLANNING',
-      hasFlights: true,
-      hasHotels: false,
-      hasLogistics: false,
-      isUrgent: true,
-      tasks: [
-        { id: 'task-1', text: 'Confirm paddock access', completed: false },
-        { id: 'task-2', text: 'Book hospitality suite', completed: false }
-      ],
-      agent: 'Elena Vance',
-      createdAt: new Date().toISOString()
-    },
-    {
-      id: 'pt-3',
-      name: 'New York Spring Business...',
-      clientName: 'Alice Johnson',
-      stage: 'IN_PROGRESS',
-      hasFlights: true,
-      hasHotels: true,
-      hasLogistics: false,
-      isUrgent: true,
-      tasks: [
-        { id: 'task-3', text: 'Finalize meeting schedule', completed: true },
-        { id: 'task-4', text: 'Arrange airport transfer', completed: false }
-      ],
-      agent: 'James Sterling',
-      createdAt: new Date().toISOString()
-    }
-  ]);
+  const [pipelineTrips, setPipelineTrips] = useState<PipelineTrip[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
@@ -839,28 +797,79 @@ const App: React.FC = () => {
     }
   };
 
-  const handleDeleteFlight = (id: string) => {
+  const handleDeleteFlight = async (id: string) => {
+    const flight = convertedFlights.find(f => f.id === id);
+    if (flight?.originalRequestId) {
+      try {
+        await fetch(`${API_URL}/api/requests/${flight.originalRequestId}`, { method: 'DELETE' });
+      } catch (error) {
+        console.error('Error deleting flight:', error);
+      }
+    }
     setConvertedFlights(prev => prev.filter(f => f.id !== id));
   };
 
-  const handleDeleteHotel = (id: string) => {
+  const handleDeleteHotel = async (id: string) => {
+    const hotel = convertedHotels.find(h => h.id === id);
+    if (hotel?.originalRequestId) {
+      try {
+        await fetch(`${API_URL}/api/requests/${hotel.originalRequestId}`, { method: 'DELETE' });
+      } catch (error) {
+        console.error('Error deleting hotel:', error);
+      }
+    }
     setConvertedHotels(prev => prev.filter(h => h.id !== id));
   };
 
-  const handleDeleteLogistics = (id: string) => {
+  const handleDeleteLogistics = async (id: string) => {
+    const logistics = convertedLogistics.find(l => l.id === id);
+    if (logistics?.originalRequestId) {
+      try {
+        await fetch(`${API_URL}/api/requests/${logistics.originalRequestId}`, { method: 'DELETE' });
+      } catch (error) {
+        console.error('Error deleting logistics:', error);
+      }
+    }
     setConvertedLogistics(prev => prev.filter(l => l.id !== id));
   };
 
-  const handleAddPipelineTrip = (trip: PipelineTrip) => {
-    setPipelineTrips(prev => [trip, ...prev]);
+  const handleAddPipelineTrip = async (trip: PipelineTrip) => {
+    try {
+      const res = await fetch(`${API_URL}/api/pipeline`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(trip),
+      });
+      if (res.ok) {
+        const newTrip = await res.json();
+        setPipelineTrips(prev => [newTrip, ...prev]);
+      }
+    } catch (error) {
+      console.error('Error adding pipeline trip:', error);
+    }
   };
 
-  const handleUpdatePipelineTrip = (id: string, updates: Partial<PipelineTrip>) => {
+  const handleUpdatePipelineTrip = async (id: string, updates: Partial<PipelineTrip>) => {
+    // Update locally first for instant feedback
     setPipelineTrips(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+    try {
+      await fetch(`${API_URL}/api/pipeline/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+    } catch (error) {
+      console.error('Error updating pipeline trip:', error);
+    }
   };
 
-  const handleDeletePipelineTrip = (id: string) => {
+  const handleDeletePipelineTrip = async (id: string) => {
     setPipelineTrips(prev => prev.filter(t => t.id !== id));
+    try {
+      await fetch(`${API_URL}/api/pipeline/${id}`, { method: 'DELETE' });
+    } catch (error) {
+      console.error('Error deleting pipeline trip:', error);
+    }
   };
 
   const handleAddRequest = async (req: Partial<BookingRequest>) => {

@@ -17,6 +17,7 @@ const parseRoutes = require('./routes/parse');
 const aiRoutes = require('./routes/ai');
 const customerRoutes = require('./routes/customers');
 const notificationRoutes = require('./routes/notifications');
+const pipelineRoutes = require('./routes/pipeline');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -103,6 +104,7 @@ app.use('/api/parse', parseRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/pipeline', pipelineRoutes);
 
 // Root route
 app.get('/', (req, res) => {

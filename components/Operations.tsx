@@ -1,9 +1,8 @@
 
 import React, { useState } from 'react';
 import { SectionHeader, DataTable, Badge } from './Shared';
-import { MOCK_FLIGHTS, MOCK_HOTELS, MOCK_TRIPS, MOCK_USERS } from '../constants';
-import { ElementStatus, BookingRequest, Comment, User, ConvertedFlight, ConvertedHotel, ConvertedLogistics, PipelineTrip, PipelineStage, PipelineTask } from '../types';
-import Comments from './Comments';
+import { MOCK_USERS } from '../constants';
+import { BookingRequest, User, ConvertedFlight, ConvertedHotel, ConvertedLogistics, PipelineTrip, PipelineStage, PipelineTask } from '../types';
 import { GoogleUser } from './Login';
 import { API_URL } from '../config';
 
@@ -35,7 +34,7 @@ interface OperationsProps {
 }
 
 const Operations: React.FC<OperationsProps> = ({
-  requests, comments, currentUser, onAddComment, onDeleteComment, googleUser,
+  requests, currentUser, googleUser,
   convertedFlights, convertedHotels, convertedLogistics,
   onConvertToFlight, onConvertToHotel, onConvertToLogistics,
   onUpdateFlight, onUpdateHotel, onUpdateLogistics,
@@ -44,7 +43,6 @@ const Operations: React.FC<OperationsProps> = ({
   onAddRequest, onDeleteRequest
 }) => {
   const [subTab, setSubTab] = useState('flights');
-  const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
 
   // Convert modal state
@@ -62,6 +60,7 @@ const Operations: React.FC<OperationsProps> = ({
   const [flightAgent, setFlightAgent] = useState('');
   const [flightProfitLoss, setFlightProfitLoss] = useState(0);
   const [flightStatus, setFlightStatus] = useState<'PENDING' | 'CONFIRMED' | 'TICKETED' | 'CANCELLED'>('PENDING');
+  const [flightNotes, setFlightNotes] = useState('');
 
   // Hotel form state
   const [hotelDescription, setHotelDescription] = useState('');
@@ -75,6 +74,7 @@ const Operations: React.FC<OperationsProps> = ({
   const [hotelAgent, setHotelAgent] = useState('');
   const [hotelProfitLoss, setHotelProfitLoss] = useState(0);
   const [hotelStatus, setHotelStatus] = useState<'PENDING' | 'CONFIRMED' | 'CANCELLED'>('PENDING');
+  const [hotelNotes, setHotelNotes] = useState('');
 
   // Logistics form state
   const [logisticsDescription, setLogisticsDescription] = useState('');
@@ -86,6 +86,7 @@ const Operations: React.FC<OperationsProps> = ({
   const [logisticsAgent, setLogisticsAgent] = useState('');
   const [logisticsProfitLoss, setLogisticsProfitLoss] = useState(0);
   const [logisticsStatus, setLogisticsStatus] = useState<'PENDING' | 'CONFIRMED' | 'CANCELLED'>('PENDING');
+  const [logisticsNotes, setLogisticsNotes] = useState('');
 
   // Edit modal state
   const [showEditModal, setShowEditModal] = useState(false);
@@ -375,17 +376,54 @@ const Operations: React.FC<OperationsProps> = ({
 
   const openConvertModal = (request: BookingRequest) => {
     setConvertingRequest(request);
-    // Pre-fill some fields based on request data
-    const clientName = request.details?.clientName || '';
+    const details = request.details || {};
+    const clientName = details.clientName || '';
+
     if (request.type === 'FLIGHT') {
+      // Pre-fill flight fields from request details
       setFlightDescription(clientName ? `${clientName}-` : '');
-      setFlightAgent('');
+      setFlightAirline(details.airline || '');
+      setFlightPassengerCount(details.passengerCount || details.passengers || 1);
+      setFlightAgent(details.agentName || request.agentName || '');
+
+      // Build routes from origin/destination
+      if (details.origin && details.destination) {
+        setFlightRoutes(`${details.origin}-${details.destination}`);
+      }
+
+      // Build dates string from depart/return dates
+      const dates: string[] = [];
+      if (details.departDate) dates.push(details.departDate);
+      if (details.returnDate) dates.push(details.returnDate);
+      if (dates.length > 0) {
+        setFlightDates(dates.join(' - '));
+      }
     } else if (request.type === 'HOTEL') {
+      // Pre-fill hotel fields from request details
       setHotelDescription(clientName ? `${clientName}-` : '');
-      setHotelAgent('');
+      setHotelName(details.hotelName || '');
+      setHotelGuestCount(details.guestCount || details.guests || 1);
+      setHotelRoomType(details.roomType || '');
+      setHotelAgent(details.agentName || request.agentName || '');
+
+      // Pre-fill dates
+      if (details.checkIn || details.departDate) {
+        setHotelCheckIn(details.checkIn || details.departDate || '');
+      }
+      if (details.checkOut || details.returnDate) {
+        setHotelCheckOut(details.checkOut || details.returnDate || '');
+      }
     } else {
+      // Pre-fill logistics fields from request details
       setLogisticsDescription(clientName || '');
-      setLogisticsAgent('');
+      setLogisticsServiceType(details.serviceType || '');
+      setLogisticsDetails(details.logisticsDetails || request.notes || '');
+      setLogisticsAgent(details.agentName || request.agentName || '');
+
+      // Pre-fill date
+      if (details.date || details.targetDate || details.departDate) {
+        setLogisticsDate(details.date || details.targetDate || details.departDate || '');
+      }
     }
     setShowConvertModal(true);
   };
@@ -396,13 +434,13 @@ const Operations: React.FC<OperationsProps> = ({
     // Reset all form fields
     setFlightDescription(''); setFlightAirline(''); setFlightPaymentStatus('UNPAID');
     setFlightPnr(''); setFlightRoutes(''); setFlightPassengerCount(1);
-    setFlightDates(''); setFlightAgent(''); setFlightProfitLoss(0); setFlightStatus('PENDING');
+    setFlightDates(''); setFlightAgent(''); setFlightProfitLoss(0); setFlightStatus('PENDING'); setFlightNotes('');
     setHotelDescription(''); setHotelName(''); setHotelPaymentStatus('UNPAID');
     setHotelConfirmation(''); setHotelRoomType(''); setHotelGuestCount(1);
-    setHotelCheckIn(''); setHotelCheckOut(''); setHotelAgent(''); setHotelProfitLoss(0); setHotelStatus('PENDING');
+    setHotelCheckIn(''); setHotelCheckOut(''); setHotelAgent(''); setHotelProfitLoss(0); setHotelStatus('PENDING'); setHotelNotes('');
     setLogisticsDescription(''); setLogisticsServiceType(''); setLogisticsPaymentStatus('UNPAID');
     setLogisticsConfirmation(''); setLogisticsDetails(''); setLogisticsDate('');
-    setLogisticsAgent(''); setLogisticsProfitLoss(0); setLogisticsStatus('PENDING');
+    setLogisticsAgent(''); setLogisticsProfitLoss(0); setLogisticsStatus('PENDING'); setLogisticsNotes('');
   };
 
   const handleSubmitConvert = () => {
@@ -422,7 +460,8 @@ const Operations: React.FC<OperationsProps> = ({
         profitLoss: flightProfitLoss,
         status: flightStatus,
         createdAt: new Date().toISOString(),
-        originalRequestId: convertingRequest.id
+        originalRequestId: convertingRequest.id,
+        notes: flightNotes || undefined
       };
       onConvertToFlight(newFlight, convertingRequest.id);
     } else if (convertingRequest.type === 'HOTEL') {
@@ -440,7 +479,8 @@ const Operations: React.FC<OperationsProps> = ({
         profitLoss: hotelProfitLoss,
         status: hotelStatus,
         createdAt: new Date().toISOString(),
-        originalRequestId: convertingRequest.id
+        originalRequestId: convertingRequest.id,
+        notes: hotelNotes || undefined
       };
       onConvertToHotel(newHotel, convertingRequest.id);
     } else {
@@ -456,7 +496,8 @@ const Operations: React.FC<OperationsProps> = ({
         profitLoss: logisticsProfitLoss,
         status: logisticsStatus,
         createdAt: new Date().toISOString(),
-        originalRequestId: convertingRequest.id
+        originalRequestId: convertingRequest.id,
+        notes: logisticsNotes || undefined
       };
       onConvertToLogistics(newLogistics, convertingRequest.id);
     }
@@ -479,6 +520,7 @@ const Operations: React.FC<OperationsProps> = ({
         setFlightAgent(flight.agent);
         setFlightProfitLoss(flight.profitLoss);
         setFlightStatus(flight.status);
+        setFlightNotes(flight.notes || '');
       }
     } else if (type === 'hotel') {
       const hotel = convertedHotels.find(h => h.id === id);
@@ -494,6 +536,7 @@ const Operations: React.FC<OperationsProps> = ({
         setHotelAgent(hotel.agent);
         setHotelProfitLoss(hotel.profitLoss);
         setHotelStatus(hotel.status);
+        setHotelNotes(hotel.notes || '');
       }
     } else {
       const logistics = convertedLogistics.find(l => l.id === id);
@@ -507,6 +550,7 @@ const Operations: React.FC<OperationsProps> = ({
         setLogisticsAgent(logistics.agent);
         setLogisticsProfitLoss(logistics.profitLoss);
         setLogisticsStatus(logistics.status);
+        setLogisticsNotes(logistics.notes || '');
       }
     }
     setShowEditModal(true);
@@ -518,13 +562,13 @@ const Operations: React.FC<OperationsProps> = ({
     // Reset all form fields
     setFlightDescription(''); setFlightAirline(''); setFlightPaymentStatus('UNPAID');
     setFlightPnr(''); setFlightRoutes(''); setFlightPassengerCount(1);
-    setFlightDates(''); setFlightAgent(''); setFlightProfitLoss(0); setFlightStatus('PENDING');
+    setFlightDates(''); setFlightAgent(''); setFlightProfitLoss(0); setFlightStatus('PENDING'); setFlightNotes('');
     setHotelDescription(''); setHotelName(''); setHotelPaymentStatus('UNPAID');
     setHotelConfirmation(''); setHotelRoomType(''); setHotelGuestCount(1);
-    setHotelCheckIn(''); setHotelCheckOut(''); setHotelAgent(''); setHotelProfitLoss(0); setHotelStatus('PENDING');
+    setHotelCheckIn(''); setHotelCheckOut(''); setHotelAgent(''); setHotelProfitLoss(0); setHotelStatus('PENDING'); setHotelNotes('');
     setLogisticsDescription(''); setLogisticsServiceType(''); setLogisticsPaymentStatus('UNPAID');
     setLogisticsConfirmation(''); setLogisticsDetails(''); setLogisticsDate('');
-    setLogisticsAgent(''); setLogisticsProfitLoss(0); setLogisticsStatus('PENDING');
+    setLogisticsAgent(''); setLogisticsProfitLoss(0); setLogisticsStatus('PENDING'); setLogisticsNotes('');
   };
 
   const handleSubmitEdit = () => {
@@ -541,7 +585,8 @@ const Operations: React.FC<OperationsProps> = ({
         dates: flightDates,
         agent: flightAgent,
         profitLoss: flightProfitLoss,
-        status: flightStatus
+        status: flightStatus,
+        notes: flightNotes || undefined
       });
     } else if (editingItem.type === 'hotel') {
       onUpdateHotel(editingItem.id, {
@@ -555,7 +600,8 @@ const Operations: React.FC<OperationsProps> = ({
         checkOut: hotelCheckOut,
         agent: hotelAgent,
         profitLoss: hotelProfitLoss,
-        status: hotelStatus
+        status: hotelStatus,
+        notes: hotelNotes || undefined
       });
     } else {
       onUpdateLogistics(editingItem.id, {
@@ -567,7 +613,8 @@ const Operations: React.FC<OperationsProps> = ({
         date: logisticsDate,
         agent: logisticsAgent,
         profitLoss: logisticsProfitLoss,
-        status: logisticsStatus
+        status: logisticsStatus,
+        notes: logisticsNotes || undefined
       });
     }
     closeEditModal();
@@ -743,7 +790,7 @@ const Operations: React.FC<OperationsProps> = ({
           {tabs.map(t => (
             <button
               key={t.id}
-              onClick={() => { setSubTab(t.id); setSelectedElementId(null); }}
+              onClick={() => setSubTab(t.id)}
               className={`pb-3 sm:pb-4 text-[10px] sm:text-xs font-bold tracking-widest transition-all whitespace-nowrap ${
                 subTab === t.id
                   ? 'text-paragon border-b-2 border-paragon'
@@ -770,589 +817,421 @@ const Operations: React.FC<OperationsProps> = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 lg:gap-8">
-        <div className={selectedElementId ? 'lg:col-span-8' : 'lg:col-span-12'}>
-          {subTab === 'flights' && (
+      <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:gap-8">
+        <div>
+          {subTab === 'flights' && (() => {
+            // Separate flights by age: < 7 days = Completed Bookings, >= 7 days = Existing Inventory
+            const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+            const now = Date.now();
+            const recentFlights = convertedFlights.filter(f => now - new Date(f.createdAt).getTime() < WEEK_MS);
+            const olderFlights = convertedFlights.filter(f => now - new Date(f.createdAt).getTime() >= WEEK_MS);
+
+            // Mobile card render
+            const renderFlightCardMobile = (f: ConvertedFlight) => {
+              const isExpanded = expandedItemId === f.id;
+              return (
+                <div key={f.id} className="bg-white border border-slate-200 rounded-sm transition-all">
+                  <div className="p-3 flex items-center gap-3 cursor-pointer" onClick={() => setExpandedItemId(isExpanded ? null : f.id)}>
+                    <div className="w-8 h-8 rounded-full bg-red-100 text-red-600 flex items-center justify-center flex-shrink-0">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-xs text-slate-900 truncate">{f.description}</span>
+                        <Badge color={f.status === 'TICKETED' ? 'teal' : f.status === 'CONFIRMED' ? 'gold' : f.status === 'CANCELLED' ? 'red' : 'slate'}>{f.status}</Badge>
+                      </div>
+                      <p className="text-[10px] text-slate-500">{f.airline} • {f.pnr}</p>
+                    </div>
+                    <Badge color={f.paymentStatus === 'PAID' ? 'teal' : 'red'}>{f.paymentStatus}</Badge>
+                    <svg className={`w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                  {isExpanded && (
+                    <div className="px-3 pb-3 border-t border-slate-100">
+                      <div className="grid grid-cols-2 gap-3 pt-3 text-[11px]">
+                        <div><span className="text-slate-400 block text-[9px] uppercase tracking-wider">Routes</span><span className="font-medium text-slate-700">{f.flights}</span></div>
+                        <div><span className="text-slate-400 block text-[9px] uppercase tracking-wider">Passengers</span><span className="font-medium text-slate-700">{f.passengerCount}</span></div>
+                        <div><span className="text-slate-400 block text-[9px] uppercase tracking-wider">Dates</span><span className="font-medium text-slate-700">{f.dates || '-'}</span></div>
+                        <div><span className="text-slate-400 block text-[9px] uppercase tracking-wider">Agent</span><span className="font-medium text-slate-700">{f.agent}</span></div>
+                        <div><span className="text-slate-400 block text-[9px] uppercase tracking-wider">Profit/Loss</span><span className={`font-bold ${f.profitLoss >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>${f.profitLoss.toLocaleString()}</span></div>
+                      </div>
+                      {f.notes && (
+                        <div className="mt-3 pt-3 border-t border-slate-100">
+                          <span className="text-slate-400 block text-[9px] uppercase tracking-wider mb-1">Notes</span>
+                          <p className="text-[11px] text-slate-600 whitespace-pre-wrap">{f.notes}</p>
+                        </div>
+                      )}
+                      <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100">
+                        <button onClick={(e) => { e.stopPropagation(); openEditModal('flight', f.id); }} className="flex-1 bg-slate-100 text-slate-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-slate-200 transition-colors rounded-sm">Edit</button>
+                        <button onClick={(e) => { e.stopPropagation(); onDeleteFlight(f.id); }} className="flex-1 bg-red-100 text-red-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-red-200 transition-colors rounded-sm">Delete</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            };
+
+            // Desktop table render
+            const renderFlightsTable = (flights: ConvertedFlight[]) => (
+              <DataTable headers={['Status', 'Description', 'Airline', 'PNR', 'Routes', 'Pax', 'Dates', 'Agent', 'P/L', 'Payment', 'Action']}>
+                {flights.map(f => {
+                  const isExpanded = expandedItemId === f.id;
+                  return (
+                    <React.Fragment key={f.id}>
+                      <tr className="hover:bg-slate-50 cursor-pointer" onClick={() => setExpandedItemId(isExpanded ? null : f.id)}>
+                        <td className="px-4 py-3"><Badge color={f.status === 'TICKETED' ? 'teal' : f.status === 'CONFIRMED' ? 'gold' : f.status === 'CANCELLED' ? 'red' : 'slate'}>{f.status}</Badge></td>
+                        <td className="px-4 py-3 font-bold">{f.description}</td>
+                        <td className="px-4 py-3">{f.airline}</td>
+                        <td className="px-4 py-3 font-mono text-paragon font-bold">{f.pnr}</td>
+                        <td className="px-4 py-3">{f.flights}</td>
+                        <td className="px-4 py-3">{f.passengerCount}</td>
+                        <td className="px-4 py-3 text-slate-600">{f.dates || '-'}</td>
+                        <td className="px-4 py-3 font-semibold">{f.agent}</td>
+                        <td className={`px-4 py-3 font-bold ${f.profitLoss >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>${f.profitLoss.toLocaleString()}</td>
+                        <td className="px-4 py-3"><Badge color={f.paymentStatus === 'PAID' ? 'teal' : 'red'}>{f.paymentStatus}</Badge></td>
+                        <td className="px-4 py-3 text-right">
+                          <svg className={`w-4 h-4 text-slate-400 transition-transform inline ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </td>
+                      </tr>
+                      {isExpanded && (
+                        <tr className="bg-slate-50">
+                          <td colSpan={11} className="px-4 py-3">
+                            {f.notes && (
+                              <div className="mb-3 pb-3 border-b border-slate-200">
+                                <span className="text-slate-400 block text-[9px] uppercase tracking-wider mb-1">Notes</span>
+                                <p className="text-xs text-slate-600 whitespace-pre-wrap">{f.notes}</p>
+                              </div>
+                            )}
+                            <div className="flex gap-3 items-center">
+                              <button onClick={(e) => { e.stopPropagation(); openEditModal('flight', f.id); }} className="bg-slate-200 text-slate-700 text-[10px] py-2 px-4 font-bold uppercase tracking-wider hover:bg-slate-300 transition-colors rounded-sm">Edit</button>
+                              <button onClick={(e) => { e.stopPropagation(); onDeleteFlight(f.id); }} className="bg-red-100 text-red-600 text-[10px] py-2 px-4 font-bold uppercase tracking-wider hover:bg-red-200 transition-colors rounded-sm">Delete</button>
+                              <span className="text-[10px] text-slate-400 ml-auto">Created: {new Date(f.createdAt).toLocaleDateString()}</span>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </DataTable>
+            );
+
+            return (
             <div>
               <SectionHeader title="Global Flight Operations" subtitle="Manage commercial and private jet inventory." />
 
-              {/* Converted Flights */}
-              {convertedFlights.length > 0 && (
+              {/* Completed Bookings (less than 7 days old) */}
+              {recentFlights.length > 0 && (
                 <div className="mb-6">
                   <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Completed Bookings</h4>
-
-                  {/* Mobile: Expandable List */}
-                  <div className="lg:hidden space-y-2">
-                    {convertedFlights.map(f => {
-                      const isExpanded = expandedItemId === f.id;
-                      const isSelected = selectedElementId === f.id;
-                      return (
-                        <div
-                          key={f.id}
-                          className={`bg-white border rounded-sm transition-all ${isSelected ? 'border-paragon ring-1 ring-paragon' : 'border-slate-200'}`}
-                        >
-                          <div
-                            className="p-3 flex items-center gap-3 cursor-pointer"
-                            onClick={() => setExpandedItemId(isExpanded ? null : f.id)}
-                          >
-                            <div className="w-8 h-8 rounded-full bg-red-100 text-red-600 flex items-center justify-center flex-shrink-0">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                              </svg>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="font-semibold text-xs text-slate-900 truncate">{f.description}</span>
-                                <Badge color={f.status === 'TICKETED' ? 'teal' : f.status === 'CONFIRMED' ? 'gold' : f.status === 'CANCELLED' ? 'red' : 'slate'}>
-                                  {f.status}
-                                </Badge>
-                              </div>
-                              <p className="text-[10px] text-slate-500">{f.airline} • {f.pnr}</p>
-                            </div>
-                            <Badge color={f.paymentStatus === 'PAID' ? 'teal' : 'red'}>{f.paymentStatus}</Badge>
-                            <svg className={`w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </div>
-                          {isExpanded && (
-                            <div className="px-3 pb-3 border-t border-slate-100">
-                              <div className="grid grid-cols-2 gap-3 pt-3 text-[11px]">
-                                <div>
-                                  <span className="text-slate-400 block text-[9px] uppercase tracking-wider">Flights</span>
-                                  <span className="font-medium text-slate-700">{f.flights}</span>
-                                </div>
-                                <div>
-                                  <span className="text-slate-400 block text-[9px] uppercase tracking-wider">Passengers</span>
-                                  <span className="font-medium text-slate-700">{f.passengerCount}</span>
-                                </div>
-                                <div>
-                                  <span className="text-slate-400 block text-[9px] uppercase tracking-wider">Agent</span>
-                                  <span className="font-medium text-slate-700">{f.agent}</span>
-                                </div>
-                                <div>
-                                  <span className="text-slate-400 block text-[9px] uppercase tracking-wider">P/L</span>
-                                  <span className={`font-bold ${f.profitLoss >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>${f.profitLoss.toLocaleString()}</span>
-                                </div>
-                              </div>
-                              <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100">
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); openEditModal('flight', f.id); }}
-                                  className="flex-1 bg-slate-100 text-slate-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-slate-200 transition-colors rounded-sm"
-                                >
-                                  Edit
-                                </button>
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); setSelectedElementId(f.id); }}
-                                  className="flex-1 bg-paragon text-white text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-paragon-dark transition-colors rounded-sm"
-                                >
-                                  Discuss
-                                </button>
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); onDeleteFlight(f.id); }}
-                                  className="bg-red-100 text-red-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-red-200 transition-colors rounded-sm"
-                                >
-                                  Delete
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Desktop: Table */}
-                  <div className="hidden lg:block">
-                    <DataTable headers={['Status', 'Description', 'Airline', 'PNR', 'Flights', 'Pax', 'Agent', 'P/L', 'Payment', 'Action']}>
-                      {convertedFlights.map(f => (
-                        <tr key={f.id} className={`hover:bg-slate-50 cursor-pointer ${selectedElementId === f.id ? 'bg-paragon-light/30' : ''}`} onClick={() => setSelectedElementId(f.id)}>
-                          <td className="px-4 py-3">
-                            <Badge color={f.status === 'TICKETED' ? 'teal' : f.status === 'CONFIRMED' ? 'gold' : f.status === 'CANCELLED' ? 'red' : 'slate'}>
-                              {f.status}
-                            </Badge>
-                          </td>
-                          <td className="px-4 py-3 font-bold">{f.description}</td>
-                          <td className="px-4 py-3">{f.airline}</td>
-                          <td className="px-4 py-3 font-mono text-paragon font-bold">{f.pnr}</td>
-                          <td className="px-4 py-3">{f.flights}</td>
-                          <td className="px-4 py-3">{f.passengerCount}</td>
-                          <td className="px-4 py-3 font-semibold">{f.agent}</td>
-                          <td className={`px-4 py-3 font-bold ${f.profitLoss >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                            ${f.profitLoss.toLocaleString()}
-                          </td>
-                          <td className="px-4 py-3">
-                            <Badge color={f.paymentStatus === 'PAID' ? 'teal' : 'red'}>{f.paymentStatus}</Badge>
-                          </td>
-                          <td className="px-4 py-3 text-right flex gap-2">
-                            <button
-                              onClick={(e) => { e.stopPropagation(); openEditModal('flight', f.id); }}
-                              className="text-[10px] text-slate-400 font-bold hover:text-paragon"
-                            >
-                              EDIT
-                            </button>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); onDeleteFlight(f.id); }}
-                              className="text-[10px] text-red-400 font-bold hover:text-red-600"
-                            >
-                              DELETE
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </DataTable>
-                  </div>
+                  {/* Mobile */}
+                  <div className="lg:hidden space-y-2">{recentFlights.map(renderFlightCardMobile)}</div>
+                  {/* Desktop */}
+                  <div className="hidden lg:block">{renderFlightsTable(recentFlights)}</div>
                 </div>
               )}
 
-              {/* Mock Flights (Original) */}
+              {/* Existing Inventory (7+ days old) */}
               <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Existing Inventory</h4>
+              {olderFlights.length > 0 ? (
+                <>
+                  {/* Mobile */}
+                  <div className="lg:hidden space-y-2">{olderFlights.map(renderFlightCardMobile)}</div>
+                  {/* Desktop */}
+                  <div className="hidden lg:block">{renderFlightsTable(olderFlights)}</div>
+                </>
+              ) : (
+                <div className="text-center py-8 text-slate-400">
+                  <p className="text-sm">No existing inventory</p>
+                  <p className="text-xs mt-1">Completed bookings older than 7 days will appear here</p>
+                </div>
+              )}
+            </div>
+            );
+          })()}
 
-              {/* Mobile: Expandable List */}
-              <div className="lg:hidden space-y-2">
-                {MOCK_FLIGHTS.map(f => {
-                  const isExpanded = expandedItemId === f.id;
-                  const isSelected = selectedElementId === f.id;
-                  return (
-                    <div
-                      key={f.id}
-                      className={`bg-white border rounded-sm transition-all ${isSelected ? 'border-paragon ring-1 ring-paragon' : 'border-slate-200'}`}
-                    >
-                      <div
-                        className="p-3 flex items-center gap-3 cursor-pointer"
-                        onClick={() => setExpandedItemId(isExpanded ? null : f.id)}
-                      >
-                        <div className="w-8 h-8 rounded-full bg-red-100 text-red-600 flex items-center justify-center flex-shrink-0">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                          </svg>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold text-xs text-slate-900 truncate">{f.carrier}</span>
-                            <Badge color={f.status === ElementStatus.TICKETED ? 'teal' : 'gold'}>{f.status}</Badge>
-                          </div>
-                          <p className="text-[10px] text-slate-500 font-mono">{f.pnr}</p>
-                        </div>
-                        <svg className={`w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                        </svg>
+          {subTab === 'hotels' && (() => {
+            // Separate hotels by age: < 7 days = Completed Bookings, >= 7 days = Existing Inventory
+            const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+            const now = Date.now();
+            const recentHotels = convertedHotels.filter(h => now - new Date(h.createdAt).getTime() < WEEK_MS);
+            const olderHotels = convertedHotels.filter(h => now - new Date(h.createdAt).getTime() >= WEEK_MS);
+
+            // Mobile card render
+            const renderHotelCardMobile = (h: ConvertedHotel) => {
+              const isExpanded = expandedItemId === h.id;
+              return (
+                <div key={h.id} className="bg-white border border-slate-200 rounded-sm transition-all">
+                  <div className="p-3 flex items-center gap-3 cursor-pointer" onClick={() => setExpandedItemId(isExpanded ? null : h.id)}>
+                    <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center flex-shrink-0">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-xs text-slate-900 truncate">{h.description}</span>
+                        <Badge color={h.status === 'CONFIRMED' ? 'teal' : h.status === 'CANCELLED' ? 'red' : 'slate'}>{h.status}</Badge>
                       </div>
-                      {isExpanded && (
-                        <div className="px-3 pb-3 border-t border-slate-100">
-                          <div className="pt-3 text-[11px]">
-                            <span className="text-slate-400 block text-[9px] uppercase tracking-wider mb-1">Segments</span>
-                            {f.segments.map((s, i) => (
-                              <div key={i} className="font-medium text-slate-700">{s.from} → {s.to} ({s.flightNo})</div>
-                            ))}
-                          </div>
-                          <div className="grid grid-cols-2 gap-3 pt-3 text-[11px]">
-                            <div>
-                              <span className="text-slate-400 block text-[9px] uppercase tracking-wider">Passengers</span>
-                              <span className="font-medium text-slate-700 truncate block">{f.passengers.join(', ')}</span>
-                            </div>
-                            <div>
-                              <span className="text-slate-400 block text-[9px] uppercase tracking-wider">Total Cost</span>
-                              <span className="font-bold text-slate-900">${f.cost.toLocaleString()}</span>
-                            </div>
-                          </div>
-                          <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100">
-                            <button
-                              onClick={(e) => { e.stopPropagation(); setSelectedElementId(f.id); }}
-                              className="flex-1 bg-paragon text-white text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-paragon-dark transition-colors rounded-sm"
-                            >
-                              View Details
-                            </button>
-                          </div>
+                      <p className="text-[10px] text-slate-500">{h.hotelName}</p>
+                    </div>
+                    <Badge color={h.paymentStatus === 'PAID' ? 'teal' : 'red'}>{h.paymentStatus}</Badge>
+                    <svg className={`w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                  {isExpanded && (
+                    <div className="px-3 pb-3 border-t border-slate-100">
+                      <div className="grid grid-cols-2 gap-3 pt-3 text-[11px]">
+                        <div><span className="text-slate-400 block text-[9px] uppercase tracking-wider">Confirmation #</span><span className="font-medium text-slate-700 font-mono">{h.confirmationNumber || '-'}</span></div>
+                        <div><span className="text-slate-400 block text-[9px] uppercase tracking-wider">Room Type</span><span className="font-medium text-slate-700">{h.roomType}</span></div>
+                        <div><span className="text-slate-400 block text-[9px] uppercase tracking-wider">Guests</span><span className="font-medium text-slate-700">{h.guestCount}</span></div>
+                        <div><span className="text-slate-400 block text-[9px] uppercase tracking-wider">Check-In</span><span className="font-medium text-slate-700">{h.checkIn}</span></div>
+                        <div><span className="text-slate-400 block text-[9px] uppercase tracking-wider">Check-Out</span><span className="font-medium text-slate-700">{h.checkOut}</span></div>
+                        <div><span className="text-slate-400 block text-[9px] uppercase tracking-wider">Agent</span><span className="font-medium text-slate-700">{h.agent}</span></div>
+                        <div><span className="text-slate-400 block text-[9px] uppercase tracking-wider">Profit/Loss</span><span className={`font-bold ${h.profitLoss >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>${h.profitLoss.toLocaleString()}</span></div>
+                      </div>
+                      {h.notes && (
+                        <div className="mt-3 pt-3 border-t border-slate-100">
+                          <span className="text-slate-400 block text-[9px] uppercase tracking-wider mb-1">Notes</span>
+                          <p className="text-[11px] text-slate-600 whitespace-pre-wrap">{h.notes}</p>
                         </div>
                       )}
+                      <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100">
+                        <button onClick={(e) => { e.stopPropagation(); openEditModal('hotel', h.id); }} className="flex-1 bg-slate-100 text-slate-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-slate-200 transition-colors rounded-sm">Edit</button>
+                        <button onClick={(e) => { e.stopPropagation(); onDeleteHotel(h.id); }} className="flex-1 bg-red-100 text-red-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-red-200 transition-colors rounded-sm">Delete</button>
+                      </div>
                     </div>
+                  )}
+                </div>
+              );
+            };
+
+            // Desktop table render
+            const renderHotelsTable = (hotels: ConvertedHotel[]) => (
+              <DataTable headers={['Status', 'Description', 'Hotel', 'Conf #', 'Room', 'Dates', 'Guests', 'Agent', 'P/L', 'Payment', 'Action']}>
+                {hotels.map(h => {
+                  const isExpanded = expandedItemId === h.id;
+                  return (
+                    <React.Fragment key={h.id}>
+                      <tr className="hover:bg-slate-50 cursor-pointer" onClick={() => setExpandedItemId(isExpanded ? null : h.id)}>
+                        <td className="px-4 py-3"><Badge color={h.status === 'CONFIRMED' ? 'teal' : h.status === 'CANCELLED' ? 'red' : 'slate'}>{h.status}</Badge></td>
+                        <td className="px-4 py-3 font-bold">{h.description}</td>
+                        <td className="px-4 py-3">{h.hotelName}</td>
+                        <td className="px-4 py-3 font-mono text-paragon font-bold">{h.confirmationNumber || '-'}</td>
+                        <td className="px-4 py-3">{h.roomType}</td>
+                        <td className="px-4 py-3">{h.checkIn} — {h.checkOut}</td>
+                        <td className="px-4 py-3">{h.guestCount}</td>
+                        <td className="px-4 py-3 font-semibold">{h.agent}</td>
+                        <td className={`px-4 py-3 font-bold ${h.profitLoss >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>${h.profitLoss.toLocaleString()}</td>
+                        <td className="px-4 py-3"><Badge color={h.paymentStatus === 'PAID' ? 'teal' : 'red'}>{h.paymentStatus}</Badge></td>
+                        <td className="px-4 py-3 text-right">
+                          <svg className={`w-4 h-4 text-slate-400 transition-transform inline ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </td>
+                      </tr>
+                      {isExpanded && (
+                        <tr className="bg-slate-50">
+                          <td colSpan={11} className="px-4 py-3">
+                            {h.notes && (
+                              <div className="mb-3 pb-3 border-b border-slate-200">
+                                <span className="text-slate-400 block text-[9px] uppercase tracking-wider mb-1">Notes</span>
+                                <p className="text-xs text-slate-600 whitespace-pre-wrap">{h.notes}</p>
+                              </div>
+                            )}
+                            <div className="flex gap-3 items-center">
+                              <button onClick={(e) => { e.stopPropagation(); openEditModal('hotel', h.id); }} className="bg-slate-200 text-slate-700 text-[10px] py-2 px-4 font-bold uppercase tracking-wider hover:bg-slate-300 transition-colors rounded-sm">Edit</button>
+                              <button onClick={(e) => { e.stopPropagation(); onDeleteHotel(h.id); }} className="bg-red-100 text-red-600 text-[10px] py-2 px-4 font-bold uppercase tracking-wider hover:bg-red-200 transition-colors rounded-sm">Delete</button>
+                              <span className="text-[10px] text-slate-400 ml-auto">Created: {new Date(h.createdAt).toLocaleDateString()}</span>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   );
                 })}
-              </div>
+              </DataTable>
+            );
 
-              {/* Desktop: Table */}
-              <div className="hidden lg:block">
-                <DataTable headers={['Status', 'Carrier', 'PNR', 'Segments', 'Pax', 'Total Cost', 'Action']}>
-                  {MOCK_FLIGHTS.map(f => (
-                    <tr key={f.id} className={`hover:bg-slate-50 group cursor-pointer ${selectedElementId === f.id ? 'bg-paragon-light/30' : ''}`} onClick={() => setSelectedElementId(f.id)}>
-                      <td className="px-4 py-3"><Badge color={f.status === ElementStatus.TICKETED ? 'teal' : 'gold'}>{f.status}</Badge></td>
-                      <td className="px-4 py-3 font-bold">{f.carrier}</td>
-                      <td className="px-4 py-3 font-mono text-paragon font-bold underline">{f.pnr}</td>
-                      <td className="px-4 py-3">
-                        {f.segments.map((s, i) => (
-                          <div key={i}>{s.from} → {s.to} ({s.flightNo})</div>
-                        ))}
-                      </td>
-                      <td className="px-4 py-3 italic truncate max-w-[150px]">{f.passengers.join(', ')}</td>
-                      <td className="px-4 py-3 font-bold">${f.cost.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-right">
-                        <button className="text-[10px] text-slate-400 font-bold hover:text-paragon">VIEW</button>
-                      </td>
-                    </tr>
-                  ))}
-                </DataTable>
-              </div>
-            </div>
-          )}
-
-          {subTab === 'hotels' && (
+            return (
             <div>
               <SectionHeader title="Hotel Portfolio Management" />
 
-              {/* Converted Hotels */}
-              {convertedHotels.length > 0 && (
+              {/* Completed Bookings (less than 7 days old) */}
+              {recentHotels.length > 0 && (
                 <div className="mb-6">
                   <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Completed Bookings</h4>
-
-                  {/* Mobile: Expandable List */}
-                  <div className="lg:hidden space-y-2">
-                    {convertedHotels.map(h => {
-                      const isExpanded = expandedItemId === h.id;
-                      const isSelected = selectedElementId === h.id;
-                      return (
-                        <div
-                          key={h.id}
-                          className={`bg-white border rounded-sm transition-all ${isSelected ? 'border-paragon ring-1 ring-paragon' : 'border-slate-200'}`}
-                        >
-                          <div
-                            className="p-3 flex items-center gap-3 cursor-pointer"
-                            onClick={() => setExpandedItemId(isExpanded ? null : h.id)}
-                          >
-                            <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center flex-shrink-0">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                              </svg>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="font-semibold text-xs text-slate-900 truncate">{h.description}</span>
-                                <Badge color={h.status === 'CONFIRMED' ? 'teal' : h.status === 'CANCELLED' ? 'red' : 'slate'}>
-                                  {h.status}
-                                </Badge>
-                              </div>
-                              <p className="text-[10px] text-slate-500">{h.hotelName}</p>
-                            </div>
-                            <Badge color={h.paymentStatus === 'PAID' ? 'teal' : 'red'}>{h.paymentStatus}</Badge>
-                            <svg className={`w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </div>
-                          {isExpanded && (
-                            <div className="px-3 pb-3 border-t border-slate-100">
-                              <div className="grid grid-cols-2 gap-3 pt-3 text-[11px]">
-                                <div>
-                                  <span className="text-slate-400 block text-[9px] uppercase tracking-wider">Room Type</span>
-                                  <span className="font-medium text-slate-700">{h.roomType}</span>
-                                </div>
-                                <div>
-                                  <span className="text-slate-400 block text-[9px] uppercase tracking-wider">Guests</span>
-                                  <span className="font-medium text-slate-700">{h.guestCount}</span>
-                                </div>
-                                <div>
-                                  <span className="text-slate-400 block text-[9px] uppercase tracking-wider">Check-In</span>
-                                  <span className="font-medium text-slate-700">{h.checkIn}</span>
-                                </div>
-                                <div>
-                                  <span className="text-slate-400 block text-[9px] uppercase tracking-wider">Check-Out</span>
-                                  <span className="font-medium text-slate-700">{h.checkOut}</span>
-                                </div>
-                                <div>
-                                  <span className="text-slate-400 block text-[9px] uppercase tracking-wider">Agent</span>
-                                  <span className="font-medium text-slate-700">{h.agent}</span>
-                                </div>
-                                <div>
-                                  <span className="text-slate-400 block text-[9px] uppercase tracking-wider">P/L</span>
-                                  <span className={`font-bold ${h.profitLoss >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>${h.profitLoss.toLocaleString()}</span>
-                                </div>
-                              </div>
-                              <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100">
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); openEditModal('hotel', h.id); }}
-                                  className="flex-1 bg-slate-100 text-slate-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-slate-200 transition-colors rounded-sm"
-                                >
-                                  Edit
-                                </button>
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); setSelectedElementId(h.id); }}
-                                  className="flex-1 bg-paragon text-white text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-paragon-dark transition-colors rounded-sm"
-                                >
-                                  Discuss
-                                </button>
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); onDeleteHotel(h.id); }}
-                                  className="bg-red-100 text-red-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-red-200 transition-colors rounded-sm"
-                                >
-                                  Delete
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Desktop: Table */}
-                  <div className="hidden lg:block">
-                    <DataTable headers={['Status', 'Description', 'Hotel', 'Room', 'Dates', 'Guests', 'Agent', 'P/L', 'Payment', 'Action']}>
-                      {convertedHotels.map(h => (
-                        <tr key={h.id} className={`hover:bg-slate-50 cursor-pointer ${selectedElementId === h.id ? 'bg-paragon-light/30' : ''}`} onClick={() => setSelectedElementId(h.id)}>
-                          <td className="px-4 py-3">
-                            <Badge color={h.status === 'CONFIRMED' ? 'teal' : h.status === 'CANCELLED' ? 'red' : 'slate'}>
-                              {h.status}
-                            </Badge>
-                          </td>
-                          <td className="px-4 py-3 font-bold">{h.description}</td>
-                          <td className="px-4 py-3">{h.hotelName}</td>
-                          <td className="px-4 py-3">{h.roomType}</td>
-                          <td className="px-4 py-3">{h.checkIn} — {h.checkOut}</td>
-                          <td className="px-4 py-3">{h.guestCount}</td>
-                          <td className="px-4 py-3 font-semibold">{h.agent}</td>
-                          <td className={`px-4 py-3 font-bold ${h.profitLoss >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                            ${h.profitLoss.toLocaleString()}
-                          </td>
-                          <td className="px-4 py-3">
-                            <Badge color={h.paymentStatus === 'PAID' ? 'teal' : 'red'}>{h.paymentStatus}</Badge>
-                          </td>
-                          <td className="px-4 py-3 text-right flex gap-2">
-                            <button
-                              onClick={(e) => { e.stopPropagation(); openEditModal('hotel', h.id); }}
-                              className="text-[10px] text-slate-400 font-bold hover:text-paragon"
-                            >
-                              EDIT
-                            </button>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); onDeleteHotel(h.id); }}
-                              className="text-[10px] text-red-400 font-bold hover:text-red-600"
-                            >
-                              DELETE
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </DataTable>
-                  </div>
+                  {/* Mobile */}
+                  <div className="lg:hidden space-y-2">{recentHotels.map(renderHotelCardMobile)}</div>
+                  {/* Desktop */}
+                  <div className="hidden lg:block">{renderHotelsTable(recentHotels)}</div>
                 </div>
               )}
 
-              {/* Mock Hotels (Original) */}
+              {/* Existing Inventory (7+ days old) */}
               <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Existing Inventory</h4>
+              {olderHotels.length > 0 ? (
+                <>
+                  {/* Mobile */}
+                  <div className="lg:hidden space-y-2">{olderHotels.map(renderHotelCardMobile)}</div>
+                  {/* Desktop */}
+                  <div className="hidden lg:block">{renderHotelsTable(olderHotels)}</div>
+                </>
+              ) : (
+                <div className="text-center py-8 text-slate-400">
+                  <p className="text-sm">No existing inventory</p>
+                  <p className="text-xs mt-1">Completed bookings older than 7 days will appear here</p>
+                </div>
+              )}
+            </div>
+            );
+          })()}
 
-              {/* Mobile: Expandable List */}
-              <div className="lg:hidden space-y-2">
-                {MOCK_HOTELS.map(h => {
-                  const isExpanded = expandedItemId === h.id;
-                  const isSelected = selectedElementId === h.id;
-                  return (
-                    <div
-                      key={h.id}
-                      className={`bg-white border rounded-sm transition-all ${isSelected ? 'border-paragon ring-1 ring-paragon' : 'border-slate-200'}`}
-                    >
-                      <div
-                        className="p-3 flex items-center gap-3 cursor-pointer"
-                        onClick={() => setExpandedItemId(isExpanded ? null : h.id)}
-                      >
-                        <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center flex-shrink-0">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                          </svg>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold text-xs text-slate-900 truncate">{h.hotelName}</span>
-                            <Badge color="gold">{h.status}</Badge>
-                          </div>
-                          <p className="text-[10px] text-slate-500">{h.roomType}</p>
-                        </div>
-                        <svg className={`w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                        </svg>
+          {subTab === 'logistics' && (() => {
+            // Separate logistics by age: < 7 days = Completed Bookings, >= 7 days = Existing Inventory
+            const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+            const now = Date.now();
+            const recentLogistics = convertedLogistics.filter(l => now - new Date(l.createdAt).getTime() < WEEK_MS);
+            const olderLogistics = convertedLogistics.filter(l => now - new Date(l.createdAt).getTime() >= WEEK_MS);
+
+            // Mobile card render
+            const renderLogisticsCardMobile = (l: ConvertedLogistics) => {
+              const isExpanded = expandedItemId === l.id;
+              return (
+                <div key={l.id} className="bg-white border border-slate-200 rounded-sm transition-all">
+                  <div className="p-3 flex items-center gap-3 cursor-pointer" onClick={() => setExpandedItemId(isExpanded ? null : l.id)}>
+                    <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center flex-shrink-0">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-xs text-slate-900 truncate">{l.description}</span>
+                        <Badge color={l.status === 'CONFIRMED' ? 'teal' : l.status === 'CANCELLED' ? 'red' : 'slate'}>{l.status}</Badge>
                       </div>
-                      {isExpanded && (
-                        <div className="px-3 pb-3 border-t border-slate-100">
-                          <div className="grid grid-cols-2 gap-3 pt-3 text-[11px]">
-                            <div>
-                              <span className="text-slate-400 block text-[9px] uppercase tracking-wider">Check-In</span>
-                              <span className="font-medium text-slate-700">{h.checkIn}</span>
-                            </div>
-                            <div>
-                              <span className="text-slate-400 block text-[9px] uppercase tracking-wider">Check-Out</span>
-                              <span className="font-medium text-slate-700">{h.checkOut}</span>
-                            </div>
-                            <div className="col-span-2">
-                              <span className="text-slate-400 block text-[9px] uppercase tracking-wider">Total Cost</span>
-                              <span className="font-bold text-slate-900">${h.cost.toLocaleString()}</span>
-                            </div>
-                          </div>
-                          <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100">
-                            <button
-                              onClick={(e) => { e.stopPropagation(); setSelectedElementId(h.id); }}
-                              className="flex-1 bg-paragon text-white text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-paragon-dark transition-colors rounded-sm"
-                            >
-                              View Details
-                            </button>
-                          </div>
+                      <p className="text-[10px] text-slate-500">{l.serviceType} • {l.date}</p>
+                    </div>
+                    <Badge color={l.paymentStatus === 'PAID' ? 'teal' : 'red'}>{l.paymentStatus}</Badge>
+                    <svg className={`w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                  {isExpanded && (
+                    <div className="px-3 pb-3 border-t border-slate-100">
+                      <div className="grid grid-cols-2 gap-3 pt-3 text-[11px]">
+                        <div><span className="text-slate-400 block text-[9px] uppercase tracking-wider">Confirmation #</span><span className="font-medium text-slate-700 font-mono">{l.confirmationNumber || '-'}</span></div>
+                        <div><span className="text-slate-400 block text-[9px] uppercase tracking-wider">Date</span><span className="font-medium text-slate-700">{l.date}</span></div>
+                      </div>
+                      <div className="pt-3 text-[11px]">
+                        <span className="text-slate-400 block text-[9px] uppercase tracking-wider mb-1">Details</span>
+                        <span className="font-medium text-slate-700">{l.details || '-'}</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 pt-3 text-[11px]">
+                        <div><span className="text-slate-400 block text-[9px] uppercase tracking-wider">Agent</span><span className="font-medium text-slate-700">{l.agent}</span></div>
+                        <div><span className="text-slate-400 block text-[9px] uppercase tracking-wider">Profit/Loss</span><span className={`font-bold ${l.profitLoss >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>${l.profitLoss.toLocaleString()}</span></div>
+                      </div>
+                      {l.notes && (
+                        <div className="mt-3 pt-3 border-t border-slate-100">
+                          <span className="text-slate-400 block text-[9px] uppercase tracking-wider mb-1">Notes</span>
+                          <p className="text-[11px] text-slate-600 whitespace-pre-wrap">{l.notes}</p>
                         </div>
                       )}
+                      <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100">
+                        <button onClick={(e) => { e.stopPropagation(); openEditModal('logistics', l.id); }} className="flex-1 bg-slate-100 text-slate-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-slate-200 transition-colors rounded-sm">Edit</button>
+                        <button onClick={(e) => { e.stopPropagation(); onDeleteLogistics(l.id); }} className="flex-1 bg-red-100 text-red-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-red-200 transition-colors rounded-sm">Delete</button>
+                      </div>
                     </div>
+                  )}
+                </div>
+              );
+            };
+
+            // Desktop table render
+            const renderLogisticsTable = (logistics: ConvertedLogistics[]) => (
+              <DataTable headers={['Status', 'Description', 'Service', 'Conf #', 'Details', 'Date', 'Agent', 'P/L', 'Payment', 'Action']}>
+                {logistics.map(l => {
+                  const isExpanded = expandedItemId === l.id;
+                  return (
+                    <React.Fragment key={l.id}>
+                      <tr className="hover:bg-slate-50 cursor-pointer" onClick={() => setExpandedItemId(isExpanded ? null : l.id)}>
+                        <td className="px-4 py-3"><Badge color={l.status === 'CONFIRMED' ? 'teal' : l.status === 'CANCELLED' ? 'red' : 'slate'}>{l.status}</Badge></td>
+                        <td className="px-4 py-3 font-bold">{l.description}</td>
+                        <td className="px-4 py-3">{l.serviceType}</td>
+                        <td className="px-4 py-3 font-mono text-paragon font-bold">{l.confirmationNumber || '-'}</td>
+                        <td className="px-4 py-3 italic truncate max-w-[200px]">{l.details || '-'}</td>
+                        <td className="px-4 py-3">{l.date}</td>
+                        <td className="px-4 py-3 font-semibold">{l.agent}</td>
+                        <td className={`px-4 py-3 font-bold ${l.profitLoss >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>${l.profitLoss.toLocaleString()}</td>
+                        <td className="px-4 py-3"><Badge color={l.paymentStatus === 'PAID' ? 'teal' : 'red'}>{l.paymentStatus}</Badge></td>
+                        <td className="px-4 py-3 text-right">
+                          <svg className={`w-4 h-4 text-slate-400 transition-transform inline ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </td>
+                      </tr>
+                      {isExpanded && (
+                        <tr className="bg-slate-50">
+                          <td colSpan={10} className="px-4 py-3">
+                            {l.notes && (
+                              <div className="mb-3 pb-3 border-b border-slate-200">
+                                <span className="text-slate-400 block text-[9px] uppercase tracking-wider mb-1">Notes</span>
+                                <p className="text-xs text-slate-600 whitespace-pre-wrap">{l.notes}</p>
+                              </div>
+                            )}
+                            <div className="flex gap-3 items-center">
+                              <button onClick={(e) => { e.stopPropagation(); openEditModal('logistics', l.id); }} className="bg-slate-200 text-slate-700 text-[10px] py-2 px-4 font-bold uppercase tracking-wider hover:bg-slate-300 transition-colors rounded-sm">Edit</button>
+                              <button onClick={(e) => { e.stopPropagation(); onDeleteLogistics(l.id); }} className="bg-red-100 text-red-600 text-[10px] py-2 px-4 font-bold uppercase tracking-wider hover:bg-red-200 transition-colors rounded-sm">Delete</button>
+                              <span className="text-[10px] text-slate-400 ml-auto">Created: {new Date(l.createdAt).toLocaleDateString()}</span>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   );
                 })}
-              </div>
+              </DataTable>
+            );
 
-              {/* Desktop: Table */}
-              <div className="hidden lg:block">
-                <DataTable headers={['Status', 'Hotel', 'Room Type', 'Dates', 'Cost', 'Action']}>
-                  {MOCK_HOTELS.map(h => (
-                    <tr key={h.id} className={`hover:bg-slate-50 cursor-pointer ${selectedElementId === h.id ? 'bg-paragon-light/30' : ''}`} onClick={() => setSelectedElementId(h.id)}>
-                      <td className="px-4 py-3"><Badge color="gold">{h.status}</Badge></td>
-                      <td className="px-4 py-3 font-bold">{h.hotelName}</td>
-                      <td className="px-4 py-3">{h.roomType}</td>
-                      <td className="px-4 py-3">{h.checkIn} — {h.checkOut}</td>
-                      <td className="px-4 py-3 font-bold">${h.cost.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-right">
-                        <button className="text-[10px] text-slate-400 font-bold hover:text-paragon">VIEW</button>
-                      </td>
-                    </tr>
-                  ))}
-                </DataTable>
-              </div>
-            </div>
-          )}
-
-          {subTab === 'logistics' && (
+            return (
             <div>
               <SectionHeader title="Logistics & Ground Transportation" subtitle="Manage transfers, car services, and other logistics." />
 
-              {/* Converted Logistics */}
-              {convertedLogistics.length > 0 && (
+              {/* Completed Bookings (less than 7 days old) */}
+              {recentLogistics.length > 0 && (
                 <div className="mb-6">
                   <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Completed Bookings</h4>
-
-                  {/* Mobile: Expandable List */}
-                  <div className="lg:hidden space-y-2">
-                    {convertedLogistics.map(l => {
-                      const isExpanded = expandedItemId === l.id;
-                      const isSelected = selectedElementId === l.id;
-                      return (
-                        <div
-                          key={l.id}
-                          className={`bg-white border rounded-sm transition-all ${isSelected ? 'border-paragon ring-1 ring-paragon' : 'border-slate-200'}`}
-                        >
-                          <div
-                            className="p-3 flex items-center gap-3 cursor-pointer"
-                            onClick={() => setExpandedItemId(isExpanded ? null : l.id)}
-                          >
-                            <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center flex-shrink-0">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                              </svg>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="font-semibold text-xs text-slate-900 truncate">{l.description}</span>
-                                <Badge color={l.status === 'CONFIRMED' ? 'teal' : l.status === 'CANCELLED' ? 'red' : 'slate'}>
-                                  {l.status}
-                                </Badge>
-                              </div>
-                              <p className="text-[10px] text-slate-500">{l.serviceType} • {l.date}</p>
-                            </div>
-                            <Badge color={l.paymentStatus === 'PAID' ? 'teal' : 'red'}>{l.paymentStatus}</Badge>
-                            <svg className={`w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </div>
-                          {isExpanded && (
-                            <div className="px-3 pb-3 border-t border-slate-100">
-                              <div className="pt-3 text-[11px]">
-                                <span className="text-slate-400 block text-[9px] uppercase tracking-wider mb-1">Details</span>
-                                <span className="font-medium text-slate-700">{l.details}</span>
-                              </div>
-                              <div className="grid grid-cols-2 gap-3 pt-3 text-[11px]">
-                                <div>
-                                  <span className="text-slate-400 block text-[9px] uppercase tracking-wider">Agent</span>
-                                  <span className="font-medium text-slate-700">{l.agent}</span>
-                                </div>
-                                <div>
-                                  <span className="text-slate-400 block text-[9px] uppercase tracking-wider">P/L</span>
-                                  <span className={`font-bold ${l.profitLoss >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>${l.profitLoss.toLocaleString()}</span>
-                                </div>
-                              </div>
-                              <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100">
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); openEditModal('logistics', l.id); }}
-                                  className="flex-1 bg-slate-100 text-slate-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-slate-200 transition-colors rounded-sm"
-                                >
-                                  Edit
-                                </button>
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); setSelectedElementId(l.id); }}
-                                  className="flex-1 bg-paragon text-white text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-paragon-dark transition-colors rounded-sm"
-                                >
-                                  Discuss
-                                </button>
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); onDeleteLogistics(l.id); }}
-                                  className="bg-red-100 text-red-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-red-200 transition-colors rounded-sm"
-                                >
-                                  Delete
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Desktop: Table */}
-                  <div className="hidden lg:block">
-                    <DataTable headers={['Status', 'Description', 'Service', 'Details', 'Date', 'Agent', 'P/L', 'Payment', 'Action']}>
-                      {convertedLogistics.map(l => (
-                        <tr key={l.id} className={`hover:bg-slate-50 cursor-pointer ${selectedElementId === l.id ? 'bg-paragon-light/30' : ''}`} onClick={() => setSelectedElementId(l.id)}>
-                          <td className="px-4 py-3">
-                            <Badge color={l.status === 'CONFIRMED' ? 'teal' : l.status === 'CANCELLED' ? 'red' : 'slate'}>
-                              {l.status}
-                            </Badge>
-                          </td>
-                          <td className="px-4 py-3 font-bold">{l.description}</td>
-                          <td className="px-4 py-3">{l.serviceType}</td>
-                          <td className="px-4 py-3 italic truncate max-w-[200px]">{l.details}</td>
-                          <td className="px-4 py-3">{l.date}</td>
-                          <td className="px-4 py-3 font-semibold">{l.agent}</td>
-                          <td className={`px-4 py-3 font-bold ${l.profitLoss >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                            ${l.profitLoss.toLocaleString()}
-                          </td>
-                          <td className="px-4 py-3">
-                            <Badge color={l.paymentStatus === 'PAID' ? 'teal' : 'red'}>{l.paymentStatus}</Badge>
-                          </td>
-                          <td className="px-4 py-3 text-right flex gap-2">
-                            <button
-                              onClick={(e) => { e.stopPropagation(); openEditModal('logistics', l.id); }}
-                              className="text-[10px] text-slate-400 font-bold hover:text-paragon"
-                            >
-                              EDIT
-                            </button>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); onDeleteLogistics(l.id); }}
-                              className="text-[10px] text-red-400 font-bold hover:text-red-600"
-                            >
-                              DELETE
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </DataTable>
-                  </div>
+                  {/* Mobile */}
+                  <div className="lg:hidden space-y-2">{recentLogistics.map(renderLogisticsCardMobile)}</div>
+                  {/* Desktop */}
+                  <div className="hidden lg:block">{renderLogisticsTable(recentLogistics)}</div>
                 </div>
               )}
 
-              {/* Placeholder for existing logistics */}
-              <div className="text-center py-12 text-slate-400">
-                <p className="text-sm">No existing logistics inventory</p>
-                <p className="text-xs mt-1">Complete pending requests to add logistics here</p>
-              </div>
+              {/* Existing Inventory (7+ days old) */}
+              <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Existing Inventory</h4>
+              {olderLogistics.length > 0 ? (
+                <>
+                  {/* Mobile */}
+                  <div className="lg:hidden space-y-2">{olderLogistics.map(renderLogisticsCardMobile)}</div>
+                  {/* Desktop */}
+                  <div className="hidden lg:block">{renderLogisticsTable(olderLogistics)}</div>
+                </>
+              ) : (
+                <div className="text-center py-8 text-slate-400">
+                  <p className="text-sm">No existing inventory</p>
+                  <p className="text-xs mt-1">Completed bookings older than 7 days will appear here</p>
+                </div>
+              )}
             </div>
-          )}
+            );
+          })()}
 
           {subTab === 'pending' && (
             <div>
@@ -1374,13 +1253,12 @@ const Operations: React.FC<OperationsProps> = ({
                     const targetDate = r.details?.targetDate ? new Date(r.details.targetDate).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
                     const agentName = r.details?.agentName || (googleUser && (r.agentId === googleUser.googleId || r.agentId === googleUser.id) ? googleUser.name : (MOCK_USERS.find(u => u.id === r.agentId)?.name || 'Unknown'));
                     const isExpanded = expandedItemId === r.id;
-                    const isSelected = selectedElementId === r.id;
                     const isOwnRequest = googleUser ? (r.agentId === googleUser.googleId || r.agentId === googleUser.id) : r.agentId === currentUser.id;
 
                     return (
                       <div
                         key={r.id}
-                        className={`bg-white border rounded-sm transition-all ${isSelected ? 'border-paragon ring-1 ring-paragon' : 'border-slate-200'}`}
+                        className="bg-white border border-slate-200 rounded-sm transition-all"
                       >
                         {/* Header Row - Always Visible */}
                         <div
@@ -1455,12 +1333,6 @@ const Operations: React.FC<OperationsProps> = ({
                               >
                                 Complete
                               </button>
-                              <button
-                                onClick={(e) => { e.stopPropagation(); setSelectedElementId(r.id); }}
-                                className="flex-1 bg-slate-100 text-slate-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-slate-200 transition-colors rounded-sm"
-                              >
-                                Discuss
-                              </button>
                               {isOwnRequest && onDeleteRequest && (
                                 <button
                                   onClick={(e) => { e.stopPropagation(); if (confirm('Delete this request?')) onDeleteRequest(r.id); }}
@@ -1501,7 +1373,7 @@ const Operations: React.FC<OperationsProps> = ({
                     const isOwnRequest = googleUser ? (r.agentId === googleUser.googleId || r.agentId === googleUser.id) : r.agentId === currentUser.id;
 
                     return (
-                      <tr key={r.id} className={`hover:bg-slate-50 cursor-pointer ${selectedElementId === r.id ? 'bg-paragon-light/30' : ''}`} onClick={() => setSelectedElementId(r.id)}>
+                      <tr key={r.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => setExpandedItemId(expandedItemId === r.id ? null : r.id)}>
                         <td className="px-4 py-3">{new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
                         <td className="px-4 py-3 font-bold">{clientName}</td>
                         <td className="px-4 py-3"><Badge color={r.type === 'FLIGHT' ? 'red' : r.type === 'HOTEL' ? 'gold' : 'slate'}>{r.type}</Badge></td>
@@ -1536,6 +1408,7 @@ const Operations: React.FC<OperationsProps> = ({
           )}
         </div>
 
+        {/* Collaboration Panel - commented out for later
         {selectedElementId && (
           <div className="lg:col-span-4 fixed inset-x-0 bottom-0 lg:relative lg:inset-auto lg:sticky lg:top-20 lg:h-fit z-40">
             <div className="bg-white border-t lg:border border-slate-200 p-4 sm:p-6 rounded-t-lg lg:rounded-sm shadow-lg max-h-[60vh] lg:max-h-none overflow-auto animate-slideUp">
@@ -1557,6 +1430,7 @@ const Operations: React.FC<OperationsProps> = ({
             </div>
           </div>
         )}
+        */}
       </div>
 
       {/* Convert Modal */}
@@ -1699,6 +1573,17 @@ const Operations: React.FC<OperationsProps> = ({
                       <option value="CANCELLED">Cancelled</option>
                     </select>
                   </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Notes</label>
+                    <textarea
+                      value={flightNotes}
+                      onChange={(e) => setFlightNotes(e.target.value)}
+                      placeholder="Additional notes about this booking..."
+                      rows={3}
+                      className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon resize-none"
+                    />
+                  </div>
                 </div>
               )}
 
@@ -1832,6 +1717,17 @@ const Operations: React.FC<OperationsProps> = ({
                       <option value="CANCELLED">Cancelled</option>
                     </select>
                   </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Notes</label>
+                    <textarea
+                      value={hotelNotes}
+                      onChange={(e) => setHotelNotes(e.target.value)}
+                      placeholder="Additional notes about this booking..."
+                      rows={3}
+                      className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon resize-none"
+                    />
+                  </div>
                 </div>
               )}
 
@@ -1941,6 +1837,17 @@ const Operations: React.FC<OperationsProps> = ({
                         <option value="CANCELLED">Cancelled</option>
                       </select>
                     </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Notes</label>
+                    <textarea
+                      value={logisticsNotes}
+                      onChange={(e) => setLogisticsNotes(e.target.value)}
+                      placeholder="Additional notes about this booking..."
+                      rows={3}
+                      className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon resize-none"
+                    />
                   </div>
                 </div>
               )}
@@ -2092,6 +1999,16 @@ const Operations: React.FC<OperationsProps> = ({
                       <option value="CANCELLED">Cancelled</option>
                     </select>
                   </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Notes</label>
+                    <textarea
+                      value={flightNotes}
+                      onChange={(e) => setFlightNotes(e.target.value)}
+                      placeholder="Additional notes about this booking..."
+                      rows={3}
+                      className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon resize-none"
+                    />
+                  </div>
                 </div>
               )}
 
@@ -2213,6 +2130,16 @@ const Operations: React.FC<OperationsProps> = ({
                       <option value="CANCELLED">Cancelled</option>
                     </select>
                   </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Notes</label>
+                    <textarea
+                      value={hotelNotes}
+                      onChange={(e) => setHotelNotes(e.target.value)}
+                      placeholder="Additional notes about this booking..."
+                      rows={3}
+                      className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon resize-none"
+                    />
+                  </div>
                 </div>
               )}
 
@@ -2312,6 +2239,16 @@ const Operations: React.FC<OperationsProps> = ({
                         <option value="CANCELLED">Cancelled</option>
                       </select>
                     </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Notes</label>
+                    <textarea
+                      value={logisticsNotes}
+                      onChange={(e) => setLogisticsNotes(e.target.value)}
+                      placeholder="Additional notes about this booking..."
+                      rows={3}
+                      className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon resize-none"
+                    />
                   </div>
                 </div>
               )}

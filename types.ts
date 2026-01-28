@@ -218,6 +218,7 @@ export interface ConvertedFlight {
   status: 'PENDING' | 'CONFIRMED' | 'TICKETED' | 'CANCELLED';
   createdAt: string;
   originalRequestId?: string;
+  notes?: string;
 }
 
 export interface ConvertedHotel {
@@ -235,6 +236,7 @@ export interface ConvertedHotel {
   status: 'PENDING' | 'CONFIRMED' | 'CANCELLED';
   createdAt: string;
   originalRequestId?: string;
+  notes?: string;
 }
 
 export interface ConvertedLogistics {
@@ -250,6 +252,7 @@ export interface ConvertedLogistics {
   status: 'PENDING' | 'CONFIRMED' | 'CANCELLED';
   createdAt: string;
   originalRequestId?: string;
+  notes?: string;
 }
 
 // Pipeline stages for Kanban board
