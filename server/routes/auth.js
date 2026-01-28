@@ -199,8 +199,9 @@ router.get('/users', async (req, res) => {
       lastSeen: 1,
     });
 
-    // Check for stale users - if lastSeen > 5 minutes ago, treat as OFFLINE
-    const STALE_THRESHOLD = 5 * 60 * 1000; // 5 minutes
+    // Check for stale users - if lastSeen > 10 minutes ago, treat as OFFLINE
+    // (heartbeat is sent every 2 minutes, so 10 minutes allows for some network delays)
+    const STALE_THRESHOLD = 10 * 60 * 1000; // 10 minutes
     const now = Date.now();
 
     const usersWithStatus = users.map(user => {

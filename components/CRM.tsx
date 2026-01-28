@@ -964,7 +964,7 @@ const CRM: React.FC<CRMProps> = ({ requests = [], googleUser, onDeleteRequest })
               : 'text-slate-400 border-transparent hover:text-slate-600'
           }`}
         >
-          Customers
+         My Customers
         </button>
         <button
           onClick={() => setActiveSubTab('my-requests')}

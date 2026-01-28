@@ -633,7 +633,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
       <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6 sm:mb-8">
         <div>
           <h1 className="font-cinzel text-xl sm:text-2xl lg:text-3xl font-bold text-slate-900 uppercase tracking-widest">Command Center</h1>
-          <p className="text-[10px] sm:text-xs text-slate-500 mt-1 uppercase tracking-tight">System Status: <span className="text-emerald-500 font-bold">OPERATIONAL</span> / Active Agents: <span className="font-bold">{allUsers.filter(u => u.status !== 'OFFLINE').length}</span></p>
+          <p className="text-[10px] sm:text-xs text-slate-500 mt-1 uppercase tracking-tight">System Status: <span className="text-emerald-500 font-bold">OPERATIONAL</span> / Active Agents: <span className="font-bold">{allUsers.filter(u => u.status !== 'OFFLINE' && u.role !== 'CLIENT').length}</span></p>
         </div>
         <div className="flex gap-4 w-full sm:w-auto">
           <div className="relative flex-1 sm:flex-initial" ref={statusDropdownRef}>

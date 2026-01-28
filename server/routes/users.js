@@ -122,10 +122,29 @@ const sendInviteEmail = async (toEmail, toName, role) => {
 router.get('/', async (req, res) => {
   try {
     const users = await User.find({})
-      .select('email name role status isActive avatarColor invitedAt lastLogin createdAt')
+      .select('email name role status isActive avatarColor invitedAt lastLogin lastSeen createdAt')
       .sort({ createdAt: -1 });
 
-    res.json(users);
+    // Check for stale users - if lastSeen > 10 minutes ago, treat as OFFLINE
+    // (matches the logic in /api/auth/users)
+    const STALE_THRESHOLD = 10 * 60 * 1000; // 10 minutes
+    const now = Date.now();
+
+    const usersWithStatus = users.map(user => {
+      const userObj = user.toObject();
+      // If user has a lastSeen and it's stale, override status to OFFLINE
+      if (userObj.lastSeen && userObj.status !== 'OFFLINE') {
+        const lastSeenTime = new Date(userObj.lastSeen).getTime();
+        if (now - lastSeenTime > STALE_THRESHOLD) {
+          userObj.status = 'OFFLINE';
+        }
+      }
+      // Remove lastSeen from response (internal use only)
+      delete userObj.lastSeen;
+      return userObj;
+    });
+
+    res.json(usersWithStatus);
   } catch (error) {
     console.error('Get users error:', error);
     res.status(500).json({ error: 'Failed to get users' });

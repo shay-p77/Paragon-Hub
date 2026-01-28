@@ -4,6 +4,7 @@ import Layout from './components/Layout';
 import Operations from './components/Operations';
 import CRM from './components/CRM';
 import ClientDatabase from './components/ClientDatabase';
+import ConciergeTrips from './components/ConciergeTrips';
 import Accounting from './components/Accounting';
 import KnowledgeBase from './components/KnowledgeBase';
 import ClientPortal from './components/ClientPortal';
@@ -57,8 +58,8 @@ const App: React.FC = () => {
     }
   };
 
-  // Inactivity timeout (15 minutes = 900000ms, warning at 14 minutes)
-  const INACTIVITY_TIMEOUT = 15 * 60 * 1000; // 15 minutes
+  // Inactivity timeout (12 hours for all-day shift workers)
+  const INACTIVITY_TIMEOUT = 12 * 60 * 60 * 1000; // 12 hours
   const WARNING_BEFORE = 60 * 1000; // Show warning 1 minute before logout
   const [showTimeoutWarning, setShowTimeoutWarning] = useState(false);
   const [timeoutCountdown, setTimeoutCountdown] = useState(60);
@@ -153,6 +154,28 @@ const App: React.FC = () => {
     const heartbeatInterval = setInterval(sendHeartbeat, 2 * 60 * 1000);
 
     return () => clearInterval(heartbeatInterval);
+  }, [googleUser?.googleId]);
+
+  // Poll for new notifications every 30 seconds
+  useEffect(() => {
+    if (!googleUser?.googleId) return;
+
+    const pollNotifications = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/notifications?userId=${encodeURIComponent(googleUser.googleId)}`);
+        if (res.ok) {
+          const data = await res.json();
+          setNotifications(data);
+        }
+      } catch (error) {
+        // Silently fail - don't spam console
+      }
+    };
+
+    // Poll every 30 seconds
+    const notificationInterval = setInterval(pollNotifications, 30 * 1000);
+
+    return () => clearInterval(notificationInterval);
   }, [googleUser?.googleId]);
 
   const [currentUser] = useState<User>(MOCK_USERS[0]); // Fallback user data
@@ -258,6 +281,19 @@ const App: React.FC = () => {
       if (usersRes.ok) {
         const data = await usersRes.json();
         setTeamUsers(data);
+      }
+
+      // Fetch notifications for current user
+      if (googleUser?.googleId) {
+        try {
+          const notificationsRes = await fetch(`${API_URL}/api/notifications?userId=${encodeURIComponent(googleUser.googleId)}`);
+          if (notificationsRes.ok) {
+            const notifData = await notificationsRes.json();
+            setNotifications(notifData);
+          }
+        } catch (notifError) {
+          console.error('Error fetching notifications:', notifError);
+        }
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -417,6 +453,8 @@ const App: React.FC = () => {
         if (mentions) {
           const senderName = googleUser?.name || currentUser.name;
           const senderGoogleId = googleUser?.googleId;
+          const notificationsToCreate: Array<{ userId: string; message: string; type: string; link: string }> = [];
+
           mentions.forEach(mention => {
             const mentionName = mention.substring(1).toLowerCase();
             // Find user by name (case-insensitive partial match)
@@ -424,17 +462,27 @@ const App: React.FC = () => {
               u.name.toLowerCase().includes(mentionName) && u.googleId !== senderGoogleId
             );
             if (targetUser) {
-              setNotifications(prev => [{
-                id: `n-${Date.now()}-${targetUser.googleId}`,
+              notificationsToCreate.push({
                 userId: targetUser.googleId,
                 message: `${senderName} tagged you in a comment.`,
                 type: 'TAG',
-                read: false,
-                timestamp: new Date().toISOString(),
                 link: parentId
-              }, ...prev]);
+              });
             }
           });
+
+          // Save notifications to database
+          if (notificationsToCreate.length > 0) {
+            try {
+              await fetch(`${API_URL}/api/notifications/bulk`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ notifications: notificationsToCreate }),
+              });
+            } catch (notifError) {
+              console.error('Error creating tag notifications:', notifError);
+            }
+          }
         }
       }
     } catch (error) {
@@ -841,31 +889,54 @@ const App: React.FC = () => {
         const senderGoogleId = googleUser?.googleId;
         const priorityText = newReq.priority === 'URGENT' || newReq.priority === 'CRITICAL' ? ' (URGENT)' : '';
 
-        teamUsers.forEach(u => {
-          // Don't notify the sender, and only notify non-CLIENT users
-          if (u.googleId !== senderGoogleId && u.role !== 'CLIENT') {
-            setNotifications(prev => [{
-              id: `n-${Date.now()}-${u.googleId}`,
-              userId: u.googleId,
-              message: `New ${newReq.type.toLowerCase()} request from ${senderName}${priorityText}`,
-              type: 'ASSIGN',
-              read: false,
-              timestamp: new Date().toISOString(),
-              link: newReq.id
-            }, ...prev]);
+        // Build notifications for all team members (except sender and clients)
+        const notificationsToCreate = teamUsers
+          .filter(u => u.googleId !== senderGoogleId && u.role !== 'CLIENT')
+          .map(u => ({
+            userId: u.googleId,
+            message: `New ${newReq.type.toLowerCase()} request from ${senderName}${priorityText}`,
+            type: 'REQUEST',
+            link: newReq.id
+          }));
+
+        // Save notifications to database
+        if (notificationsToCreate.length > 0) {
+          try {
+            await fetch(`${API_URL}/api/notifications/bulk`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ notifications: notificationsToCreate }),
+            });
+          } catch (notifError) {
+            console.error('Error creating notifications:', notifError);
           }
-        });
+        }
       }
     } catch (error) {
       console.error('Error adding request:', error);
     }
   };
 
-  const markRead = (id: string) => {
+  const markRead = async (id: string) => {
+    // Update locally first for instant feedback
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+    // Then persist to server
+    try {
+      await fetch(`${API_URL}/api/notifications/${id}/read`, { method: 'PUT' });
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
   };
 
-  const clearAll = () => setNotifications([]);
+  const clearAll = async () => {
+    if (!googleUser?.googleId) return;
+    setNotifications([]);
+    try {
+      await fetch(`${API_URL}/api/notifications?userId=${encodeURIComponent(googleUser.googleId)}`, { method: 'DELETE' });
+    } catch (error) {
+      console.error('Error clearing notifications:', error);
+    }
+  };
 
   const userNotifications = notifications.filter(n => n.userId === googleUser?.googleId);
   const unreadCount = userNotifications.filter(n => !n.read).length;
@@ -875,6 +946,7 @@ const App: React.FC = () => {
       case 'home': return <Home currentUser={currentUser} announcements={announcements} comments={comments} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onAddAnnouncement={handleAddAnnouncement} onEditAnnouncement={handleEditAnnouncement} onDeleteAnnouncement={handleDeleteAnnouncement} onPinAnnouncement={handlePinAnnouncement} onArchiveAnnouncement={handleArchiveAnnouncement} onPinComment={handlePinComment} onAddRequest={handleAddRequest} onDeleteRequest={handleDeleteRequest} requests={requests} googleUser={googleUser} />;
       case 'ops': return <Operations requests={requests} comments={comments} currentUser={currentUser} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} googleUser={googleUser} convertedFlights={convertedFlights} convertedHotels={convertedHotels} convertedLogistics={convertedLogistics} onConvertToFlight={handleConvertToFlight} onConvertToHotel={handleConvertToHotel} onConvertToLogistics={handleConvertToLogistics} onUpdateFlight={handleUpdateFlight} onUpdateHotel={handleUpdateHotel} onUpdateLogistics={handleUpdateLogistics} onDeleteFlight={handleDeleteFlight} onDeleteHotel={handleDeleteHotel} onDeleteLogistics={handleDeleteLogistics} pipelineTrips={pipelineTrips} onAddPipelineTrip={handleAddPipelineTrip} onUpdatePipelineTrip={handleUpdatePipelineTrip} onDeletePipelineTrip={handleDeletePipelineTrip} onAddRequest={handleAddRequest} onDeleteRequest={handleDeleteRequest} />;
       case 'sales': return <CRM requests={requests} googleUser={googleUser} onDeleteRequest={handleDeleteRequest} />;
+      case 'concierge': return <ConciergeTrips googleUser={googleUser} currentUser={currentUser} pipelineTrips={pipelineTrips} onAddPipelineTrip={handleAddPipelineTrip} onUpdatePipelineTrip={handleUpdatePipelineTrip} onDeletePipelineTrip={handleDeletePipelineTrip} />;
       case 'clientdb': return <ClientDatabase googleUser={googleUser} />;
       case 'accounting': return <Accounting />;
       case 'knowledge': return <KnowledgeBase />;
