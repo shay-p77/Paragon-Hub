@@ -172,8 +172,9 @@ router.post('/invite', async (req, res) => {
       return res.status(400).json({ error: 'Invalid role' });
     }
 
-    // Create invited user
+    // Create invited user with placeholder googleId (will be replaced on first login)
     const user = new User({
+      googleId: `invited-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       email: email.toLowerCase(),
       name,
       role,
