@@ -43,6 +43,24 @@ const preferencesSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const passportSchema = new mongoose.Schema(
+  {
+    number: {
+      type: String,
+      required: true,
+    },
+    country: {
+      type: String,
+      required: true,
+    },
+    expiry: {
+      type: String,
+      default: '',
+    },
+  },
+  { _id: false }
+);
+
 const customerSchema = new mongoose.Schema({
   // Basic Info
   legalFirstName: {
@@ -81,7 +99,7 @@ const customerSchema = new mongoose.Schema({
     default: null,
   },
 
-  // Travel Documents
+  // Travel Documents (legacy single passport - kept for backwards compatibility)
   passportNumber: {
     type: String,
     default: '',
@@ -94,6 +112,9 @@ const customerSchema = new mongoose.Schema({
     type: String,
     default: '',
   },
+
+  // Multiple passports support
+  passports: [passportSchema],
 
   // Loyalty Programs (numbers will be encrypted via custom handling)
   loyaltyPrograms: [loyaltyProgramSchema],
@@ -158,6 +179,20 @@ customerSchema.pre('save', function (next) {
       this.markModified('loyaltyPrograms');
     }
 
+    // Encrypt passport numbers in passports array
+    if (this.passports && this.passports.length > 0) {
+      this.passports = this.passports.map((passport) => {
+        if (passport.number && !passport.number.includes(':')) {
+          return {
+            ...passport.toObject(),
+            number: encrypt(passport.number),
+          };
+        }
+        return passport;
+      });
+      this.markModified('passports');
+    }
+
     // Update the updatedAt timestamp
     this.updatedAt = new Date();
 
@@ -167,8 +202,8 @@ customerSchema.pre('save', function (next) {
   }
 });
 
-// Decrypt loyalty program numbers after find
-function decryptLoyaltyPrograms(doc) {
+// Decrypt loyalty program numbers and passport numbers after find
+function decryptNestedFields(doc) {
   if (!doc) return doc;
 
   if (doc.loyaltyPrograms && doc.loyaltyPrograms.length > 0) {
@@ -183,22 +218,34 @@ function decryptLoyaltyPrograms(doc) {
     });
   }
 
+  if (doc.passports && doc.passports.length > 0) {
+    doc.passports = doc.passports.map((passport) => {
+      if (passport.number) {
+        return {
+          ...passport.toObject ? passport.toObject() : passport,
+          number: decrypt(passport.number),
+        };
+      }
+      return passport;
+    });
+  }
+
   return doc;
 }
 
 customerSchema.post('find', function (docs) {
   if (Array.isArray(docs)) {
-    docs.forEach(decryptLoyaltyPrograms);
+    docs.forEach(decryptNestedFields);
   }
   return docs;
 });
 
 customerSchema.post('findOne', function (doc) {
-  return decryptLoyaltyPrograms(doc);
+  return decryptNestedFields(doc);
 });
 
 customerSchema.post('findOneAndUpdate', function (doc) {
-  return decryptLoyaltyPrograms(doc);
+  return decryptNestedFields(doc);
 });
 
 // Index for faster lookups

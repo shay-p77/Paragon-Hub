@@ -10,6 +10,7 @@ router.get('/', async (req, res) => {
     const formatted = trips.map(t => ({
       id: t._id.toString(),
       name: t.name,
+      clientId: t.clientId || null,
       clientName: t.clientName,
       stage: t.stage,
       hasFlights: t.hasFlights,
@@ -33,10 +34,11 @@ router.get('/', async (req, res) => {
 // POST create new pipeline trip
 router.post('/', async (req, res) => {
   try {
-    const { name, clientName, stage, hasFlights, hasHotels, hasLogistics, isUrgent, tasks, startDate, endDate, agent, notes } = req.body;
+    const { name, clientId, clientName, stage, hasFlights, hasHotels, hasLogistics, isUrgent, tasks, startDate, endDate, agent, notes } = req.body;
 
     const trip = new PipelineTrip({
       name,
+      clientId: clientId || null,
       clientName,
       stage: stage || 'NEW',
       hasFlights: hasFlights || false,
@@ -57,13 +59,14 @@ router.post('/', async (req, res) => {
       resourceType: 'PipelineTrip',
       resourceId: trip._id,
       resourceName: `${name} - ${clientName}`,
-      details: { stage, agent },
+      details: { stage, agent, clientId },
       req
     });
 
     res.status(201).json({
       id: trip._id.toString(),
       name: trip.name,
+      clientId: trip.clientId || null,
       clientName: trip.clientName,
       stage: trip.stage,
       hasFlights: trip.hasFlights,
@@ -110,6 +113,7 @@ router.put('/:id', async (req, res) => {
     res.json({
       id: trip._id.toString(),
       name: trip.name,
+      clientId: trip.clientId || null,
       clientName: trip.clientName,
       stage: trip.stage,
       hasFlights: trip.hasFlights,

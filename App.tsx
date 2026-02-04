@@ -23,15 +23,37 @@ const App: React.FC = () => {
 
   // Check for existing session on mount
   useEffect(() => {
-    const storedUser = localStorage.getItem('paragon_user');
-    if (storedUser) {
-      try {
-        setGoogleUser(JSON.parse(storedUser));
-      } catch (e) {
-        localStorage.removeItem('paragon_user');
+    const restoreSession = async () => {
+      const storedUser = localStorage.getItem('paragon_user');
+      if (storedUser) {
+        try {
+          const user = JSON.parse(storedUser);
+          setGoogleUser(user);
+
+          // Set status to AVAILABLE when restoring session from localStorage
+          // This ensures users appear "on duty" when they return after being away
+          if (user.googleId) {
+            try {
+              await fetch(`${API_URL}/api/auth/status`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ googleId: user.googleId, status: 'AVAILABLE' }),
+              });
+              // Update localStorage with new status
+              const updatedUser = { ...user, status: 'AVAILABLE' };
+              localStorage.setItem('paragon_user', JSON.stringify(updatedUser));
+            } catch (error) {
+              console.error('Failed to restore session status:', error);
+            }
+          }
+        } catch (e) {
+          localStorage.removeItem('paragon_user');
+        }
       }
-    }
-    setIsAuthLoading(false);
+      setIsAuthLoading(false);
+    };
+
+    restoreSession();
   }, []);
 
   const handleLogin = (user: GoogleUser) => {
@@ -239,6 +261,10 @@ const App: React.FC = () => {
               status: details.bookingStatus || 'CONFIRMED',
               createdAt: r.timestamp,
               originalRequestId: r.id,
+              tripId: r.tripId,
+              tripName: r.tripName,
+              vendorId: details.vendorId,
+              vendorName: details.vendorName,
             });
           } else if (r.type === 'HOTEL') {
             hotels.push({
@@ -256,6 +282,10 @@ const App: React.FC = () => {
               status: details.bookingStatus || 'CONFIRMED',
               createdAt: r.timestamp,
               originalRequestId: r.id,
+              tripId: r.tripId,
+              tripName: r.tripName,
+              vendorId: details.vendorId,
+              vendorName: details.vendorName,
             });
           } else if (r.type === 'LOGISTICS') {
             logistics.push({
@@ -271,6 +301,10 @@ const App: React.FC = () => {
               status: details.bookingStatus || 'CONFIRMED',
               createdAt: r.timestamp,
               originalRequestId: r.id,
+              tripId: r.tripId,
+              tripName: r.tripName,
+              vendorId: details.vendorId,
+              vendorName: details.vendorName,
             });
           }
         });
@@ -341,9 +375,14 @@ const App: React.FC = () => {
   const [pipelineTrips, setPipelineTrips] = useState<PipelineTrip[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+  const [userStatus, setUserStatus] = useState<'AVAILABLE' | 'BUSY' | 'AWAY' | 'OFFLINE'>(
+    (googleUser?.status as 'AVAILABLE' | 'BUSY' | 'AWAY' | 'OFFLINE') || 'AVAILABLE'
+  );
 
   // Ref for notification dropdown click-outside detection
   const notificationRef = useRef<HTMLDivElement>(null);
+  const profileDropdownRef = useRef<HTMLDivElement>(null);
 
   // Close notification dropdown when clicking outside
   useEffect(() => {
@@ -361,6 +400,44 @@ const App: React.FC = () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showNotifications]);
+
+  // Close profile dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target as Node)) {
+        setShowProfileDropdown(false);
+      }
+    };
+
+    if (showProfileDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showProfileDropdown]);
+
+  // Update user status
+  const updateUserStatus = async (newStatus: 'AVAILABLE' | 'BUSY' | 'AWAY' | 'OFFLINE') => {
+    setUserStatus(newStatus);
+    setShowProfileDropdown(false);
+
+    if (googleUser) {
+      try {
+        await fetch(`${API_URL}/api/auth/status`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ googleId: googleUser.googleId, status: newStatus }),
+        });
+
+        const updatedUser = { ...googleUser, status: newStatus };
+        localStorage.setItem('paragon_user', JSON.stringify(updatedUser));
+      } catch (error) {
+        console.error('Failed to update status:', error);
+      }
+    }
+  };
 
   // Generate a consistent color based on user's email
   const getAvatarColor = (email: string) => {
@@ -616,6 +693,8 @@ const App: React.FC = () => {
       paymentStatus: flight.paymentStatus,
       bookingStatus: flight.status,
       convertedBookingId: flight.id,
+      vendorId: flight.vendorId,
+      vendorName: flight.vendorName,
     };
     // Mark request as CONVERTED in state with booking details
     setRequests(prev => prev.map(r => r.id === requestId ? {
@@ -649,6 +728,8 @@ const App: React.FC = () => {
       paymentStatus: hotel.paymentStatus,
       bookingStatus: hotel.status,
       convertedBookingId: hotel.id,
+      vendorId: hotel.vendorId,
+      vendorName: hotel.vendorName,
     };
     // Mark request as CONVERTED in state with booking details
     setRequests(prev => prev.map(r => r.id === requestId ? {
@@ -680,6 +761,8 @@ const App: React.FC = () => {
       paymentStatus: logistics.paymentStatus,
       bookingStatus: logistics.status,
       convertedBookingId: logistics.id,
+      vendorId: logistics.vendorId,
+      vendorName: logistics.vendorName,
     };
     // Mark request as CONVERTED in state with booking details
     setRequests(prev => prev.map(r => r.id === requestId ? {
@@ -713,6 +796,8 @@ const App: React.FC = () => {
         profitLoss: updates.profitLoss ?? flight.profitLoss,
         paymentStatus: updates.paymentStatus ?? flight.paymentStatus,
         bookingStatus: updates.status ?? flight.status,
+        vendorId: updates.vendorId ?? flight.vendorId,
+        vendorName: updates.vendorName ?? flight.vendorName,
       };
       // Update request in state
       setRequests(prev => prev.map(r => r.id === flight.originalRequestId ? {
@@ -747,6 +832,8 @@ const App: React.FC = () => {
         profitLoss: updates.profitLoss ?? hotel.profitLoss,
         paymentStatus: updates.paymentStatus ?? hotel.paymentStatus,
         bookingStatus: updates.status ?? hotel.status,
+        vendorId: updates.vendorId ?? hotel.vendorId,
+        vendorName: updates.vendorName ?? hotel.vendorName,
       };
       // Update request in state
       setRequests(prev => prev.map(r => r.id === hotel.originalRequestId ? {
@@ -779,6 +866,8 @@ const App: React.FC = () => {
         profitLoss: updates.profitLoss ?? logistics.profitLoss,
         paymentStatus: updates.paymentStatus ?? logistics.paymentStatus,
         bookingStatus: updates.status ?? logistics.status,
+        vendorId: updates.vendorId ?? logistics.vendorId,
+        vendorName: updates.vendorName ?? logistics.vendorName,
       };
       // Update request in state
       setRequests(prev => prev.map(r => r.id === logistics.originalRequestId ? {
@@ -881,11 +970,13 @@ const App: React.FC = () => {
           agentId: req.agentId || googleUser?.googleId || currentUser.id,
           agentName: googleUser?.name || currentUser.name,
           clientId: req.clientId || '',
-          clientName: (req.details as any)?.clientName || '',
+          clientName: (req.details as any)?.clientName || req.clientName || '',
           type: req.type || 'GENERAL',
           priority: req.priority || 'NORMAL',
           notes: req.notes || '',
           details: req.details,
+          tripId: req.tripId,
+          tripName: req.tripName,
         }),
       });
 
@@ -955,12 +1046,12 @@ const App: React.FC = () => {
       case 'home': return <Home currentUser={currentUser} announcements={announcements} comments={comments} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onAddAnnouncement={handleAddAnnouncement} onEditAnnouncement={handleEditAnnouncement} onDeleteAnnouncement={handleDeleteAnnouncement} onPinAnnouncement={handlePinAnnouncement} onArchiveAnnouncement={handleArchiveAnnouncement} onPinComment={handlePinComment} onAddRequest={handleAddRequest} onDeleteRequest={handleDeleteRequest} requests={requests} googleUser={googleUser} />;
       case 'ops': return <Operations requests={requests} comments={comments} currentUser={currentUser} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} googleUser={googleUser} convertedFlights={convertedFlights} convertedHotels={convertedHotels} convertedLogistics={convertedLogistics} onConvertToFlight={handleConvertToFlight} onConvertToHotel={handleConvertToHotel} onConvertToLogistics={handleConvertToLogistics} onUpdateFlight={handleUpdateFlight} onUpdateHotel={handleUpdateHotel} onUpdateLogistics={handleUpdateLogistics} onDeleteFlight={handleDeleteFlight} onDeleteHotel={handleDeleteHotel} onDeleteLogistics={handleDeleteLogistics} pipelineTrips={pipelineTrips} onAddPipelineTrip={handleAddPipelineTrip} onUpdatePipelineTrip={handleUpdatePipelineTrip} onDeletePipelineTrip={handleDeletePipelineTrip} onAddRequest={handleAddRequest} onDeleteRequest={handleDeleteRequest} />;
       case 'sales': return <CRM requests={requests} googleUser={googleUser} onDeleteRequest={handleDeleteRequest} />;
-      case 'concierge': return <ConciergeTrips googleUser={googleUser} currentUser={currentUser} pipelineTrips={pipelineTrips} onAddPipelineTrip={handleAddPipelineTrip} onUpdatePipelineTrip={handleUpdatePipelineTrip} onDeletePipelineTrip={handleDeletePipelineTrip} />;
-      case 'clientdb': return <ClientDatabase googleUser={googleUser} />;
+      case 'concierge': return <ConciergeTrips googleUser={googleUser} currentUser={currentUser} pipelineTrips={pipelineTrips} onAddPipelineTrip={handleAddPipelineTrip} onUpdatePipelineTrip={handleUpdatePipelineTrip} onDeletePipelineTrip={handleDeletePipelineTrip} requests={requests} onAddRequest={handleAddRequest} convertedFlights={convertedFlights} convertedHotels={convertedHotels} convertedLogistics={convertedLogistics} />;
+      case 'clientdb': return <ClientDatabase googleUser={googleUser} pipelineTrips={pipelineTrips} convertedFlights={convertedFlights} convertedHotels={convertedHotels} convertedLogistics={convertedLogistics} requests={requests} />;
       case 'accounting': return <Accounting />;
       case 'knowledge': return <KnowledgeBase />;
       case 'portal': return <ClientPortal />;
-      case 'settings': return <Settings />;
+      case 'settings': return <Settings currentUserRole={googleUser?.role as any} />;
       default: return <Home currentUser={currentUser} announcements={announcements} comments={comments} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onAddAnnouncement={handleAddAnnouncement} onEditAnnouncement={handleEditAnnouncement} onDeleteAnnouncement={handleDeleteAnnouncement} onPinAnnouncement={handlePinAnnouncement} onArchiveAnnouncement={handleArchiveAnnouncement} onPinComment={handlePinComment} onAddRequest={handleAddRequest} onDeleteRequest={handleDeleteRequest} requests={requests} googleUser={googleUser} />;
     }
   };
@@ -1036,27 +1127,83 @@ const App: React.FC = () => {
                </button>
              )}
              <div className="h-8 w-[1px] bg-slate-200"></div>
-             {/* User Profile & Logout */}
-             <div className="flex items-center gap-2 sm:gap-3">
-                <div
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs flex-shrink-0"
-                  style={{ backgroundColor: googleUser.avatarColor || '#3B82F6' }}
-                >
-                  {getInitials(googleUser.name)}
-                </div>
-                <div className="hidden sm:block">
-                  <div className="text-[10px] font-bold text-slate-900 truncate max-w-[120px]">{googleUser.name}</div>
-                  <div className="text-[9px] text-slate-400 truncate max-w-[120px]">{googleUser.email}</div>
-                </div>
+             {/* User Profile with Status Dropdown */}
+             <div className="relative" ref={profileDropdownRef}>
                 <button
-                  onClick={() => setShowLogoutConfirm(true)}
-                  className="p-2 text-slate-400 hover:text-red-600 transition-colors"
-                  title="Sign out"
+                  onClick={() => setShowProfileDropdown(!showProfileDropdown)}
+                  className="flex items-center gap-2 sm:gap-3 hover:bg-slate-50 rounded-lg p-1.5 transition-colors"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  <div className="relative">
+                    <div
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs flex-shrink-0"
+                      style={{ backgroundColor: googleUser.avatarColor || '#3B82F6' }}
+                    >
+                      {getInitials(googleUser.name)}
+                    </div>
+                    <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-white ${
+                      userStatus === 'AVAILABLE' ? 'bg-emerald-500' :
+                      userStatus === 'BUSY' ? 'bg-red-500' :
+                      userStatus === 'AWAY' ? 'bg-amber-500' :
+                      'bg-slate-400'
+                    }`}></div>
+                  </div>
+                  <div className="hidden sm:block text-left">
+                    <div className="text-[10px] font-bold text-slate-900 truncate max-w-[120px]">{googleUser.name}</div>
+                    <div className="text-[9px] text-slate-400 truncate max-w-[120px]">{googleUser.email}</div>
+                  </div>
+                  <svg className={`w-3 h-3 text-slate-400 transition-transform ${showProfileDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
+
+                {showProfileDropdown && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white border border-slate-200 rounded-sm shadow-lg z-50 animate-slideUp">
+                    <div className="px-4 py-2 border-b border-slate-100">
+                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</div>
+                    </div>
+                    <div className="py-1">
+                      <button
+                        onClick={() => updateUserStatus('AVAILABLE')}
+                        className={`w-full px-4 py-2 text-left flex items-center gap-3 hover:bg-slate-50 ${userStatus === 'AVAILABLE' ? 'bg-slate-50' : ''}`}
+                      >
+                        <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                        <span className="text-xs font-semibold text-slate-700">Available</span>
+                      </button>
+                      <button
+                        onClick={() => updateUserStatus('BUSY')}
+                        className={`w-full px-4 py-2 text-left flex items-center gap-3 hover:bg-slate-50 ${userStatus === 'BUSY' ? 'bg-slate-50' : ''}`}
+                      >
+                        <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                        <span className="text-xs font-semibold text-slate-700">Busy</span>
+                      </button>
+                      <button
+                        onClick={() => updateUserStatus('AWAY')}
+                        className={`w-full px-4 py-2 text-left flex items-center gap-3 hover:bg-slate-50 ${userStatus === 'AWAY' ? 'bg-slate-50' : ''}`}
+                      >
+                        <div className="w-2 h-2 rounded-full bg-amber-500"></div>
+                        <span className="text-xs font-semibold text-slate-700">Away</span>
+                      </button>
+                      <button
+                        onClick={() => updateUserStatus('OFFLINE')}
+                        className={`w-full px-4 py-2 text-left flex items-center gap-3 hover:bg-slate-50 ${userStatus === 'OFFLINE' ? 'bg-slate-50' : ''}`}
+                      >
+                        <div className="w-2 h-2 rounded-full bg-slate-400"></div>
+                        <span className="text-xs font-semibold text-slate-700">Offline</span>
+                      </button>
+                    </div>
+                    <div className="border-t border-slate-100">
+                      <button
+                        onClick={() => { setShowProfileDropdown(false); setShowLogoutConfirm(true); }}
+                        className="w-full px-4 py-2 text-left flex items-center gap-3 hover:bg-red-50 text-red-600"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
+                        <span className="text-xs font-semibold">Sign Out</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
              </div>
           </div>
         </div>

@@ -1,10 +1,27 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { SectionHeader, Badge } from './Shared';
+import { SectionHeader, Badge, ClientAutocomplete, QuickAddCustomerModal } from './Shared';
 import { MOCK_USERS } from '../constants';
 import { User, Comment, Announcement, BookingRequest } from '../types';
 import { GoogleUser } from './Login';
 import { API_URL } from '../config';
+
+// Helper to parse date strings as local time (avoids timezone offset issues)
+const parseLocalDate = (dateStr: string): Date => {
+  // For YYYY-MM-DD format, parse as local date to avoid UTC conversion
+  if (dateStr && dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  }
+  return new Date(dateStr);
+};
+
+// Format date for display using local time
+const formatDisplayDate = (dateStr?: string, options?: Intl.DateTimeFormatOptions): string => {
+  if (!dateStr) return '—';
+  const date = dateStr.match(/^\d{4}-\d{2}-\d{2}$/) ? parseLocalDate(dateStr) : new Date(dateStr);
+  return date.toLocaleDateString([], options || { month: 'short', day: 'numeric', year: 'numeric' });
+};
 
 interface HomeProps {
   currentUser: User;
@@ -83,8 +100,17 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [requestMode, setRequestMode] = useState<'QUICK' | 'AI_PARSE' | 'DETAIL'>('QUICK');
   const [quickSnippet, setQuickSnippet] = useState('');
+  const [quickClientName, setQuickClientName] = useState('');
+  const [quickClientId, setQuickClientId] = useState<string | null>(null);
+  const [quickServiceType, setQuickServiceType] = useState<'FLIGHT' | 'HOTEL' | 'LOGISTICS' | 'GENERAL'>('GENERAL');
   const [detailServiceType, setDetailServiceType] = useState<'FLIGHT' | 'HOTEL' | 'LOGISTICS'>('FLIGHT');
+
+  // Customers state for client dropdown
+  const [customers, setCustomers] = useState<{ id: string; name: string; email?: string }[]>([]);
+  const [showAddCustomerModal, setShowAddCustomerModal] = useState(false);
+  const [newCustomerInitialName, setNewCustomerInitialName] = useState('');
   const [detailClientName, setDetailClientName] = useState('');
+  const [detailClientId, setDetailClientId] = useState<string | null>(null);
   const [detailTargetDate, setDetailTargetDate] = useState('');
   const [detailSpecs, setDetailSpecs] = useState('');
   const [detailOrigin, setDetailOrigin] = useState('');
@@ -162,51 +188,24 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
     return () => clearInterval(interval);
   }, []);
 
-  // User status state - initialize from googleUser's stored status
-  const [userStatus, setUserStatus] = useState<'AVAILABLE' | 'BUSY' | 'AWAY' | 'OFFLINE'>(
-    (googleUser?.status as 'AVAILABLE' | 'BUSY' | 'AWAY' | 'OFFLINE') || 'AVAILABLE'
-  );
-  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
-  const statusDropdownRef = useRef<HTMLDivElement>(null);
-
-
-  // Function to update status in backend and localStorage
-  const updateUserStatus = async (newStatus: 'AVAILABLE' | 'BUSY' | 'AWAY' | 'OFFLINE') => {
-    setUserStatus(newStatus);
-    setShowStatusDropdown(false);
-
-    if (googleUser) {
-      try {
-        // Update backend
-        await fetch(`${API_URL}/api/auth/status`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ googleId: googleUser.googleId, status: newStatus }),
-        });
-
-        // Update localStorage
-        const updatedUser = { ...googleUser, status: newStatus };
-        localStorage.setItem('paragon_user', JSON.stringify(updatedUser));
-
-        // Update allUsers state immediately so On Duty section reflects the change
-        setAllUsers(prev => prev.map(u =>
-          u.googleId === googleUser.googleId ? { ...u, status: newStatus } : u
-        ));
-      } catch (error) {
-        console.error('Failed to update status:', error);
-      }
-    }
-  };
-
-  // Close status dropdown when clicking outside
+  // Fetch customers for client dropdown
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (statusDropdownRef.current && !statusDropdownRef.current.contains(e.target as Node)) {
-        setShowStatusDropdown(false);
+    const fetchCustomers = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/customers`);
+        if (res.ok) {
+          const data = await res.json();
+          setCustomers(data.map((c: any) => ({
+            id: c.id,
+            name: c.displayName || `${c.legalFirstName} ${c.legalLastName}`,
+            email: c.email
+          })));
+        }
+      } catch (error) {
+        console.error('Failed to fetch customers:', error);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    fetchCustomers();
   }, []);
 
   // Expanded content state for long posts and comments
@@ -574,17 +573,22 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
         }
         await onAddRequest({
           agentId,
-          clientId: '',
-          type: 'GENERAL',
+          clientId: quickClientId || '',
+          clientName: quickClientName || undefined,
+          type: quickServiceType,
           status: 'PENDING',
           priority: requestPriority,
           notes: quickSnippet,
           timestamp: new Date().toISOString(),
           details: {
-            agentName
+            agentName,
+            clientName: quickClientName || undefined
           }
         });
         setQuickSnippet('');
+        setQuickClientName('');
+        setQuickClientId(null);
+        setQuickServiceType('GENERAL');
       } else {
         if (!detailClientName.trim() || !detailSpecs.trim()) {
           setIsSavingRequest(false);
@@ -592,7 +596,8 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
         }
         await onAddRequest({
           agentId,
-          clientId: '',
+          clientId: detailClientId || '',
+          clientName: detailClientName || undefined,
           type: detailServiceType,
           status: 'PENDING',
           priority: requestPriority,
@@ -609,6 +614,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
           }
         });
         setDetailClientName('');
+        setDetailClientId(null);
         setDetailTargetDate('');
         setDetailSpecs('');
         setDetailOrigin('');
@@ -630,76 +636,9 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto">
-      <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6 sm:mb-8">
-        <div>
-          <h1 className="font-cinzel text-xl sm:text-2xl lg:text-3xl font-bold text-slate-900 uppercase tracking-widest">Command Center</h1>
-          <p className="text-[10px] sm:text-xs text-slate-500 mt-1 uppercase tracking-tight">System Status: <span className="text-emerald-500 font-bold">OPERATIONAL</span> / Active Agents: <span className="font-bold">{allUsers.filter(u => u.status !== 'OFFLINE' && u.role !== 'CLIENT').length}</span></p>
-        </div>
-        <div className="flex gap-4 w-full sm:w-auto">
-          <div className="relative flex-1 sm:flex-initial" ref={statusDropdownRef}>
-            <button
-              onClick={() => setShowStatusDropdown(!showStatusDropdown)}
-              className="w-full sm:w-auto bg-white border border-slate-200 p-3 sm:p-4 rounded-sm shadow-sm flex items-center gap-3 sm:gap-4 hover:border-paragon transition-colors"
-            >
-               <div className="relative">
-                 <div
-                   className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-[10px]"
-                   style={{ backgroundColor: googleUser?.avatarColor || '#3B82F6' }}
-                 >
-                   {(googleUser?.name || currentUser.name).split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
-                 </div>
-                 <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-white ${
-                   userStatus === 'AVAILABLE' ? 'bg-emerald-500' :
-                   userStatus === 'BUSY' ? 'bg-red-500' :
-                   userStatus === 'AWAY' ? 'bg-amber-500' :
-                   'bg-slate-400'
-                 }`}></div>
-               </div>
-               <div className="text-left flex-1 sm:flex-initial">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{userStatus}</div>
-                  <div className="text-xs font-bold text-slate-900 truncate max-w-[120px] sm:max-w-none">{googleUser?.name || currentUser.name}</div>
-               </div>
-               <svg className={`w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ${showStatusDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-               </svg>
-            </button>
-
-            {showStatusDropdown && (
-              <div className="absolute right-0 mt-2 w-48 bg-white border border-slate-200 rounded-sm shadow-lg z-50 animate-slideUp">
-                <div className="py-1">
-                  <button
-                    onClick={() => updateUserStatus('AVAILABLE')}
-                    className={`w-full px-4 py-2 text-left flex items-center gap-3 hover:bg-slate-50 ${userStatus === 'AVAILABLE' ? 'bg-slate-50' : ''}`}
-                  >
-                    <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                    <span className="text-xs font-semibold text-slate-700">Available</span>
-                  </button>
-                  <button
-                    onClick={() => updateUserStatus('BUSY')}
-                    className={`w-full px-4 py-2 text-left flex items-center gap-3 hover:bg-slate-50 ${userStatus === 'BUSY' ? 'bg-slate-50' : ''}`}
-                  >
-                    <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                    <span className="text-xs font-semibold text-slate-700">Busy</span>
-                  </button>
-                  <button
-                    onClick={() => updateUserStatus('AWAY')}
-                    className={`w-full px-4 py-2 text-left flex items-center gap-3 hover:bg-slate-50 ${userStatus === 'AWAY' ? 'bg-slate-50' : ''}`}
-                  >
-                    <div className="w-2 h-2 rounded-full bg-amber-500"></div>
-                    <span className="text-xs font-semibold text-slate-700">Away</span>
-                  </button>
-                  <button
-                    onClick={() => updateUserStatus('OFFLINE')}
-                    className={`w-full px-4 py-2 text-left flex items-center gap-3 hover:bg-slate-50 ${userStatus === 'OFFLINE' ? 'bg-slate-50' : ''}`}
-                  >
-                    <div className="w-2 h-2 rounded-full bg-slate-400"></div>
-                    <span className="text-xs font-semibold text-slate-700">Offline</span>
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+      <div className="mb-6 sm:mb-8">
+        <h1 className="font-cinzel text-xl sm:text-2xl lg:text-3xl font-bold text-slate-900 uppercase tracking-widest">Command Center</h1>
+        <p className="text-[10px] sm:text-xs text-slate-500 mt-1 uppercase tracking-tight">System Status: <span className="text-emerald-500 font-bold">OPERATIONAL</span> / Active Agents: <span className="font-bold">{allUsers.filter(u => u.status !== 'OFFLINE' && u.role !== 'CLIENT').length}</span></p>
       </div>
 
       <WorldClock />
@@ -853,14 +792,45 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
               <form onSubmit={handleQuickAddSubmit} className="p-4 sm:p-6 flex-1 flex flex-col overflow-hidden">
                 {requestMode === 'QUICK' ? (
                   <div className="flex-1 flex flex-col">
+                    {/* Client and Service Type Row */}
+                    <div className="grid grid-cols-2 gap-3 mb-3">
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">Client</label>
+                        <ClientAutocomplete
+                          value={quickClientName}
+                          onChange={setQuickClientName}
+                          onSelectCustomer={(customer) => setQuickClientId(customer.id)}
+                          customers={customers}
+                          onAddNewClient={() => {
+                            setNewCustomerInitialName(quickClientName);
+                            setShowAddCustomerModal(true);
+                          }}
+                          placeholder="Client name..."
+                          className="text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">Service Type</label>
+                        <select
+                          value={quickServiceType}
+                          onChange={(e) => setQuickServiceType(e.target.value as any)}
+                          className="w-full p-2 border border-slate-300 text-xs rounded-sm focus:outline-none focus:ring-2 focus:ring-paragon-gold bg-white"
+                        >
+                          <option value="GENERAL">General</option>
+                          <option value="FLIGHT">Flight</option>
+                          <option value="HOTEL">Hotel</option>
+                          <option value="LOGISTICS">Logistics</option>
+                        </select>
+                      </div>
+                    </div>
                     <textarea
                       value={quickSnippet}
                       onChange={(e) => setQuickSnippet(e.target.value)}
                       placeholder="Paste a request snippet, PNR, or client note here..."
-                      className="w-full flex-1 p-4 bg-white border border-slate-300 text-sm text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon-gold rounded-sm resize-none min-h-[120px]"
+                      className="w-full flex-1 p-4 bg-white border border-slate-300 text-sm text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon-gold rounded-sm resize-none min-h-[80px]"
                       required
                     />
-                    <div className="mt-4 flex-shrink-0">
+                    <div className="mt-3 flex-shrink-0">
                       <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Priority</label>
                       <div className="flex gap-2">
                         <button
@@ -890,7 +860,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                     <button
                       type="submit"
                       disabled={isSavingRequest}
-                      className="mt-4 w-full bg-paragon text-white py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors flex-shrink-0 rounded-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      className="mt-3 w-full bg-paragon text-white py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors flex-shrink-0 rounded-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                       {isSavingRequest ? (
                         <>
@@ -1102,12 +1072,16 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                       </div>
                       <div>
                         <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Client Name</label>
-                        <input
-                          type="text"
+                        <ClientAutocomplete
                           value={detailClientName}
-                          onChange={(e) => setDetailClientName(e.target.value)}
+                          onChange={setDetailClientName}
+                          onSelectCustomer={(customer) => setDetailClientId(customer.id)}
+                          customers={customers}
+                          onAddNewClient={() => {
+                            setNewCustomerInitialName(detailClientName);
+                            setShowAddCustomerModal(true);
+                          }}
                           placeholder="e.g. Alice Johnson"
-                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon-gold rounded-sm"
                           required
                         />
                       </div>
@@ -1556,8 +1530,8 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                 return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
               })
               .map(r => {
-                const clientName = r.details?.clientName || MOCK_USERS.find(u => u.id === r.clientId)?.name || '—';
-                const targetDate = r.details?.targetDate ? new Date(r.details.targetDate).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+                const clientName = r.details?.clientName || r.clientName || MOCK_USERS.find(u => u.id === r.clientId)?.name || '—';
+                const targetDate = r.details?.targetDate ? formatDisplayDate(r.details.targetDate) : '—';
                 const agentName = r.details?.agentName || (googleUser && (r.agentId === googleUser.googleId || r.agentId === googleUser.id) ? googleUser.name : (MOCK_USERS.find(u => u.id === r.agentId)?.name || 'Unknown'));
                 const isExpanded = expandedQueueItem === r.id;
                 const isOwnRequest = googleUser ? (r.agentId === googleUser.googleId || r.agentId === googleUser.id) : r.agentId === currentUser.id;
@@ -1597,9 +1571,14 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-semibold text-xs text-slate-900 truncate">{clientName}</span>
                           <Badge color={r.type === 'FLIGHT' ? 'red' : r.type === 'HOTEL' ? 'gold' : r.type === 'LOGISTICS' ? 'blue' : 'slate'}>{r.type}</Badge>
+                          {r.tripName && (
+                            <span className="text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">
+                              {r.tripName}
+                            </span>
+                          )}
                         </div>
                         <p className="text-[10px] text-slate-500 truncate">{r.notes}</p>
                       </div>
@@ -1920,6 +1899,26 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
           </button>
         </div>
       )}
+
+      {/* Quick Add Customer Modal */}
+      <QuickAddCustomerModal
+        isOpen={showAddCustomerModal}
+        onClose={() => setShowAddCustomerModal(false)}
+        onCustomerAdded={(newCustomer) => {
+          setCustomers(prev => [...prev, newCustomer]);
+          // Update the appropriate mode's client fields
+          if (requestMode === 'QUICK') {
+            setQuickClientId(newCustomer.id);
+            setQuickClientName(newCustomer.name);
+          } else {
+            setDetailClientId(newCustomer.id);
+            setDetailClientName(newCustomer.name);
+          }
+        }}
+        initialName={newCustomerInitialName}
+        agents={allUsers.filter(u => u.role !== 'CLIENT').map(u => ({ id: u.googleId, name: u.name }))}
+        defaultAgentId={googleUser?.googleId || googleUser?.id || ''}
+      />
     </div>
   );
 };

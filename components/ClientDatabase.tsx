@@ -1,13 +1,28 @@
 
 import React, { useState, useEffect } from 'react';
-import { SectionHeader } from './Shared';
-import { Customer, LoyaltyProgram } from '../types';
+import { SectionHeader, ConfirmModal, Badge, CountrySelect } from './Shared';
+import { Customer, LoyaltyProgram, PipelineTrip, ConvertedFlight, ConvertedHotel, ConvertedLogistics, BookingRequest, Passport } from '../types';
 import { GoogleUser } from './Login';
 import { API_URL } from '../config';
 
 interface ClientDatabaseProps {
   googleUser?: GoogleUser | null;
+  pipelineTrips?: PipelineTrip[];
+  convertedFlights?: ConvertedFlight[];
+  convertedHotels?: ConvertedHotel[];
+  convertedLogistics?: ConvertedLogistics[];
+  requests?: BookingRequest[];
 }
+
+// Helper to parse date strings as local time (avoids timezone offset issues)
+const parseLocalDate = (dateStr: string): Date => {
+  // For YYYY-MM-DD format, parse as local date to avoid UTC conversion
+  if (dateStr && dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  }
+  return new Date(dateStr);
+};
 
 // All country codes with flags (US first, then sorted alphabetically)
 const COUNTRY_CODES = [
@@ -254,13 +269,20 @@ const parsePhoneNumber = (phone?: string): { countryCode: string; number: string
 };
 
 // Customer Form Modal Component (Full form for add/edit)
+interface AgentOption {
+  id: string;
+  name: string;
+}
+
 const CustomerFormModal: React.FC<{
   customer?: Customer;
   primaryCustomers: Customer[];
+  agents?: AgentOption[];
+  defaultAgentId?: string;
   onSave: (customer: Customer) => void;
   onDelete?: (customerId: string) => void;
   onClose: () => void;
-}> = ({ customer, primaryCustomers, onSave, onDelete, onClose }) => {
+}> = ({ customer, primaryCustomers, agents = [], defaultAgentId = '', onSave, onDelete, onClose }) => {
   const isEditing = !!customer;
   const parsedPhone = parsePhoneNumber(customer?.phone);
 
@@ -274,15 +296,29 @@ const CustomerFormModal: React.FC<{
   const [countryCode, setCountryCode] = useState(parsedPhone.countryCode);
   const [phone, setPhone] = useState(parsedPhone.number);
   const [primaryCustomerId, setPrimaryCustomerId] = useState(customer?.primaryCustomerId || '');
-  const [passportNumber, setPassportNumber] = useState(customer?.passportNumber || '');
-  const [passportExpiry, setPassportExpiry] = useState(customer?.passportExpiry || '');
-  const [passportCountry, setPassportCountry] = useState(customer?.passportCountry || '');
+  // Multiple passports support - migrate from legacy single passport if needed
+  const getInitialPassports = (): Passport[] => {
+    if (customer?.passports && customer.passports.length > 0) {
+      return customer.passports;
+    }
+    // Migrate legacy single passport to array
+    if (customer?.passportNumber || customer?.passportCountry) {
+      return [{
+        number: customer.passportNumber || '',
+        country: customer.passportCountry || '',
+        expiry: customer.passportExpiry || '',
+      }];
+    }
+    return [];
+  };
+  const [passports, setPassports] = useState<Passport[]>(getInitialPassports());
   const [seatPreference, setSeatPreference] = useState<'aisle' | 'window' | 'middle' | ''>(customer?.preferences?.seatPreference || '');
   const [dietaryRestrictions, setDietaryRestrictions] = useState(customer?.preferences?.dietaryRestrictions?.join(', ') || '');
   const [hotelPreferences, setHotelPreferences] = useState(customer?.preferences?.hotelPreferences || '');
   const [specialRequests, setSpecialRequests] = useState(customer?.preferences?.specialRequests || '');
   const [notes, setNotes] = useState(customer?.notes || '');
   const [loyaltyPrograms, setLoyaltyPrograms] = useState<LoyaltyProgram[]>(customer?.loyaltyPrograms || []);
+  const [agentId, setAgentId] = useState(customer?.agentId || defaultAgentId);
 
   const addLoyaltyProgram = () => {
     setLoyaltyPrograms([...loyaltyPrograms, { program: '', number: '', status: '' }]);
@@ -298,6 +334,21 @@ const CustomerFormModal: React.FC<{
     setLoyaltyPrograms(loyaltyPrograms.filter((_, i) => i !== index));
   };
 
+  // Passport helper functions
+  const addPassport = () => {
+    setPassports([...passports, { number: '', country: '', expiry: '' }]);
+  };
+
+  const updatePassport = (index: number, field: keyof Passport, value: string) => {
+    const updated = [...passports];
+    updated[index] = { ...updated[index], [field]: value };
+    setPassports(updated);
+  };
+
+  const removePassport = (index: number) => {
+    setPassports(passports.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const now = new Date().toISOString();
@@ -311,9 +362,8 @@ const CustomerFormModal: React.FC<{
       email: email || undefined,
       phone: phone ? `${countryCode} ${phone}` : undefined,
       primaryCustomerId: primaryCustomerId || undefined,
-      passportNumber: passportNumber || undefined,
-      passportExpiry: passportExpiry || undefined,
-      passportCountry: passportCountry || undefined,
+      agentId: agentId || undefined,
+      passports: passports.filter(p => p.number || p.country),
       loyaltyPrograms: loyaltyPrograms.filter(lp => lp.program && lp.number),
       preferences: {
         seatPreference: seatPreference || undefined,
@@ -443,60 +493,103 @@ const CustomerFormModal: React.FC<{
           {/* Link to Primary Customer */}
           <div className="mb-6">
             <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Account Association</h3>
-            <div>
-              <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Primary Customer (if sub-customer)</label>
-              <select
-                value={primaryCustomerId}
-                onChange={(e) => setPrimaryCustomerId(e.target.value)}
-                className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon bg-white"
-              >
-                <option value="">-- None (This is a primary customer) --</option>
-                {primaryCustomers
-                  .filter(pc => pc.id !== customer?.id)
-                  .map(pc => (
-                    <option key={pc.id} value={pc.id}>{pc.displayName}</option>
-                  ))
-                }
-              </select>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Primary Customer (if sub-customer)</label>
+                <select
+                  value={primaryCustomerId}
+                  onChange={(e) => setPrimaryCustomerId(e.target.value)}
+                  className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon bg-white"
+                >
+                  <option value="">-- None (This is a primary customer) --</option>
+                  {primaryCustomers
+                    .filter(pc => pc.id !== customer?.id)
+                    .map(pc => (
+                      <option key={pc.id} value={pc.id}>{pc.displayName}</option>
+                    ))
+                  }
+                </select>
+              </div>
+              {agents.length > 0 && (
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Assigned Agent</label>
+                  <select
+                    value={agentId}
+                    onChange={(e) => setAgentId(e.target.value)}
+                    className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon bg-white"
+                  >
+                    <option value="">— No agent assigned —</option>
+                    {agents.map(agent => (
+                      <option key={agent.id} value={agent.id}>{agent.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Travel Documents */}
+          {/* Travel Documents - Multiple Passports */}
           <div className="mb-6">
-            <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Travel Documents</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">
-                  Passport Number
-                  <span className="ml-1 text-emerald-600 text-[8px]">ENCRYPTED</span>
-                </label>
-                <input
-                  type="text"
-                  value={passportNumber}
-                  onChange={(e) => setPassportNumber(e.target.value)}
-                  className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon font-mono"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Passport Expiry</label>
-                <input
-                  type="date"
-                  value={passportExpiry}
-                  onChange={(e) => setPassportExpiry(e.target.value)}
-                  className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Passport Country</label>
-                <input
-                  type="text"
-                  value={passportCountry}
-                  onChange={(e) => setPassportCountry(e.target.value)}
-                  placeholder="e.g., USA"
-                  className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon"
-                />
-              </div>
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                Travel Documents
+                <span className="ml-1 text-emerald-600 text-[8px]">NUMBERS ENCRYPTED</span>
+              </h3>
+              <button
+                type="button"
+                onClick={addPassport}
+                className="text-[10px] text-paragon font-bold hover:text-paragon-dark"
+              >
+                + Add Passport
+              </button>
             </div>
+            {passports.length === 0 ? (
+              <p className="text-xs text-slate-400 italic">No passports added</p>
+            ) : (
+              <div className="space-y-3">
+                {passports.map((passport, idx) => (
+                  <div key={idx} className="grid grid-cols-1 sm:grid-cols-4 gap-2 p-3 bg-slate-50 rounded items-end">
+                    <div>
+                      <label className="block text-[9px] font-bold uppercase text-slate-400 mb-1">
+                        Passport Number
+                      </label>
+                      <input
+                        type="text"
+                        value={passport.number}
+                        onChange={(e) => updatePassport(idx, 'number', e.target.value)}
+                        className="w-full p-2 border border-slate-200 rounded text-sm font-mono"
+                        placeholder="Passport #"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] font-bold uppercase text-slate-400 mb-1">Country</label>
+                      <CountrySelect
+                        value={passport.country}
+                        onChange={(value) => updatePassport(idx, 'country', value)}
+                        placeholder="Select country"
+                        className="w-full"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] font-bold uppercase text-slate-400 mb-1">Expiry</label>
+                      <input
+                        type="date"
+                        value={passport.expiry || ''}
+                        onChange={(e) => updatePassport(idx, 'expiry', e.target.value)}
+                        className="w-full p-2 border border-slate-200 rounded text-sm"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removePassport(idx)}
+                      className="text-rose-500 hover:text-rose-700 text-xs font-bold py-2"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Loyalty Programs */}
@@ -634,11 +727,7 @@ const CustomerFormModal: React.FC<{
           {isEditing && onDelete && (
             <button
               type="button"
-              onClick={() => {
-                if (confirm(`Delete ${customer?.displayName || 'this customer'}? This cannot be undone.`)) {
-                  onDelete(customer!.id);
-                }
-              }}
+              onClick={() => onDelete(customer!.id)}
               className="py-2.5 px-4 bg-red-50 text-red-600 text-[10px] font-bold uppercase tracking-widest hover:bg-red-100 transition-colors rounded-sm"
             >
               Delete
@@ -669,12 +758,21 @@ const CustomerDetailModal: React.FC<{
   customer: Customer;
   primaryCustomer?: Customer;
   subCustomers: Customer[];
+  trips: PipelineTrip[];
+  flights: ConvertedFlight[];
+  hotels: ConvertedHotel[];
+  logistics: ConvertedLogistics[];
+  agents?: AgentOption[];
   onClose: () => void;
   onEdit: (customer: Customer) => void;
-}> = ({ customer, primaryCustomer, subCustomers, onClose, onEdit }) => {
+}> = ({ customer, primaryCustomer, subCustomers, trips, flights, hotels, logistics, agents = [], onClose, onEdit }) => {
+  // Find agent name
+  const assignedAgent = customer.agentId ? agents.find(a => a.id === customer.agentId) : null;
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return '---';
-    return new Date(dateStr).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    // Use parseLocalDate for date-only strings to avoid timezone issues
+    const date = dateStr.match(/^\d{4}-\d{2}-\d{2}$/) ? parseLocalDate(dateStr) : new Date(dateStr);
+    return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
   };
 
   return (
@@ -702,6 +800,14 @@ const CustomerDetailModal: React.FC<{
                     <span className="ml-2 text-paragon">| Under {primaryCustomer.displayName}'s account</span>
                   )}
                 </p>
+                {assignedAgent && (
+                  <p className="text-[10px] text-teal-600 mt-1 flex items-center gap-1">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    Assigned to {assignedAgent.name}
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -735,26 +841,52 @@ const CustomerDetailModal: React.FC<{
             </div>
           </div>
 
-          {/* Travel Documents */}
-          <div className="mb-6">
-            <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Travel Documents</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="bg-slate-50 p-3 rounded">
-                <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Passport Number</p>
-                <p className="text-sm font-mono font-semibold text-slate-700">{customer.passportNumber || '---'}</p>
-              </div>
-              <div className="bg-slate-50 p-3 rounded">
-                <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Passport Expiry</p>
-                <p className={`text-sm font-semibold ${customer.passportExpiry && new Date(customer.passportExpiry) < new Date(Date.now() + 6 * 30 * 24 * 60 * 60 * 1000) ? 'text-amber-600' : 'text-slate-700'}`}>
-                  {formatDate(customer.passportExpiry)}
-                </p>
-              </div>
-              <div className="bg-slate-50 p-3 rounded">
-                <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Country</p>
-                <p className="text-sm font-semibold text-slate-700">{customer.passportCountry || '---'}</p>
+          {/* Travel Documents - Multiple Passports */}
+          {((customer.passports && customer.passports.length > 0) || customer.passportNumber) && (
+            <div className="mb-6">
+              <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Travel Documents</h3>
+              <div className="space-y-3">
+                {customer.passports && customer.passports.length > 0 ? (
+                  customer.passports.map((passport, idx) => (
+                    <div key={idx} className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-3 bg-slate-50 rounded">
+                      <div>
+                        <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Passport Number</p>
+                        <p className="text-sm font-mono font-semibold text-slate-700">{passport.number || '---'}</p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Passport Expiry</p>
+                        <p className={`text-sm font-semibold ${passport.expiry && new Date(passport.expiry) < new Date(Date.now() + 6 * 30 * 24 * 60 * 60 * 1000) ? 'text-amber-600' : 'text-slate-700'}`}>
+                          {formatDate(passport.expiry)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Country</p>
+                        <p className="text-sm font-semibold text-slate-700">{passport.country || '---'}</p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  // Fallback for legacy single passport
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-3 bg-slate-50 rounded">
+                    <div>
+                      <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Passport Number</p>
+                      <p className="text-sm font-mono font-semibold text-slate-700">{customer.passportNumber || '---'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Passport Expiry</p>
+                      <p className={`text-sm font-semibold ${customer.passportExpiry && new Date(customer.passportExpiry) < new Date(Date.now() + 6 * 30 * 24 * 60 * 60 * 1000) ? 'text-amber-600' : 'text-slate-700'}`}>
+                        {formatDate(customer.passportExpiry)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Country</p>
+                      <p className="text-sm font-semibold text-slate-700">{customer.passportCountry || '---'}</p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
-          </div>
+          )}
 
           {/* Loyalty Programs */}
           {customer.loyaltyPrograms && customer.loyaltyPrograms.length > 0 && (
@@ -840,6 +972,169 @@ const CustomerDetailModal: React.FC<{
               </div>
             </div>
           )}
+
+          {/* Trip History */}
+          {(() => {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            // Filter trips for this customer (by clientId or clientName match)
+            const customerTrips = trips.filter(t =>
+              t.clientId === customer.id ||
+              t.clientName.toLowerCase() === customer.displayName.toLowerCase()
+            );
+
+            // Separate into upcoming and past based on startDate
+            const upcomingTrips = customerTrips.filter(t => {
+              if (!t.startDate) return true; // No date = treat as upcoming
+              return parseLocalDate(t.startDate) >= today;
+            }).sort((a, b) => {
+              if (!a.startDate) return 1;
+              if (!b.startDate) return -1;
+              return parseLocalDate(a.startDate).getTime() - parseLocalDate(b.startDate).getTime();
+            });
+
+            const pastTrips = customerTrips.filter(t => {
+              if (!t.startDate) return false;
+              return parseLocalDate(t.startDate) < today;
+            }).sort((a, b) => {
+              return parseLocalDate(b.startDate!).getTime() - parseLocalDate(a.startDate!).getTime();
+            });
+
+            // Get bookings linked to this customer's trips
+            const getTripBookings = (tripId: string) => ({
+              flights: flights.filter(f => f.tripId === tripId),
+              hotels: hotels.filter(h => h.tripId === tripId),
+              logistics: logistics.filter(l => l.tripId === tripId),
+            });
+
+            const formatTripDate = (dateStr?: string) => {
+              if (!dateStr) return '---';
+              return parseLocalDate(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            };
+
+            if (customerTrips.length === 0) return null;
+
+            return (
+              <div className="mb-6">
+                <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3 flex items-center gap-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
+                  </svg>
+                  Trip History ({customerTrips.length} trips)
+                </h3>
+
+                {/* Upcoming Trips */}
+                {upcomingTrips.length > 0 && (
+                  <div className="mb-4">
+                    <p className="text-[9px] font-bold uppercase text-emerald-600 mb-2">
+                      Upcoming ({upcomingTrips.length})
+                    </p>
+                    <div className="space-y-2">
+                      {upcomingTrips.map(trip => {
+                        const bookings = getTripBookings(trip.id);
+                        const bookingCount = bookings.flights.length + bookings.hotels.length + bookings.logistics.length;
+                        return (
+                          <div key={trip.id} className="bg-emerald-50 border border-emerald-200 rounded-sm p-3">
+                            <div className="flex justify-between items-start mb-2">
+                              <div>
+                                <p className="text-sm font-semibold text-slate-800">{trip.name}</p>
+                                <p className="text-[10px] text-slate-500">
+                                  {formatTripDate(trip.startDate)} {trip.endDate && `- ${formatTripDate(trip.endDate)}`}
+                                </p>
+                              </div>
+                              <div className="flex gap-1">
+                                {trip.isUrgent && <Badge color="red">URGENT</Badge>}
+                                <Badge color={
+                                  trip.stage === 'NEW' ? 'slate' :
+                                  trip.stage === 'PLANNING' ? 'gold' :
+                                  trip.stage === 'IN_PROGRESS' ? 'paragon' : 'teal'
+                                }>{trip.stage.replace('_', ' ')}</Badge>
+                              </div>
+                            </div>
+                            {/* Trip services */}
+                            <div className="flex gap-2 mb-2">
+                              {trip.hasFlights && (
+                                <span className="text-[9px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded">Flights</span>
+                              )}
+                              {trip.hasHotels && (
+                                <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">Hotels</span>
+                              )}
+                              {trip.hasLogistics && (
+                                <span className="text-[9px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">Logistics</span>
+                              )}
+                            </div>
+                            {/* Bookings summary */}
+                            {bookingCount > 0 && (
+                              <div className="text-[10px] text-slate-600 border-t border-emerald-200 pt-2 mt-2">
+                                <span className="font-medium">{bookingCount} confirmed booking{bookingCount !== 1 ? 's' : ''}: </span>
+                                {bookings.flights.length > 0 && <span>{bookings.flights.length} flight{bookings.flights.length !== 1 ? 's' : ''}</span>}
+                                {bookings.flights.length > 0 && (bookings.hotels.length > 0 || bookings.logistics.length > 0) && ', '}
+                                {bookings.hotels.length > 0 && <span>{bookings.hotels.length} hotel{bookings.hotels.length !== 1 ? 's' : ''}</span>}
+                                {bookings.hotels.length > 0 && bookings.logistics.length > 0 && ', '}
+                                {bookings.logistics.length > 0 && <span>{bookings.logistics.length} transfer{bookings.logistics.length !== 1 ? 's' : ''}</span>}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Past Trips */}
+                {pastTrips.length > 0 && (
+                  <div>
+                    <p className="text-[9px] font-bold uppercase text-slate-500 mb-2">
+                      Past ({pastTrips.length})
+                    </p>
+                    <div className="space-y-2">
+                      {pastTrips.slice(0, 5).map(trip => {
+                        const bookings = getTripBookings(trip.id);
+                        const bookingCount = bookings.flights.length + bookings.hotels.length + bookings.logistics.length;
+                        const totalPL =
+                          bookings.flights.reduce((sum, f) => sum + (f.profitLoss || 0), 0) +
+                          bookings.hotels.reduce((sum, h) => sum + (h.profitLoss || 0), 0) +
+                          bookings.logistics.reduce((sum, l) => sum + (l.profitLoss || 0), 0);
+                        return (
+                          <div key={trip.id} className="bg-slate-50 border border-slate-200 rounded-sm p-3">
+                            <div className="flex justify-between items-start mb-2">
+                              <div>
+                                <p className="text-sm font-semibold text-slate-700">{trip.name}</p>
+                                <p className="text-[10px] text-slate-400">
+                                  {formatTripDate(trip.startDate)} {trip.endDate && `- ${formatTripDate(trip.endDate)}`}
+                                </p>
+                              </div>
+                              <Badge color="slate">COMPLETED</Badge>
+                            </div>
+                            {/* Bookings summary */}
+                            {bookingCount > 0 && (
+                              <div className="flex justify-between items-center text-[10px] text-slate-500">
+                                <span>
+                                  {bookingCount} booking{bookingCount !== 1 ? 's' : ''}
+                                  {bookings.flights.length > 0 && ` (${bookings.flights.map(f => f.pnr || 'Flight').join(', ')})`}
+                                </span>
+                                {totalPL !== 0 && (
+                                  <span className={totalPL >= 0 ? 'text-emerald-600 font-medium' : 'text-red-600 font-medium'}>
+                                    {totalPL >= 0 ? '+' : ''}${totalPL.toLocaleString()}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                      {pastTrips.length > 5 && (
+                        <p className="text-[10px] text-slate-400 text-center py-2">
+                          +{pastTrips.length - 5} more past trips
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
 
         <div className="p-4 sm:p-6 border-t border-slate-200 flex gap-3">
@@ -861,8 +1156,16 @@ const CustomerDetailModal: React.FC<{
   );
 };
 
-const ClientDatabase: React.FC<ClientDatabaseProps> = ({ googleUser }) => {
+const ClientDatabase: React.FC<ClientDatabaseProps> = ({
+  googleUser,
+  pipelineTrips = [],
+  convertedFlights = [],
+  convertedHotels = [],
+  convertedLogistics = [],
+  requests = [],
+}) => {
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [agents, setAgents] = useState<AgentOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -871,6 +1174,7 @@ const ClientDatabase: React.FC<ClientDatabaseProps> = ({ googleUser }) => {
   const [sortBy, setSortBy] = useState<'name' | 'created' | 'updated'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [filterType, setFilterType] = useState<'all' | 'primary' | 'sub'>('all');
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
 
   // Fetch customers from API
   useEffect(() => {
@@ -888,6 +1192,27 @@ const ClientDatabase: React.FC<ClientDatabaseProps> = ({ googleUser }) => {
       }
     };
     fetchCustomers();
+  }, []);
+
+  // Fetch agents for dropdown (exclude clients)
+  useEffect(() => {
+    const fetchAgents = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/users`);
+        if (res.ok) {
+          const data = await res.json();
+          setAgents(data
+            .filter((u: { role?: string }) => u.role !== 'CLIENT')
+            .map((u: { id: string; googleId?: string; name: string }) => ({
+              id: u.googleId || u.id,
+              name: u.name
+            })));
+        }
+      } catch (error) {
+        console.error('Error fetching agents:', error);
+      }
+    };
+    fetchAgents();
   }, []);
 
   // Get primary customers
@@ -1012,7 +1337,9 @@ const ClientDatabase: React.FC<ClientDatabaseProps> = ({ googleUser }) => {
   // Format date
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return '---';
-    return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    // Use parseLocalDate for date-only strings to avoid timezone issues
+    const date = dateStr.match(/^\d{4}-\d{2}-\d{2}$/) ? parseLocalDate(dateStr) : new Date(dateStr);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
   // Stats
@@ -1020,7 +1347,7 @@ const ClientDatabase: React.FC<ClientDatabaseProps> = ({ googleUser }) => {
   const primaryCount = primaryCustomers.length;
   const subCount = customers.filter(c => c.primaryCustomerId).length;
   const withLoyalty = customers.filter(c => c.loyaltyPrograms && c.loyaltyPrograms.length > 0).length;
-  const withPassport = customers.filter(c => c.passportNumber).length;
+  const withPassport = customers.filter(c => (c.passports && c.passports.length > 0) || c.passportNumber).length;
 
   return (
     <div className="p-4 sm:p-8">
@@ -1211,7 +1538,17 @@ const ClientDatabase: React.FC<ClientDatabaseProps> = ({ googleUser }) => {
 
                   {/* Passport */}
                   <div className="col-span-2 mb-2 lg:mb-0">
-                    {customer.passportNumber ? (
+                    {(customer.passports && customer.passports.length > 0) ? (
+                      <>
+                        <p className="text-xs font-mono text-slate-700">
+                          {customer.passports[0].country || '---'}
+                          {customer.passports.length > 1 && <span className="text-slate-400"> +{customer.passports.length - 1}</span>}
+                        </p>
+                        <p className={`text-[10px] ${customer.passports[0].expiry && new Date(customer.passports[0].expiry) < new Date(Date.now() + 6 * 30 * 24 * 60 * 60 * 1000) ? 'text-amber-600 font-semibold' : 'text-slate-400'}`}>
+                          Exp: {formatDate(customer.passports[0].expiry)}
+                        </p>
+                      </>
+                    ) : customer.passportNumber ? (
                       <>
                         <p className="text-xs font-mono text-slate-700">{customer.passportCountry || '---'}</p>
                         <p className={`text-[10px] ${customer.passportExpiry && new Date(customer.passportExpiry) < new Date(Date.now() + 6 * 30 * 24 * 60 * 60 * 1000) ? 'text-amber-600 font-semibold' : 'text-slate-400'}`}>
@@ -1260,9 +1597,7 @@ const ClientDatabase: React.FC<ClientDatabaseProps> = ({ googleUser }) => {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (confirm(`Delete ${customer.displayName}? This cannot be undone.`)) {
-                          handleDeleteCustomer(customer.id);
-                        }
+                        setDeleteConfirm({ id: customer.id, name: customer.displayName });
                       }}
                       className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
                       title="Delete"
@@ -1285,6 +1620,11 @@ const ClientDatabase: React.FC<ClientDatabaseProps> = ({ googleUser }) => {
           customer={selectedCustomer}
           primaryCustomer={getPrimaryCustomer(selectedCustomer.id)}
           subCustomers={getSubCustomers(selectedCustomer.id)}
+          trips={pipelineTrips}
+          flights={convertedFlights}
+          hotels={convertedHotels}
+          logistics={convertedLogistics}
+          agents={agents}
           onClose={() => setSelectedCustomer(null)}
           onEdit={(c) => { setSelectedCustomer(null); setEditingCustomer(c); }}
         />
@@ -1294,6 +1634,7 @@ const ClientDatabase: React.FC<ClientDatabaseProps> = ({ googleUser }) => {
       {showAddModal && (
         <CustomerFormModal
           primaryCustomers={primaryCustomers}
+          agents={agents}
           onSave={handleSaveCustomer}
           onClose={() => setShowAddModal(false)}
         />
@@ -1304,11 +1645,29 @@ const ClientDatabase: React.FC<ClientDatabaseProps> = ({ googleUser }) => {
         <CustomerFormModal
           customer={editingCustomer}
           primaryCustomers={primaryCustomers}
+          agents={agents}
           onSave={handleSaveCustomer}
-          onDelete={handleDeleteCustomer}
+          onDelete={(id) => setDeleteConfirm({ id, name: editingCustomer.displayName })}
           onClose={() => setEditingCustomer(null)}
         />
       )}
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={!!deleteConfirm}
+        onClose={() => setDeleteConfirm(null)}
+        onConfirm={() => {
+          if (deleteConfirm) {
+            handleDeleteCustomer(deleteConfirm.id);
+            setEditingCustomer(null);
+          }
+        }}
+        title="Delete Customer"
+        message={`Are you sure you want to delete "${deleteConfirm?.name}"? This will also remove all associated bookings and cannot be undone.`}
+        confirmText="Yes, Delete"
+        cancelText="Cancel"
+        variant="danger"
+      />
     </div>
   );
 };

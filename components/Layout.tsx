@@ -96,7 +96,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
     { id: 'ops', label: 'OPERATIONS', roles: ['ADMIN', 'OPERATIONS', 'ACCOUNTING'] },
     { id: 'sales', label: 'CRM', roles: ['ADMIN', 'OPERATIONS', 'SALES'] },
     { id: 'concierge', label: 'CONCIERGE TRIPS', roles: ['ADMIN', 'OPERATIONS', 'SALES', 'ACCOUNTING'] },
-    { id: 'clientdb', label: 'CLIENT DATABASE', roles: ['ADMIN', 'OPERATIONS', 'ACCOUNTING'] },
+    { id: 'clientdb', label: 'CLIENT DATABASE', roles: ['ADMIN', 'OPERATIONS', 'SALES'] },
     { id: 'accounting', label: 'ACCOUNTING', roles: ['ADMIN', 'ACCOUNTING'] },
     { id: 'knowledge', label: 'KNOWLEDGE BASE', roles: ['ADMIN', 'OPERATIONS', 'SALES'] },
     { id: 'portal', label: 'CLIENT PORTAL', roles: ['ADMIN', 'CLIENT'] },

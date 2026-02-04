@@ -24,9 +24,13 @@ const auditLogSchema = new mongoose.Schema({
       'VIEW_PII',
       'EXPORT_DATA',
       'INVITE_USER',
+      'RESEND_INVITE',
       'UPDATE_USER',
       'DELETE_USER',
       'SETTINGS_CHANGE',
+      'CREATE_VENDOR',
+      'UPDATE_VENDOR',
+      'DELETE_VENDOR',
       'FAILED_LOGIN',
       'RATE_LIMITED'
     ]

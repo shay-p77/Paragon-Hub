@@ -20,6 +20,8 @@ router.get('/', async (req, res) => {
       notes: r.notes,
       timestamp: r.timestamp.toISOString(),
       details: r.details,
+      tripId: r.tripId || null,
+      tripName: r.tripName || null,
     }));
     res.json(formatted);
   } catch (error) {
@@ -44,6 +46,8 @@ router.get('/pending', async (req, res) => {
       notes: r.notes,
       timestamp: r.timestamp.toISOString(),
       details: r.details,
+      tripId: r.tripId || null,
+      tripName: r.tripName || null,
     }));
     res.json(formatted);
   } catch (error) {
@@ -55,7 +59,7 @@ router.get('/pending', async (req, res) => {
 // POST new request
 router.post('/', async (req, res) => {
   try {
-    const { agentId, agentName, clientId, clientName, type, priority, notes, details } = req.body;
+    const { agentId, agentName, clientId, clientName, type, priority, notes, details, tripId, tripName } = req.body;
     const request = new BookingRequest({
       agentId,
       agentName,
@@ -65,6 +69,8 @@ router.post('/', async (req, res) => {
       priority: priority || 'NORMAL',
       notes,
       details: details || {},
+      tripId: tripId || null,
+      tripName: tripName || null,
     });
     await request.save();
 
@@ -74,7 +80,7 @@ router.post('/', async (req, res) => {
       resourceType: 'BookingRequest',
       resourceId: request._id,
       resourceName: `${type} - ${clientName || 'No client'}`,
-      details: { agentId, type, priority },
+      details: { agentId, type, priority, tripId },
       req
     });
 
@@ -90,6 +96,8 @@ router.post('/', async (req, res) => {
       notes: request.notes,
       timestamp: request.timestamp.toISOString(),
       details: request.details,
+      tripId: request.tripId || null,
+      tripName: request.tripName || null,
     });
   } catch (error) {
     console.error('Error creating request:', error);
@@ -152,6 +160,8 @@ router.put('/:id', async (req, res) => {
       notes: request.notes,
       timestamp: request.timestamp.toISOString(),
       details: request.details,
+      tripId: request.tripId || null,
+      tripName: request.tripName || null,
     });
   } catch (error) {
     console.error('Error updating request:', error);

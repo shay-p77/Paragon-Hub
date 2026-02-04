@@ -1,10 +1,27 @@
 
-import React, { useState } from 'react';
-import { SectionHeader, DataTable, Badge } from './Shared';
-import { MOCK_USERS } from '../constants';
-import { BookingRequest, User, ConvertedFlight, ConvertedHotel, ConvertedLogistics, PipelineTrip, PipelineStage, PipelineTask } from '../types';
+import React, { useState, useEffect } from 'react';
+import { SectionHeader, DataTable, Badge, ConfirmModal, ClientAutocomplete, QuickAddCustomerModal, VendorAutocomplete, QuickAddVendorModal } from './Shared';
+import { MOCK_USERS } from '../constants'; // Fallback only
+import { BookingRequest, User, ConvertedFlight, ConvertedHotel, ConvertedLogistics, PipelineTrip, PipelineStage, PipelineTask, Vendor, VendorType } from '../types';
 import { GoogleUser } from './Login';
 import { API_URL } from '../config';
+
+// Helper to parse date strings as local time (avoids timezone offset issues)
+const parseLocalDate = (dateStr: string): Date => {
+  // For YYYY-MM-DD format, parse as local date to avoid UTC conversion
+  if (dateStr && dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  }
+  return new Date(dateStr);
+};
+
+// Format date for display using local time
+const formatDisplayDate = (dateStr?: string, options?: Intl.DateTimeFormatOptions): string => {
+  if (!dateStr) return '—';
+  const date = dateStr.match(/^\d{4}-\d{2}-\d{2}$/) ? parseLocalDate(dateStr) : new Date(dateStr);
+  return date.toLocaleDateString([], options || { month: 'short', day: 'numeric' });
+};
 
 interface OperationsProps {
   requests: BookingRequest[];
@@ -42,8 +59,12 @@ const Operations: React.FC<OperationsProps> = ({
   pipelineTrips, onAddPipelineTrip, onUpdatePipelineTrip, onDeletePipelineTrip,
   onAddRequest, onDeleteRequest
 }) => {
-  const [subTab, setSubTab] = useState('flights');
+  const [subTab, setSubTab] = useState('dashboard');
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
+  const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
+
+  // Delete confirmation state
+  const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'request' | 'flight' | 'hotel' | 'logistics'; id: string; name: string } | null>(null);
 
   // Convert modal state
   const [showConvertModal, setShowConvertModal] = useState(false);
@@ -133,6 +154,76 @@ const Operations: React.FC<OperationsProps> = ({
   const [aiParsedData, setAiParsedData] = useState<any>(null);
   const [aiParseStep, setAiParseStep] = useState<'input' | 'review'>('input');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Customers state for autocomplete
+  const [customers, setCustomers] = useState<{ id: string; name: string; email?: string }[]>([]);
+  const [showClientDropdown, setShowClientDropdown] = useState(false);
+  const [clientSearchQuery, setClientSearchQuery] = useState('');
+  const [showAddCustomerModal, setShowAddCustomerModal] = useState(false);
+  const [newCustomerInitialName, setNewCustomerInitialName] = useState('');
+
+  // Users/Agents state from database
+  const [agents, setAgents] = useState<{ id: string; name: string; role: string }[]>([]);
+
+  // Vendors state
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [flightVendorId, setFlightVendorId] = useState('');
+  const [flightVendorName, setFlightVendorName] = useState('');
+  const [hotelVendorId, setHotelVendorId] = useState('');
+  const [hotelVendorName, setHotelVendorName] = useState('');
+  const [logisticsVendorId, setLogisticsVendorId] = useState('');
+  const [logisticsVendorName, setLogisticsVendorName] = useState('');
+  const [showQuickAddVendorModal, setShowQuickAddVendorModal] = useState(false);
+  const [quickAddVendorType, setQuickAddVendorType] = useState<VendorType>('FLIGHT');
+  const [quickAddVendorInitialName, setQuickAddVendorInitialName] = useState('');
+
+  // Fetch customers, agents, and vendors
+  React.useEffect(() => {
+    const fetchCustomers = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/customers`);
+        if (res.ok) {
+          const data = await res.json();
+          setCustomers(data.map((c: any) => ({ id: c.id, name: c.displayName || `${c.legalFirstName} ${c.legalLastName}`, email: c.email })));
+        }
+      } catch (error) {
+        console.error('Error fetching customers:', error);
+      }
+    };
+
+    const fetchAgents = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/auth/users`);
+        if (res.ok) {
+          const data = await res.json();
+          // Filter out CLIENT role, only keep staff
+          setAgents(data.filter((u: any) => u.role !== 'CLIENT').map((u: any) => ({
+            id: u.googleId,
+            name: u.name,
+            role: u.role
+          })));
+        }
+      } catch (error) {
+        console.error('Error fetching agents:', error);
+      }
+    };
+
+    const fetchVendors = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/vendors`);
+        if (res.ok) {
+          const data = await res.json();
+          setVendors(data);
+        }
+      } catch (error) {
+        console.error('Error fetching vendors:', error);
+      }
+    };
+
+    fetchCustomers();
+    fetchAgents();
+    fetchVendors();
+  }, []);
 
   const closeDispatchModal = () => {
     setShowDispatchModal(false);
@@ -338,12 +429,15 @@ const Operations: React.FC<OperationsProps> = ({
       onAddRequest({
         agentId,
         clientId: '',
-        type: 'GENERAL',
+        type: dispatchServiceType,
         status: 'PENDING',
         priority: dispatchPriority,
         notes: dispatchSnippet,
         timestamp: new Date().toISOString(),
-        details: { agentName }
+        details: {
+          agentName,
+          clientName: dispatchClientName || undefined
+        }
       });
     } else {
       if (!dispatchClientName.trim() || !dispatchSpecs.trim()) return;
@@ -435,12 +529,15 @@ const Operations: React.FC<OperationsProps> = ({
     setFlightDescription(''); setFlightAirline(''); setFlightPaymentStatus('UNPAID');
     setFlightPnr(''); setFlightRoutes(''); setFlightPassengerCount(1);
     setFlightDates(''); setFlightAgent(''); setFlightProfitLoss(0); setFlightStatus('PENDING'); setFlightNotes('');
+    setFlightVendorId(''); setFlightVendorName('');
     setHotelDescription(''); setHotelName(''); setHotelPaymentStatus('UNPAID');
     setHotelConfirmation(''); setHotelRoomType(''); setHotelGuestCount(1);
     setHotelCheckIn(''); setHotelCheckOut(''); setHotelAgent(''); setHotelProfitLoss(0); setHotelStatus('PENDING'); setHotelNotes('');
+    setHotelVendorId(''); setHotelVendorName('');
     setLogisticsDescription(''); setLogisticsServiceType(''); setLogisticsPaymentStatus('UNPAID');
     setLogisticsConfirmation(''); setLogisticsDetails(''); setLogisticsDate('');
     setLogisticsAgent(''); setLogisticsProfitLoss(0); setLogisticsStatus('PENDING'); setLogisticsNotes('');
+    setLogisticsVendorId(''); setLogisticsVendorName('');
   };
 
   const handleSubmitConvert = () => {
@@ -461,7 +558,11 @@ const Operations: React.FC<OperationsProps> = ({
         status: flightStatus,
         createdAt: new Date().toISOString(),
         originalRequestId: convertingRequest.id,
-        notes: flightNotes || undefined
+        notes: flightNotes || undefined,
+        tripId: convertingRequest.tripId,
+        tripName: convertingRequest.tripName,
+        vendorId: flightVendorId || undefined,
+        vendorName: flightVendorName || undefined,
       };
       onConvertToFlight(newFlight, convertingRequest.id);
     } else if (convertingRequest.type === 'HOTEL') {
@@ -480,7 +581,11 @@ const Operations: React.FC<OperationsProps> = ({
         status: hotelStatus,
         createdAt: new Date().toISOString(),
         originalRequestId: convertingRequest.id,
-        notes: hotelNotes || undefined
+        notes: hotelNotes || undefined,
+        tripId: convertingRequest.tripId,
+        tripName: convertingRequest.tripName,
+        vendorId: hotelVendorId || undefined,
+        vendorName: hotelVendorName || undefined,
       };
       onConvertToHotel(newHotel, convertingRequest.id);
     } else {
@@ -497,7 +602,11 @@ const Operations: React.FC<OperationsProps> = ({
         status: logisticsStatus,
         createdAt: new Date().toISOString(),
         originalRequestId: convertingRequest.id,
-        notes: logisticsNotes || undefined
+        notes: logisticsNotes || undefined,
+        tripId: convertingRequest.tripId,
+        tripName: convertingRequest.tripName,
+        vendorId: logisticsVendorId || undefined,
+        vendorName: logisticsVendorName || undefined,
       };
       onConvertToLogistics(newLogistics, convertingRequest.id);
     }
@@ -521,6 +630,8 @@ const Operations: React.FC<OperationsProps> = ({
         setFlightProfitLoss(flight.profitLoss);
         setFlightStatus(flight.status);
         setFlightNotes(flight.notes || '');
+        setFlightVendorId(flight.vendorId || '');
+        setFlightVendorName(flight.vendorName || '');
       }
     } else if (type === 'hotel') {
       const hotel = convertedHotels.find(h => h.id === id);
@@ -537,6 +648,8 @@ const Operations: React.FC<OperationsProps> = ({
         setHotelProfitLoss(hotel.profitLoss);
         setHotelStatus(hotel.status);
         setHotelNotes(hotel.notes || '');
+        setHotelVendorId(hotel.vendorId || '');
+        setHotelVendorName(hotel.vendorName || '');
       }
     } else {
       const logistics = convertedLogistics.find(l => l.id === id);
@@ -551,6 +664,8 @@ const Operations: React.FC<OperationsProps> = ({
         setLogisticsProfitLoss(logistics.profitLoss);
         setLogisticsStatus(logistics.status);
         setLogisticsNotes(logistics.notes || '');
+        setLogisticsVendorId(logistics.vendorId || '');
+        setLogisticsVendorName(logistics.vendorName || '');
       }
     }
     setShowEditModal(true);
@@ -563,12 +678,15 @@ const Operations: React.FC<OperationsProps> = ({
     setFlightDescription(''); setFlightAirline(''); setFlightPaymentStatus('UNPAID');
     setFlightPnr(''); setFlightRoutes(''); setFlightPassengerCount(1);
     setFlightDates(''); setFlightAgent(''); setFlightProfitLoss(0); setFlightStatus('PENDING'); setFlightNotes('');
+    setFlightVendorId(''); setFlightVendorName('');
     setHotelDescription(''); setHotelName(''); setHotelPaymentStatus('UNPAID');
     setHotelConfirmation(''); setHotelRoomType(''); setHotelGuestCount(1);
     setHotelCheckIn(''); setHotelCheckOut(''); setHotelAgent(''); setHotelProfitLoss(0); setHotelStatus('PENDING'); setHotelNotes('');
+    setHotelVendorId(''); setHotelVendorName('');
     setLogisticsDescription(''); setLogisticsServiceType(''); setLogisticsPaymentStatus('UNPAID');
     setLogisticsConfirmation(''); setLogisticsDetails(''); setLogisticsDate('');
     setLogisticsAgent(''); setLogisticsProfitLoss(0); setLogisticsStatus('PENDING'); setLogisticsNotes('');
+    setLogisticsVendorId(''); setLogisticsVendorName('');
   };
 
   const handleSubmitEdit = () => {
@@ -586,7 +704,9 @@ const Operations: React.FC<OperationsProps> = ({
         agent: flightAgent,
         profitLoss: flightProfitLoss,
         status: flightStatus,
-        notes: flightNotes || undefined
+        notes: flightNotes || undefined,
+        vendorId: flightVendorId || undefined,
+        vendorName: flightVendorName || undefined,
       });
     } else if (editingItem.type === 'hotel') {
       onUpdateHotel(editingItem.id, {
@@ -601,7 +721,9 @@ const Operations: React.FC<OperationsProps> = ({
         agent: hotelAgent,
         profitLoss: hotelProfitLoss,
         status: hotelStatus,
-        notes: hotelNotes || undefined
+        notes: hotelNotes || undefined,
+        vendorId: hotelVendorId || undefined,
+        vendorName: hotelVendorName || undefined,
       });
     } else {
       onUpdateLogistics(editingItem.id, {
@@ -614,7 +736,9 @@ const Operations: React.FC<OperationsProps> = ({
         agent: logisticsAgent,
         profitLoss: logisticsProfitLoss,
         status: logisticsStatus,
-        notes: logisticsNotes || undefined
+        notes: logisticsNotes || undefined,
+        vendorId: logisticsVendorId || undefined,
+        vendorName: logisticsVendorName || undefined,
       });
     }
     closeEditModal();
@@ -783,40 +907,324 @@ const Operations: React.FC<OperationsProps> = ({
     { id: 'logistics', label: 'LOGISTICS' },
   ];
 
+  // Calculate stats for category boxes
+  const pendingFlightRequests = requests.filter(r => r.type === 'FLIGHT' && r.status === 'PENDING').length;
+  const pendingHotelRequests = requests.filter(r => r.type === 'HOTEL' && r.status === 'PENDING').length;
+  const pendingLogisticsRequests = requests.filter(r => r.type === 'LOGISTICS' && r.status === 'PENDING').length;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const weekFromNow = new Date(today);
+  weekFromNow.setDate(weekFromNow.getDate() + 7);
+
+  const flightsToday = convertedFlights.filter(f => {
+    const flightDate = new Date(f.dates?.split(' - ')[0] || f.createdAt);
+    return flightDate >= today && flightDate < new Date(today.getTime() + 24 * 60 * 60 * 1000);
+  }).length;
+  const flightsThisWeek = convertedFlights.filter(f => {
+    const flightDate = new Date(f.dates?.split(' - ')[0] || f.createdAt);
+    return flightDate >= today && flightDate < weekFromNow;
+  }).length;
+
+  const checkInsToday = convertedHotels.filter(h => {
+    const checkIn = new Date(h.checkIn);
+    return checkIn >= today && checkIn < new Date(today.getTime() + 24 * 60 * 60 * 1000);
+  }).length;
+  const checkInsThisWeek = convertedHotels.filter(h => {
+    const checkIn = new Date(h.checkIn);
+    return checkIn >= today && checkIn < weekFromNow;
+  }).length;
+
+  const logisticsToday = convertedLogistics.filter(l => {
+    const logDate = new Date(l.date);
+    return logDate >= today && logDate < new Date(today.getTime() + 24 * 60 * 60 * 1000);
+  }).length;
+  const logisticsThisWeek = convertedLogistics.filter(l => {
+    const logDate = new Date(l.date);
+    return logDate >= today && logDate < weekFromNow;
+  }).length;
+
   return (
     <div className="p-4 sm:p-6 lg:p-8">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 mb-6 sm:mb-8 border-b border-slate-200 pb-4 sm:pb-0">
-        <div className="flex gap-4 sm:gap-8 overflow-x-auto w-full sm:w-auto pb-2 sm:pb-0 -mb-[1px]">
-          {tabs.map(t => (
-            <button
-              key={t.id}
-              onClick={() => setSubTab(t.id)}
-              className={`pb-3 sm:pb-4 text-[10px] sm:text-xs font-bold tracking-widest transition-all whitespace-nowrap ${
-                subTab === t.id
-                  ? 'text-paragon border-b-2 border-paragon'
-                  : 'text-slate-400 hover:text-slate-600'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-        <div className="flex gap-2 w-full sm:w-auto sm:pb-3">
-           <div className="relative flex-1 sm:flex-initial">
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] px-1 rounded-full z-10">{requests.filter(r => r.status === 'PENDING').length}</span>
-              <button onClick={() => setSubTab('pending')} className="w-full sm:w-auto bg-slate-100 text-slate-600 text-[9px] sm:text-[10px] px-3 sm:px-4 py-2 font-bold tracking-widest hover:bg-slate-200 transition-colors">
-                PENDING
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 sm:mb-8">
+        <div>
+          <div className="flex items-center gap-3">
+            {subTab !== 'dashboard' && (
+              <button
+                onClick={() => setSubTab('dashboard')}
+                className="text-slate-400 hover:text-paragon transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                </svg>
               </button>
-           </div>
-           <button
-             onClick={() => setShowDispatchModal(true)}
-             className="flex-1 sm:flex-initial bg-paragon text-white text-[9px] sm:text-[10px] px-3 sm:px-4 py-2 font-bold tracking-widest hover:bg-paragon-dark transition-colors"
-           >
-             NEW +
-           </button>
+            )}
+            <h1 className="font-cinzel text-xl sm:text-2xl lg:text-3xl font-bold text-slate-900 uppercase tracking-widest">
+              {subTab === 'dashboard' ? 'Operations' : subTab === 'flights' ? 'Flight Database' : subTab === 'hotels' ? 'Hotel Database' : subTab === 'logistics' ? 'Logistics Database' : 'Operations'}
+            </h1>
+          </div>
+          {subTab === 'dashboard' && (
+            <p className="text-[10px] sm:text-xs text-slate-500 mt-1 uppercase tracking-tight">
+              Open Requests: <span className="font-bold text-amber-600">{requests.filter(r => r.status === 'PENDING').length}</span> /
+              Total Bookings: <span className="font-bold">{convertedFlights.length + convertedHotels.length + convertedLogistics.length}</span>
+            </p>
+          )}
         </div>
+        <button
+          onClick={() => setShowDispatchModal(true)}
+          className="bg-paragon text-white text-[9px] sm:text-[10px] px-4 py-2 font-bold tracking-widest hover:bg-paragon-dark transition-colors"
+        >
+          + NEW BOOKING
+        </button>
       </div>
 
+      {/* Dashboard View */}
+      {subTab === 'dashboard' && (
+        <div className="space-y-6 sm:space-y-8">
+          {/* Requests Queue - Main Feature */}
+          <div className="bg-white border border-slate-200 rounded-sm shadow-sm">
+            <div className="bg-slate-900 p-3 sm:p-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></div>
+                <h2 className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-paragon-gold">Open Requests Queue</h2>
+              </div>
+              <span className="text-[10px] text-slate-400">{requests.filter(r => r.status === 'PENDING').length} pending</span>
+            </div>
+            <div className="p-4 max-h-[400px] overflow-y-auto">
+              {requests.filter(r => r.status === 'PENDING').length === 0 ? (
+                <div className="text-center py-8 text-slate-400">
+                  <svg className="w-12 h-12 mx-auto mb-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                  </svg>
+                  <p className="text-sm font-medium">All caught up!</p>
+                  <p className="text-xs">No pending requests in the queue</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {requests
+                    .filter(r => r.status === 'PENDING')
+                    .sort((a, b) => {
+                      const aUrgent = a.priority === 'URGENT' || a.priority === 'CRITICAL';
+                      const bUrgent = b.priority === 'URGENT' || b.priority === 'CRITICAL';
+                      if (aUrgent && !bUrgent) return -1;
+                      if (!aUrgent && bUrgent) return 1;
+                      return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+                    })
+                    .map(r => {
+                      const clientName = r.details?.clientName || r.clientName || '—';
+                      const targetDate = r.details?.targetDate ? formatDisplayDate(r.details.targetDate) : '—';
+                      const isExpanded = selectedRequestId === r.id;
+
+                      return (
+                        <div
+                          key={r.id}
+                          className={`border rounded-sm transition-all ${isExpanded ? 'border-paragon bg-slate-50' : 'border-slate-200 hover:border-slate-300'}`}
+                        >
+                          <div
+                            className="p-3 flex items-center gap-3 cursor-pointer"
+                            onClick={() => setSelectedRequestId(isExpanded ? null : r.id)}
+                          >
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                              r.type === 'FLIGHT' ? 'bg-red-100 text-red-600' :
+                              r.type === 'HOTEL' ? 'bg-amber-100 text-amber-600' :
+                              'bg-blue-100 text-blue-600'
+                            }`}>
+                              {r.type === 'FLIGHT' ? (
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                                </svg>
+                              ) : r.type === 'HOTEL' ? (
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                </svg>
+                              ) : (
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                                </svg>
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-semibold text-xs text-slate-900">{clientName}</span>
+                                <Badge color={r.type === 'FLIGHT' ? 'red' : r.type === 'HOTEL' ? 'gold' : 'slate'}>{r.type}</Badge>
+                                {(r.priority === 'URGENT' || r.priority === 'CRITICAL') && (
+                                  <Badge color="red">URGENT</Badge>
+                                )}
+                                {r.tripName && (
+                                  <span className="text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">
+                                    {r.tripName}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[10px] text-slate-500 truncate">{r.notes || 'No details'}</p>
+                            </div>
+                            <div className="text-right flex-shrink-0">
+                              <div className="text-[10px] font-medium text-slate-600">{targetDate}</div>
+                              <div className="text-[9px] text-slate-400">{formatDisplayDate(r.timestamp)}</div>
+                            </div>
+                            <svg className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </div>
+                          {isExpanded && (
+                            <div className="px-3 pb-3 border-t border-slate-200">
+                              {r.tripName && (
+                                <div className="pt-3 pb-2">
+                                  <span className="text-[9px] text-slate-400 uppercase tracking-wider">Linked Trip: </span>
+                                  <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">{r.tripName}</span>
+                                </div>
+                              )}
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 text-[11px]">
+                                <div><span className="text-slate-400 block text-[9px] uppercase tracking-wider">Assigned To</span><span className="font-medium text-slate-700">{r.agentName || 'Unassigned'}</span></div>
+                                <div><span className="text-slate-400 block text-[9px] uppercase tracking-wider">Start Date</span><span className="font-medium text-slate-700">{r.details?.targetDate || '—'}</span></div>
+                                <div><span className="text-slate-400 block text-[9px] uppercase tracking-wider">Priority</span><span className="font-medium text-slate-700">{r.priority}</span></div>
+                                <div><span className="text-slate-400 block text-[9px] uppercase tracking-wider">Created</span><span className="font-medium text-slate-700">{new Date(r.timestamp).toLocaleString()}</span></div>
+                              </div>
+                              {r.notes && (
+                                <div className="mt-3 pt-3 border-t border-slate-100">
+                                  <span className="text-slate-400 block text-[9px] uppercase tracking-wider mb-1">Notes</span>
+                                  <p className="text-[11px] text-slate-600 whitespace-pre-wrap">{r.notes}</p>
+                                </div>
+                              )}
+                              <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); setConvertingRequest(r); setShowConvertModal(true); }}
+                                  className="flex-1 bg-paragon text-white text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-paragon-dark transition-colors rounded-sm"
+                                >
+                                  Convert to Booking
+                                </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ type: 'request', id: r.id, name: `${r.type} request for ${clientName}` }); }}
+                                  className="bg-red-100 text-red-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-red-200 transition-colors rounded-sm"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Category Boxes - 1/3 width each */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+            {/* Flights Box */}
+            <button
+              onClick={() => setSubTab('flights')}
+              className="bg-white border border-slate-200 rounded-sm shadow-sm p-4 sm:p-6 hover:border-paragon hover:shadow-md transition-all text-left group"
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center group-hover:bg-red-600 group-hover:text-white transition-colors">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                  </svg>
+                </div>
+                <h3 className="font-bold text-sm uppercase tracking-widest text-slate-900">Flights</h3>
+              </div>
+              <div className="space-y-2 text-[11px]">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Open Requests</span>
+                  <span className="font-bold text-amber-600">{pendingFlightRequests}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Flying Today</span>
+                  <span className="font-bold text-slate-900">{flightsToday}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">This Week</span>
+                  <span className="font-bold text-slate-900">{flightsThisWeek}</span>
+                </div>
+                <div className="flex justify-between pt-2 border-t border-slate-100">
+                  <span className="text-slate-500">Total in Database</span>
+                  <span className="font-bold text-slate-900">{convertedFlights.length}</span>
+                </div>
+              </div>
+              <div className="mt-4 text-[10px] text-paragon font-bold uppercase tracking-wider group-hover:underline">
+                View All Flights →
+              </div>
+            </button>
+
+            {/* Hotels Box */}
+            <button
+              onClick={() => setSubTab('hotels')}
+              className="bg-white border border-slate-200 rounded-sm shadow-sm p-4 sm:p-6 hover:border-paragon hover:shadow-md transition-all text-left group"
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center group-hover:bg-amber-600 group-hover:text-white transition-colors">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                </div>
+                <h3 className="font-bold text-sm uppercase tracking-widest text-slate-900">Hotels</h3>
+              </div>
+              <div className="space-y-2 text-[11px]">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Open Requests</span>
+                  <span className="font-bold text-amber-600">{pendingHotelRequests}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Check-ins Today</span>
+                  <span className="font-bold text-slate-900">{checkInsToday}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">This Week</span>
+                  <span className="font-bold text-slate-900">{checkInsThisWeek}</span>
+                </div>
+                <div className="flex justify-between pt-2 border-t border-slate-100">
+                  <span className="text-slate-500">Total in Database</span>
+                  <span className="font-bold text-slate-900">{convertedHotels.length}</span>
+                </div>
+              </div>
+              <div className="mt-4 text-[10px] text-paragon font-bold uppercase tracking-wider group-hover:underline">
+                View All Hotels →
+              </div>
+            </button>
+
+            {/* Logistics Box */}
+            <button
+              onClick={() => setSubTab('logistics')}
+              className="bg-white border border-slate-200 rounded-sm shadow-sm p-4 sm:p-6 hover:border-paragon hover:shadow-md transition-all text-left group"
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                  </svg>
+                </div>
+                <h3 className="font-bold text-sm uppercase tracking-widest text-slate-900">Logistics</h3>
+              </div>
+              <div className="space-y-2 text-[11px]">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Open Requests</span>
+                  <span className="font-bold text-amber-600">{pendingLogisticsRequests}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Active Today</span>
+                  <span className="font-bold text-slate-900">{logisticsToday}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">This Week</span>
+                  <span className="font-bold text-slate-900">{logisticsThisWeek}</span>
+                </div>
+                <div className="flex justify-between pt-2 border-t border-slate-100">
+                  <span className="text-slate-500">Total in Database</span>
+                  <span className="font-bold text-slate-900">{convertedLogistics.length}</span>
+                </div>
+              </div>
+              <div className="mt-4 text-[10px] text-paragon font-bold uppercase tracking-wider group-hover:underline">
+                View All Logistics →
+              </div>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Database Views */}
       <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:gap-8">
         <div>
           {subTab === 'flights' && (() => {
@@ -838,9 +1246,12 @@ const Operations: React.FC<OperationsProps> = ({
                       </svg>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-semibold text-xs text-slate-900 truncate">{f.description}</span>
                         <Badge color={f.status === 'TICKETED' ? 'teal' : f.status === 'CONFIRMED' ? 'gold' : f.status === 'CANCELLED' ? 'red' : 'slate'}>{f.status}</Badge>
+                        {f.tripName && (
+                          <span className="text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">{f.tripName}</span>
+                        )}
                       </div>
                       <p className="text-[10px] text-slate-500">{f.airline} • {f.pnr}</p>
                     </div>
@@ -866,7 +1277,7 @@ const Operations: React.FC<OperationsProps> = ({
                       )}
                       <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100">
                         <button onClick={(e) => { e.stopPropagation(); openEditModal('flight', f.id); }} className="flex-1 bg-slate-100 text-slate-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-slate-200 transition-colors rounded-sm">Edit</button>
-                        <button onClick={(e) => { e.stopPropagation(); onDeleteFlight(f.id); }} className="flex-1 bg-red-100 text-red-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-red-200 transition-colors rounded-sm">Delete</button>
+                        <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ type: 'flight', id: f.id, name: f.description || f.pnr || 'this flight' }); }} className="flex-1 bg-red-100 text-red-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-red-200 transition-colors rounded-sm">Delete</button>
                       </div>
                     </div>
                   )}
@@ -883,7 +1294,10 @@ const Operations: React.FC<OperationsProps> = ({
                     <React.Fragment key={f.id}>
                       <tr className="hover:bg-slate-50 cursor-pointer" onClick={() => setExpandedItemId(isExpanded ? null : f.id)}>
                         <td className="px-4 py-3"><Badge color={f.status === 'TICKETED' ? 'teal' : f.status === 'CONFIRMED' ? 'gold' : f.status === 'CANCELLED' ? 'red' : 'slate'}>{f.status}</Badge></td>
-                        <td className="px-4 py-3 font-bold">{f.description}</td>
+                        <td className="px-4 py-3">
+                          <span className="font-bold">{f.description}</span>
+                          {f.tripName && <span className="ml-2 text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">{f.tripName}</span>}
+                        </td>
                         <td className="px-4 py-3">{f.airline}</td>
                         <td className="px-4 py-3 font-mono text-paragon font-bold">{f.pnr}</td>
                         <td className="px-4 py-3">{f.flights}</td>
@@ -909,8 +1323,8 @@ const Operations: React.FC<OperationsProps> = ({
                             )}
                             <div className="flex gap-3 items-center">
                               <button onClick={(e) => { e.stopPropagation(); openEditModal('flight', f.id); }} className="bg-slate-200 text-slate-700 text-[10px] py-2 px-4 font-bold uppercase tracking-wider hover:bg-slate-300 transition-colors rounded-sm">Edit</button>
-                              <button onClick={(e) => { e.stopPropagation(); onDeleteFlight(f.id); }} className="bg-red-100 text-red-600 text-[10px] py-2 px-4 font-bold uppercase tracking-wider hover:bg-red-200 transition-colors rounded-sm">Delete</button>
-                              <span className="text-[10px] text-slate-400 ml-auto">Created: {new Date(f.createdAt).toLocaleDateString()}</span>
+                              <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ type: 'flight', id: f.id, name: f.description || f.pnr || 'this flight' }); }} className="bg-red-100 text-red-600 text-[10px] py-2 px-4 font-bold uppercase tracking-wider hover:bg-red-200 transition-colors rounded-sm">Delete</button>
+                              <span className="text-[10px] text-slate-400 ml-auto">Created: {formatDisplayDate(f.createdAt)}</span>
                             </div>
                           </td>
                         </tr>
@@ -974,9 +1388,12 @@ const Operations: React.FC<OperationsProps> = ({
                       </svg>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-semibold text-xs text-slate-900 truncate">{h.description}</span>
                         <Badge color={h.status === 'CONFIRMED' ? 'teal' : h.status === 'CANCELLED' ? 'red' : 'slate'}>{h.status}</Badge>
+                        {h.tripName && (
+                          <span className="text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">{h.tripName}</span>
+                        )}
                       </div>
                       <p className="text-[10px] text-slate-500">{h.hotelName}</p>
                     </div>
@@ -1004,7 +1421,7 @@ const Operations: React.FC<OperationsProps> = ({
                       )}
                       <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100">
                         <button onClick={(e) => { e.stopPropagation(); openEditModal('hotel', h.id); }} className="flex-1 bg-slate-100 text-slate-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-slate-200 transition-colors rounded-sm">Edit</button>
-                        <button onClick={(e) => { e.stopPropagation(); onDeleteHotel(h.id); }} className="flex-1 bg-red-100 text-red-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-red-200 transition-colors rounded-sm">Delete</button>
+                        <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ type: 'hotel', id: h.id, name: h.hotelName || h.description || 'this hotel booking' }); }} className="flex-1 bg-red-100 text-red-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-red-200 transition-colors rounded-sm">Delete</button>
                       </div>
                     </div>
                   )}
@@ -1021,7 +1438,10 @@ const Operations: React.FC<OperationsProps> = ({
                     <React.Fragment key={h.id}>
                       <tr className="hover:bg-slate-50 cursor-pointer" onClick={() => setExpandedItemId(isExpanded ? null : h.id)}>
                         <td className="px-4 py-3"><Badge color={h.status === 'CONFIRMED' ? 'teal' : h.status === 'CANCELLED' ? 'red' : 'slate'}>{h.status}</Badge></td>
-                        <td className="px-4 py-3 font-bold">{h.description}</td>
+                        <td className="px-4 py-3">
+                          <span className="font-bold">{h.description}</span>
+                          {h.tripName && <span className="ml-2 text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">{h.tripName}</span>}
+                        </td>
                         <td className="px-4 py-3">{h.hotelName}</td>
                         <td className="px-4 py-3 font-mono text-paragon font-bold">{h.confirmationNumber || '-'}</td>
                         <td className="px-4 py-3">{h.roomType}</td>
@@ -1047,8 +1467,8 @@ const Operations: React.FC<OperationsProps> = ({
                             )}
                             <div className="flex gap-3 items-center">
                               <button onClick={(e) => { e.stopPropagation(); openEditModal('hotel', h.id); }} className="bg-slate-200 text-slate-700 text-[10px] py-2 px-4 font-bold uppercase tracking-wider hover:bg-slate-300 transition-colors rounded-sm">Edit</button>
-                              <button onClick={(e) => { e.stopPropagation(); onDeleteHotel(h.id); }} className="bg-red-100 text-red-600 text-[10px] py-2 px-4 font-bold uppercase tracking-wider hover:bg-red-200 transition-colors rounded-sm">Delete</button>
-                              <span className="text-[10px] text-slate-400 ml-auto">Created: {new Date(h.createdAt).toLocaleDateString()}</span>
+                              <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ type: 'hotel', id: h.id, name: h.hotelName || h.description || 'this hotel booking' }); }} className="bg-red-100 text-red-600 text-[10px] py-2 px-4 font-bold uppercase tracking-wider hover:bg-red-200 transition-colors rounded-sm">Delete</button>
+                              <span className="text-[10px] text-slate-400 ml-auto">Created: {formatDisplayDate(h.createdAt)}</span>
                             </div>
                           </td>
                         </tr>
@@ -1112,9 +1532,12 @@ const Operations: React.FC<OperationsProps> = ({
                       </svg>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-semibold text-xs text-slate-900 truncate">{l.description}</span>
                         <Badge color={l.status === 'CONFIRMED' ? 'teal' : l.status === 'CANCELLED' ? 'red' : 'slate'}>{l.status}</Badge>
+                        {l.tripName && (
+                          <span className="text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">{l.tripName}</span>
+                        )}
                       </div>
                       <p className="text-[10px] text-slate-500">{l.serviceType} • {l.date}</p>
                     </div>
@@ -1145,7 +1568,7 @@ const Operations: React.FC<OperationsProps> = ({
                       )}
                       <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100">
                         <button onClick={(e) => { e.stopPropagation(); openEditModal('logistics', l.id); }} className="flex-1 bg-slate-100 text-slate-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-slate-200 transition-colors rounded-sm">Edit</button>
-                        <button onClick={(e) => { e.stopPropagation(); onDeleteLogistics(l.id); }} className="flex-1 bg-red-100 text-red-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-red-200 transition-colors rounded-sm">Delete</button>
+                        <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ type: 'logistics', id: l.id, name: l.serviceType || l.description || 'this logistics booking' }); }} className="flex-1 bg-red-100 text-red-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-red-200 transition-colors rounded-sm">Delete</button>
                       </div>
                     </div>
                   )}
@@ -1162,7 +1585,10 @@ const Operations: React.FC<OperationsProps> = ({
                     <React.Fragment key={l.id}>
                       <tr className="hover:bg-slate-50 cursor-pointer" onClick={() => setExpandedItemId(isExpanded ? null : l.id)}>
                         <td className="px-4 py-3"><Badge color={l.status === 'CONFIRMED' ? 'teal' : l.status === 'CANCELLED' ? 'red' : 'slate'}>{l.status}</Badge></td>
-                        <td className="px-4 py-3 font-bold">{l.description}</td>
+                        <td className="px-4 py-3">
+                          <span className="font-bold">{l.description}</span>
+                          {l.tripName && <span className="ml-2 text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">{l.tripName}</span>}
+                        </td>
                         <td className="px-4 py-3">{l.serviceType}</td>
                         <td className="px-4 py-3 font-mono text-paragon font-bold">{l.confirmationNumber || '-'}</td>
                         <td className="px-4 py-3 italic truncate max-w-[200px]">{l.details || '-'}</td>
@@ -1187,8 +1613,8 @@ const Operations: React.FC<OperationsProps> = ({
                             )}
                             <div className="flex gap-3 items-center">
                               <button onClick={(e) => { e.stopPropagation(); openEditModal('logistics', l.id); }} className="bg-slate-200 text-slate-700 text-[10px] py-2 px-4 font-bold uppercase tracking-wider hover:bg-slate-300 transition-colors rounded-sm">Edit</button>
-                              <button onClick={(e) => { e.stopPropagation(); onDeleteLogistics(l.id); }} className="bg-red-100 text-red-600 text-[10px] py-2 px-4 font-bold uppercase tracking-wider hover:bg-red-200 transition-colors rounded-sm">Delete</button>
-                              <span className="text-[10px] text-slate-400 ml-auto">Created: {new Date(l.createdAt).toLocaleDateString()}</span>
+                              <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ type: 'logistics', id: l.id, name: l.serviceType || l.description || 'this logistics booking' }); }} className="bg-red-100 text-red-600 text-[10px] py-2 px-4 font-bold uppercase tracking-wider hover:bg-red-200 transition-colors rounded-sm">Delete</button>
+                              <span className="text-[10px] text-slate-400 ml-auto">Created: {formatDisplayDate(l.createdAt)}</span>
                             </div>
                           </td>
                         </tr>
@@ -1250,8 +1676,8 @@ const Operations: React.FC<OperationsProps> = ({
                   })
                   .map(r => {
                     const clientName = r.details?.clientName || MOCK_USERS.find(u => u.id === r.clientId)?.name || '—';
-                    const targetDate = r.details?.targetDate ? new Date(r.details.targetDate).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
-                    const agentName = r.details?.agentName || (googleUser && (r.agentId === googleUser.googleId || r.agentId === googleUser.id) ? googleUser.name : (MOCK_USERS.find(u => u.id === r.agentId)?.name || 'Unknown'));
+                    const targetDate = r.details?.targetDate ? formatDisplayDate(r.details.targetDate, { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+                    const agentName = r.details?.agentName || (googleUser && (r.agentId === googleUser.googleId || r.agentId === googleUser.id) ? googleUser.name : (agents.find(u => u.id === r.agentId)?.name || MOCK_USERS.find(u => u.id === r.agentId)?.name || 'Unknown'));
                     const isExpanded = expandedItemId === r.id;
                     const isOwnRequest = googleUser ? (r.agentId === googleUser.googleId || r.agentId === googleUser.id) : r.agentId === currentUser.id;
 
@@ -1285,9 +1711,17 @@ const Operations: React.FC<OperationsProps> = ({
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <span className="font-semibold text-xs text-slate-900 truncate">{clientName}</span>
                               <Badge color={r.type === 'FLIGHT' ? 'red' : r.type === 'HOTEL' ? 'gold' : 'slate'}>{r.type}</Badge>
+                              {r.tripName && (
+                                <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 text-[8px] font-bold rounded-sm border border-purple-200 flex items-center gap-1">
+                                  <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
+                                  </svg>
+                                  {r.tripName}
+                                </span>
+                              )}
                             </div>
                             <p className="text-[10px] text-slate-500 truncate">{r.notes}</p>
                           </div>
@@ -1368,15 +1802,24 @@ const Operations: React.FC<OperationsProps> = ({
                     })
                     .map(r => {
                     const clientName = r.details?.clientName || MOCK_USERS.find(u => u.id === r.clientId)?.name || '—';
-                    const targetDate = r.details?.targetDate ? new Date(r.details.targetDate).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
-                    const agentName = r.details?.agentName || (googleUser && (r.agentId === googleUser.googleId || r.agentId === googleUser.id) ? googleUser.name : (MOCK_USERS.find(u => u.id === r.agentId)?.name || 'Unknown'));
+                    const targetDate = r.details?.targetDate ? formatDisplayDate(r.details.targetDate, { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+                    const agentName = r.details?.agentName || (googleUser && (r.agentId === googleUser.googleId || r.agentId === googleUser.id) ? googleUser.name : (agents.find(u => u.id === r.agentId)?.name || MOCK_USERS.find(u => u.id === r.agentId)?.name || 'Unknown'));
                     const isOwnRequest = googleUser ? (r.agentId === googleUser.googleId || r.agentId === googleUser.id) : r.agentId === currentUser.id;
 
                     return (
                       <tr key={r.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => setExpandedItemId(expandedItemId === r.id ? null : r.id)}>
                         <td className="px-4 py-3">{new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
                         <td className="px-4 py-3 font-bold">{clientName}</td>
-                        <td className="px-4 py-3"><Badge color={r.type === 'FLIGHT' ? 'red' : r.type === 'HOTEL' ? 'gold' : 'slate'}>{r.type}</Badge></td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <Badge color={r.type === 'FLIGHT' ? 'red' : r.type === 'HOTEL' ? 'gold' : 'slate'}>{r.type}</Badge>
+                            {r.tripName && (
+                              <span className="px-1 py-0.5 bg-purple-100 text-purple-700 text-[8px] font-bold rounded-sm border border-purple-200">
+                                {r.tripName}
+                              </span>
+                            )}
+                          </div>
+                        </td>
                         <td className="px-4 py-3">{targetDate}</td>
                         <td className="px-4 py-3 italic truncate max-w-sm">{r.notes}</td>
                         <td className="px-4 py-3 font-semibold">{agentName}</td>
@@ -1541,13 +1984,16 @@ const Operations: React.FC<OperationsProps> = ({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Agent</label>
-                      <input
-                        type="text"
+                      <select
                         value={flightAgent}
                         onChange={(e) => setFlightAgent(e.target.value)}
-                        placeholder="Enter agent name"
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
-                      />
+                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon bg-white"
+                      >
+                        <option value="">Select agent...</option>
+                        {(agents.length > 0 ? agents : MOCK_USERS.filter(u => u.role !== 'CLIENT')).map(user => (
+                          <option key={user.id} value={user.name}>{user.name}</option>
+                        ))}
+                      </select>
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Profit/Loss ($)</label>
@@ -1560,18 +2006,36 @@ const Operations: React.FC<OperationsProps> = ({
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Status</label>
-                    <select
-                      value={flightStatus}
-                      onChange={(e) => setFlightStatus(e.target.value as 'PENDING' | 'CONFIRMED' | 'TICKETED' | 'CANCELLED')}
-                      className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
-                    >
-                      <option value="PENDING">Pending</option>
-                      <option value="CONFIRMED">Confirmed</option>
-                      <option value="TICKETED">Ticketed</option>
-                      <option value="CANCELLED">Cancelled</option>
-                    </select>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Vendor</label>
+                      <VendorAutocomplete
+                        value={flightVendorName}
+                        vendorId={flightVendorId}
+                        onChange={(name, id) => { setFlightVendorName(name); setFlightVendorId(id || ''); }}
+                        vendors={vendors.filter(v => v.type === 'FLIGHT')}
+                        vendorType="FLIGHT"
+                        onAddNewVendor={() => {
+                          setQuickAddVendorType('FLIGHT');
+                          setQuickAddVendorInitialName(flightVendorName);
+                          setShowQuickAddVendorModal(true);
+                        }}
+                        placeholder="Search vendors..."
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Status</label>
+                      <select
+                        value={flightStatus}
+                        onChange={(e) => setFlightStatus(e.target.value as 'PENDING' | 'CONFIRMED' | 'TICKETED' | 'CANCELLED')}
+                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                      >
+                        <option value="PENDING">Pending</option>
+                        <option value="CONFIRMED">Confirmed</option>
+                        <option value="TICKETED">Ticketed</option>
+                        <option value="CANCELLED">Cancelled</option>
+                      </select>
+                    </div>
                   </div>
 
                   <div>
@@ -1686,13 +2150,16 @@ const Operations: React.FC<OperationsProps> = ({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Agent</label>
-                      <input
-                        type="text"
+                      <select
                         value={hotelAgent}
                         onChange={(e) => setHotelAgent(e.target.value)}
-                        placeholder="Enter agent name"
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
-                      />
+                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon bg-white"
+                      >
+                        <option value="">Select agent...</option>
+                        {(agents.length > 0 ? agents : MOCK_USERS.filter(u => u.role !== 'CLIENT')).map(user => (
+                          <option key={user.id} value={user.name}>{user.name}</option>
+                        ))}
+                      </select>
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Profit/Loss ($)</label>
@@ -1705,17 +2172,35 @@ const Operations: React.FC<OperationsProps> = ({
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Status</label>
-                    <select
-                      value={hotelStatus}
-                      onChange={(e) => setHotelStatus(e.target.value as 'PENDING' | 'CONFIRMED' | 'CANCELLED')}
-                      className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
-                    >
-                      <option value="PENDING">Pending</option>
-                      <option value="CONFIRMED">Confirmed</option>
-                      <option value="CANCELLED">Cancelled</option>
-                    </select>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Vendor</label>
+                      <VendorAutocomplete
+                        value={hotelVendorName}
+                        vendorId={hotelVendorId}
+                        onChange={(name, id) => { setHotelVendorName(name); setHotelVendorId(id || ''); }}
+                        vendors={vendors.filter(v => v.type === 'HOTEL')}
+                        vendorType="HOTEL"
+                        onAddNewVendor={() => {
+                          setQuickAddVendorType('HOTEL');
+                          setQuickAddVendorInitialName(hotelVendorName);
+                          setShowQuickAddVendorModal(true);
+                        }}
+                        placeholder="Search vendors..."
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Status</label>
+                      <select
+                        value={hotelStatus}
+                        onChange={(e) => setHotelStatus(e.target.value as 'PENDING' | 'CONFIRMED' | 'CANCELLED')}
+                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                      >
+                        <option value="PENDING">Pending</option>
+                        <option value="CONFIRMED">Confirmed</option>
+                        <option value="CANCELLED">Cancelled</option>
+                      </select>
+                    </div>
                   </div>
 
                   <div>
@@ -1805,17 +2290,36 @@ const Operations: React.FC<OperationsProps> = ({
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Agent</label>
-                      <input
-                        type="text"
+                      <select
                         value={logisticsAgent}
                         onChange={(e) => setLogisticsAgent(e.target.value)}
-                        placeholder="Enter agent name"
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
-                      />
+                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon bg-white"
+                      >
+                        <option value="">Select agent...</option>
+                        {(agents.length > 0 ? agents : MOCK_USERS.filter(u => u.role !== 'CLIENT')).map(user => (
+                          <option key={user.id} value={user.name}>{user.name}</option>
+                        ))}
+                      </select>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Vendor</label>
+                      <VendorAutocomplete
+                        value={logisticsVendorName}
+                        vendorId={logisticsVendorId}
+                        onChange={(name, id) => { setLogisticsVendorName(name); setLogisticsVendorId(id || ''); }}
+                        vendors={vendors.filter(v => v.type === 'LOGISTICS')}
+                        vendorType="LOGISTICS"
+                        onAddNewVendor={() => {
+                          setQuickAddVendorType('LOGISTICS');
+                          setQuickAddVendorInitialName(logisticsVendorName);
+                          setShowQuickAddVendorModal(true);
+                        }}
+                        placeholder="Search vendors..."
+                      />
+                    </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Profit/Loss ($)</label>
                       <input
@@ -1825,6 +2329,9 @@ const Operations: React.FC<OperationsProps> = ({
                         className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
                       />
                     </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Status</label>
                       <select
@@ -1969,12 +2476,16 @@ const Operations: React.FC<OperationsProps> = ({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Agent</label>
-                      <input
-                        type="text"
+                      <select
                         value={flightAgent}
                         onChange={(e) => setFlightAgent(e.target.value)}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
-                      />
+                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon bg-white"
+                      >
+                        <option value="">Select agent...</option>
+                        {(agents.length > 0 ? agents : MOCK_USERS.filter(u => u.role !== 'CLIENT')).map(user => (
+                          <option key={user.id} value={user.name}>{user.name}</option>
+                        ))}
+                      </select>
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Profit/Loss ($)</label>
@@ -1986,18 +2497,36 @@ const Operations: React.FC<OperationsProps> = ({
                       />
                     </div>
                   </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Status</label>
-                    <select
-                      value={flightStatus}
-                      onChange={(e) => setFlightStatus(e.target.value as 'PENDING' | 'CONFIRMED' | 'TICKETED' | 'CANCELLED')}
-                      className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
-                    >
-                      <option value="PENDING">Pending</option>
-                      <option value="CONFIRMED">Confirmed</option>
-                      <option value="TICKETED">Ticketed</option>
-                      <option value="CANCELLED">Cancelled</option>
-                    </select>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Vendor</label>
+                      <VendorAutocomplete
+                        value={flightVendorName}
+                        vendorId={flightVendorId}
+                        onChange={(name, id) => { setFlightVendorName(name); setFlightVendorId(id || ''); }}
+                        vendors={vendors.filter(v => v.type === 'FLIGHT')}
+                        vendorType="FLIGHT"
+                        onAddNewVendor={() => {
+                          setQuickAddVendorType('FLIGHT');
+                          setQuickAddVendorInitialName(flightVendorName);
+                          setShowQuickAddVendorModal(true);
+                        }}
+                        placeholder="Search vendors..."
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Status</label>
+                      <select
+                        value={flightStatus}
+                        onChange={(e) => setFlightStatus(e.target.value as 'PENDING' | 'CONFIRMED' | 'TICKETED' | 'CANCELLED')}
+                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                      >
+                        <option value="PENDING">Pending</option>
+                        <option value="CONFIRMED">Confirmed</option>
+                        <option value="TICKETED">Ticketed</option>
+                        <option value="CANCELLED">Cancelled</option>
+                      </select>
+                    </div>
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Notes</label>
@@ -2101,12 +2630,16 @@ const Operations: React.FC<OperationsProps> = ({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Agent</label>
-                      <input
-                        type="text"
+                      <select
                         value={hotelAgent}
                         onChange={(e) => setHotelAgent(e.target.value)}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
-                      />
+                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon bg-white"
+                      >
+                        <option value="">Select agent...</option>
+                        {(agents.length > 0 ? agents : MOCK_USERS.filter(u => u.role !== 'CLIENT')).map(user => (
+                          <option key={user.id} value={user.name}>{user.name}</option>
+                        ))}
+                      </select>
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Profit/Loss ($)</label>
@@ -2118,17 +2651,35 @@ const Operations: React.FC<OperationsProps> = ({
                       />
                     </div>
                   </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Status</label>
-                    <select
-                      value={hotelStatus}
-                      onChange={(e) => setHotelStatus(e.target.value as 'PENDING' | 'CONFIRMED' | 'CANCELLED')}
-                      className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
-                    >
-                      <option value="PENDING">Pending</option>
-                      <option value="CONFIRMED">Confirmed</option>
-                      <option value="CANCELLED">Cancelled</option>
-                    </select>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Vendor</label>
+                      <VendorAutocomplete
+                        value={hotelVendorName}
+                        vendorId={hotelVendorId}
+                        onChange={(name, id) => { setHotelVendorName(name); setHotelVendorId(id || ''); }}
+                        vendors={vendors.filter(v => v.type === 'HOTEL')}
+                        vendorType="HOTEL"
+                        onAddNewVendor={() => {
+                          setQuickAddVendorType('HOTEL');
+                          setQuickAddVendorInitialName(hotelVendorName);
+                          setShowQuickAddVendorModal(true);
+                        }}
+                        placeholder="Search vendors..."
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Status</label>
+                      <select
+                        value={hotelStatus}
+                        onChange={(e) => setHotelStatus(e.target.value as 'PENDING' | 'CONFIRMED' | 'CANCELLED')}
+                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                      >
+                        <option value="PENDING">Pending</option>
+                        <option value="CONFIRMED">Confirmed</option>
+                        <option value="CANCELLED">Cancelled</option>
+                      </select>
+                    </div>
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Notes</label>
@@ -2209,15 +2760,35 @@ const Operations: React.FC<OperationsProps> = ({
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Agent</label>
-                      <input
-                        type="text"
+                      <select
                         value={logisticsAgent}
                         onChange={(e) => setLogisticsAgent(e.target.value)}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
-                      />
+                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon bg-white"
+                      >
+                        <option value="">Select agent...</option>
+                        {(agents.length > 0 ? agents : MOCK_USERS.filter(u => u.role !== 'CLIENT')).map(user => (
+                          <option key={user.id} value={user.name}>{user.name}</option>
+                        ))}
+                      </select>
                     </div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Vendor</label>
+                      <VendorAutocomplete
+                        value={logisticsVendorName}
+                        vendorId={logisticsVendorId}
+                        onChange={(name, id) => { setLogisticsVendorName(name); setLogisticsVendorId(id || ''); }}
+                        vendors={vendors.filter(v => v.type === 'LOGISTICS')}
+                        vendorType="LOGISTICS"
+                        onAddNewVendor={() => {
+                          setQuickAddVendorType('LOGISTICS');
+                          setQuickAddVendorInitialName(logisticsVendorName);
+                          setShowQuickAddVendorModal(true);
+                        }}
+                        placeholder="Search vendors..."
+                      />
+                    </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Profit/Loss ($)</label>
                       <input
@@ -2227,6 +2798,8 @@ const Operations: React.FC<OperationsProps> = ({
                         className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
                       />
                     </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Status</label>
                       <select
@@ -2327,13 +2900,13 @@ const Operations: React.FC<OperationsProps> = ({
                   {viewingTrip.startDate && (
                     <div className="flex-1">
                       <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Start Date</label>
-                      <p className="text-sm text-slate-900">{new Date(viewingTrip.startDate).toLocaleDateString()}</p>
+                      <p className="text-sm text-slate-900">{formatDisplayDate(viewingTrip.startDate)}</p>
                     </div>
                   )}
                   {viewingTrip.endDate && (
                     <div className="flex-1">
                       <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">End Date</label>
-                      <p className="text-sm text-slate-900">{new Date(viewingTrip.endDate).toLocaleDateString()}</p>
+                      <p className="text-sm text-slate-900">{formatDisplayDate(viewingTrip.endDate)}</p>
                     </div>
                   )}
                 </div>
@@ -2498,11 +3071,65 @@ const Operations: React.FC<OperationsProps> = ({
             <form onSubmit={handleDispatchSubmit} className="p-6 flex-1 flex flex-col overflow-hidden">
               {dispatchMode === 'QUICK' ? (
                 <div className="flex-1 flex flex-col">
+                  {/* Client Selection */}
+                  <div className="mb-4 flex-shrink-0">
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Client Name *</label>
+                    <ClientAutocomplete
+                      value={dispatchClientName}
+                      onChange={setDispatchClientName}
+                      customers={customers}
+                      onAddNewClient={() => {
+                        setNewCustomerInitialName(dispatchClientName);
+                        setShowAddCustomerModal(true);
+                      }}
+                      placeholder="Select or type client name..."
+                      required
+                    />
+                  </div>
+                  {/* Service Type Selection */}
+                  <div className="mb-4 flex-shrink-0">
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Service Type</label>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setDispatchServiceType('FLIGHT')}
+                        className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-sm ${
+                          dispatchServiceType === 'FLIGHT'
+                            ? 'bg-red-600 text-white'
+                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                        }`}
+                      >
+                        Flight
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDispatchServiceType('HOTEL')}
+                        className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-sm ${
+                          dispatchServiceType === 'HOTEL'
+                            ? 'bg-amber-600 text-white'
+                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                        }`}
+                      >
+                        Hotel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDispatchServiceType('LOGISTICS')}
+                        className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-sm ${
+                          dispatchServiceType === 'LOGISTICS'
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                        }`}
+                      >
+                        Logistics
+                      </button>
+                    </div>
+                  </div>
                   <textarea
                     value={dispatchSnippet}
                     onChange={(e) => setDispatchSnippet(e.target.value)}
-                    placeholder="Paste a request snippet, PNR, or client note here..."
-                    className="w-full flex-1 p-4 bg-white border border-slate-300 text-sm text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon rounded-sm resize-none min-h-[150px]"
+                    placeholder="Describe the booking request details..."
+                    className="w-full flex-1 p-4 bg-white border border-slate-300 text-sm text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon rounded-sm resize-none min-h-[100px]"
                     required
                   />
                   <div className="mt-4 flex-shrink-0">
@@ -2745,12 +3372,15 @@ Room Type: Deluxe King"
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Client Name</label>
-                      <input
-                        type="text"
+                      <ClientAutocomplete
                         value={dispatchClientName}
-                        onChange={(e) => setDispatchClientName(e.target.value)}
+                        onChange={setDispatchClientName}
+                        customers={customers}
+                        onAddNewClient={() => {
+                          setNewCustomerInitialName(dispatchClientName);
+                          setShowAddCustomerModal(true);
+                        }}
                         placeholder="e.g. Alice Johnson"
-                        className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon rounded-sm"
                         required
                       />
                     </div>
@@ -2922,6 +3552,86 @@ Room Type: Deluxe King"
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={!!deleteConfirm}
+        onClose={() => setDeleteConfirm(null)}
+        onConfirm={() => {
+          if (deleteConfirm) {
+            switch (deleteConfirm.type) {
+              case 'request':
+                onDeleteRequest?.(deleteConfirm.id);
+                break;
+              case 'flight':
+                onDeleteFlight(deleteConfirm.id);
+                break;
+              case 'hotel':
+                onDeleteHotel(deleteConfirm.id);
+                break;
+              case 'logistics':
+                onDeleteLogistics(deleteConfirm.id);
+                break;
+            }
+          }
+        }}
+        title="Confirm Delete"
+        message={`Are you sure you want to delete "${deleteConfirm?.name}"? This action cannot be undone.`}
+        confirmText="Yes, Delete"
+        cancelText="Cancel"
+        variant="danger"
+      />
+
+      {/* Quick Add Customer Modal */}
+      <QuickAddCustomerModal
+        isOpen={showAddCustomerModal}
+        onClose={() => setShowAddCustomerModal(false)}
+        onCustomerAdded={(newCustomer) => {
+          setCustomers(prev => [...prev, newCustomer]);
+          setDispatchClientName(newCustomer.name);
+        }}
+        initialName={newCustomerInitialName}
+        agents={agents.map(a => ({ id: a.id, name: a.name }))}
+        defaultAgentId={googleUser?.googleId || googleUser?.id || currentUser.id}
+      />
+
+      {/* Quick Add Vendor Modal */}
+      <QuickAddVendorModal
+        isOpen={showQuickAddVendorModal}
+        onClose={() => {
+          setShowQuickAddVendorModal(false);
+          setQuickAddVendorInitialName('');
+        }}
+        onVendorAdded={(newVendor) => {
+          // Extend the partial vendor to a full Vendor object
+          const fullVendor: Vendor = {
+            id: newVendor.id,
+            name: newVendor.name,
+            code: newVendor.code,
+            type: quickAddVendorType,
+            commissionPercent: newVendor.commissionPercent || 0,
+            collectionMethod: 'OTHER',
+            paymentFrequency: 'MONTHLY',
+            isActive: true,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          setVendors(prev => [...prev, fullVendor]);
+          // Set the appropriate vendor field based on type
+          if (quickAddVendorType === 'FLIGHT') {
+            setFlightVendorId(newVendor.id);
+            setFlightVendorName(newVendor.name);
+          } else if (quickAddVendorType === 'HOTEL') {
+            setHotelVendorId(newVendor.id);
+            setHotelVendorName(newVendor.name);
+          } else {
+            setLogisticsVendorId(newVendor.id);
+            setLogisticsVendorName(newVendor.name);
+          }
+        }}
+        initialName={quickAddVendorInitialName}
+        vendorType={quickAddVendorType}
+      />
     </div>
   );
 };

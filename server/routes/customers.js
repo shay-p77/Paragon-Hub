@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const Customer = require('../models/Customer');
+const PipelineTrip = require('../models/PipelineTrip');
+const BookingRequest = require('../models/BookingRequest');
 const { decrypt } = require('../utils/encryption');
 const { logAudit } = require('../utils/auditLogger');
 
@@ -16,9 +18,16 @@ function formatCustomer(c) {
     email: decrypt(c.email) || '',
     phone: decrypt(c.phone) || '',
     primaryCustomerId: c.primaryCustomerId ? c.primaryCustomerId.toString() : null,
+    // Legacy single passport fields (kept for backwards compatibility)
     passportNumber: decrypt(c.passportNumber) || '',
     passportExpiry: c.passportExpiry || '',
     passportCountry: c.passportCountry || '',
+    // Multiple passports
+    passports: (c.passports || []).map(p => ({
+      number: decrypt(p.number) || '',
+      country: p.country || '',
+      expiry: p.expiry || '',
+    })),
     loyaltyPrograms: (c.loyaltyPrograms || []).map(lp => ({
       program: lp.program,
       number: decrypt(lp.number) || '',
@@ -187,9 +196,11 @@ router.put('/:id', async (req, res) => {
       passportNumber,
       passportExpiry,
       passportCountry,
+      passports,
       loyaltyPrograms,
       preferences,
       notes,
+      agentId,
     } = req.body;
 
     // Find and update - need to handle encryption manually for updates
@@ -210,11 +221,29 @@ router.put('/:id', async (req, res) => {
     if (passportNumber !== undefined) customer.passportNumber = passportNumber;
     if (passportExpiry !== undefined) customer.passportExpiry = passportExpiry;
     if (passportCountry !== undefined) customer.passportCountry = passportCountry;
+    if (passports !== undefined) customer.passports = passports;
     if (loyaltyPrograms !== undefined) customer.loyaltyPrograms = loyaltyPrograms;
     if (preferences !== undefined) customer.preferences = preferences;
     if (notes !== undefined) customer.notes = notes;
+    if (agentId !== undefined) customer.agentId = agentId;
 
     await customer.save();
+
+    // Sync customer name to any trips or booking requests that reference this customer
+    const newClientName = customer.displayName || `${customer.legalFirstName} ${customer.legalLastName}`;
+    const customerId = customer._id.toString();
+
+    // Update trips that reference this customer
+    await PipelineTrip.updateMany(
+      { clientId: customerId },
+      { $set: { clientName: newClientName } }
+    );
+
+    // Update booking requests that reference this customer
+    await BookingRequest.updateMany(
+      { clientId: customerId },
+      { $set: { clientName: newClientName } }
+    );
 
     // Log audit
     await logAudit({

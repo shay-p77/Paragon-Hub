@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { SectionHeader } from './Shared';
-import { Customer, LoyaltyProgram, BookingRequest } from '../types';
+import { SectionHeader, ConfirmModal, CountrySelect } from './Shared';
+import { Customer, LoyaltyProgram, BookingRequest, Passport } from '../types';
 import { GoogleUser } from './Login';
 import { API_URL } from '../config';
 
@@ -256,13 +256,20 @@ const parsePhoneNumber = (phone?: string): { countryCode: string; number: string
 };
 
 // Customer Form Modal Component
+interface AgentOption {
+  id: string;
+  name: string;
+}
+
 const CustomerFormModal: React.FC<{
   customer?: Customer;
   primaryCustomers: Customer[];
+  agents?: AgentOption[];
+  defaultAgentId?: string;
   onSave: (customer: Customer) => void;
   onDelete?: (customerId: string) => void;
   onClose: () => void;
-}> = ({ customer, primaryCustomers, onSave, onDelete, onClose }) => {
+}> = ({ customer, primaryCustomers, agents = [], defaultAgentId = '', onSave, onDelete, onClose }) => {
   const isEditing = !!customer;
   const parsedPhone = parsePhoneNumber(customer?.phone);
 
@@ -276,15 +283,46 @@ const CustomerFormModal: React.FC<{
   const [countryCode, setCountryCode] = useState(parsedPhone.countryCode);
   const [phone, setPhone] = useState(parsedPhone.number);
   const [primaryCustomerId, setPrimaryCustomerId] = useState(customer?.primaryCustomerId || '');
-  const [passportNumber, setPassportNumber] = useState(customer?.passportNumber || '');
-  const [passportExpiry, setPassportExpiry] = useState(customer?.passportExpiry || '');
-  const [passportCountry, setPassportCountry] = useState(customer?.passportCountry || '');
+  // Multiple passports - migrate from legacy single passport if needed
+  const getInitialPassports = (): Passport[] => {
+    if (customer?.passports && customer.passports.length > 0) {
+      return customer.passports;
+    }
+    // Migrate legacy single passport to array format
+    if (customer?.passportNumber || customer?.passportCountry) {
+      return [{
+        number: customer.passportNumber || '',
+        country: customer.passportCountry || '',
+        expiry: customer.passportExpiry || ''
+      }];
+    }
+    return [];
+  };
+  const [passports, setPassports] = useState<Passport[]>(getInitialPassports());
   const [seatPreference, setSeatPreference] = useState<'aisle' | 'window' | 'middle' | ''>(customer?.preferences?.seatPreference || '');
   const [dietaryRestrictions, setDietaryRestrictions] = useState(customer?.preferences?.dietaryRestrictions?.join(', ') || '');
   const [hotelPreferences, setHotelPreferences] = useState(customer?.preferences?.hotelPreferences || '');
   const [specialRequests, setSpecialRequests] = useState(customer?.preferences?.specialRequests || '');
   const [notes, setNotes] = useState(customer?.notes || '');
   const [loyaltyPrograms, setLoyaltyPrograms] = useState<LoyaltyProgram[]>(customer?.loyaltyPrograms || []);
+  const [agentId, setAgentId] = useState(customer?.agentId || defaultAgentId);
+
+  // Add passport
+  const addPassport = () => {
+    setPassports([...passports, { number: '', country: '', expiry: '' }]);
+  };
+
+  // Update passport
+  const updatePassport = (index: number, field: keyof Passport, value: string) => {
+    const updated = [...passports];
+    updated[index] = { ...updated[index], [field]: value };
+    setPassports(updated);
+  };
+
+  // Remove passport
+  const removePassport = (index: number) => {
+    setPassports(passports.filter((_, i) => i !== index));
+  };
 
   // Add loyalty program
   const addLoyaltyProgram = () => {
@@ -317,9 +355,9 @@ const CustomerFormModal: React.FC<{
       email: email || undefined,
       phone: phone ? `${countryCode} ${phone}` : undefined,
       primaryCustomerId: primaryCustomerId || undefined,
-      passportNumber: passportNumber || undefined,
-      passportExpiry: passportExpiry || undefined,
-      passportCountry: passportCountry || undefined,
+      agentId: agentId || undefined,
+      // Multiple passports
+      passports: passports.filter(p => p.number && p.country),
       loyaltyPrograms: loyaltyPrograms.filter(lp => lp.program && lp.number),
       preferences: {
         seatPreference: seatPreference || undefined,
@@ -445,58 +483,104 @@ const CustomerFormModal: React.FC<{
           {/* Link to Primary Customer */}
           <div className="mb-6">
             <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Account Association</h3>
-            <div>
-              <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Primary Customer (if this is a sub-customer)</label>
-              <select
-                value={primaryCustomerId}
-                onChange={(e) => setPrimaryCustomerId(e.target.value)}
-                className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon bg-white"
-              >
-                <option value="">— None (This is a primary customer) —</option>
-                {primaryCustomers
-                  .filter(pc => pc.id !== customer?.id)
-                  .map(pc => (
-                    <option key={pc.id} value={pc.id}>{pc.displayName}</option>
-                  ))
-                }
-              </select>
-              <p className="text-[10px] text-slate-400 mt-1">Leave empty if this customer is the account holder</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Primary Customer (if this is a sub-customer)</label>
+                <select
+                  value={primaryCustomerId}
+                  onChange={(e) => setPrimaryCustomerId(e.target.value)}
+                  className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon bg-white"
+                >
+                  <option value="">— None (This is a primary customer) —</option>
+                  {primaryCustomers
+                    .filter(pc => pc.id !== customer?.id)
+                    .map(pc => (
+                      <option key={pc.id} value={pc.id}>{pc.displayName}</option>
+                    ))
+                  }
+                </select>
+                <p className="text-[10px] text-slate-400 mt-1">Leave empty if this customer is the account holder</p>
+              </div>
+              {agents.length > 0 && (
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Assigned Agent</label>
+                  <select
+                    value={agentId}
+                    onChange={(e) => setAgentId(e.target.value)}
+                    className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon bg-white"
+                  >
+                    <option value="">— No agent assigned —</option>
+                    {agents.map(agent => (
+                      <option key={agent.id} value={agent.id}>{agent.name}</option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-slate-400 mt-1">Agent responsible for this client</p>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Travel Documents */}
+          {/* Travel Documents - Multiple Passports */}
           <div className="mb-6">
-            <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Travel Documents</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Passport Number</label>
-                <input
-                  type="text"
-                  value={passportNumber}
-                  onChange={(e) => setPassportNumber(e.target.value)}
-                  className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon font-mono"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Passport Expiry</label>
-                <input
-                  type="date"
-                  value={passportExpiry}
-                  onChange={(e) => setPassportExpiry(e.target.value)}
-                  className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Passport Country</label>
-                <input
-                  type="text"
-                  value={passportCountry}
-                  onChange={(e) => setPassportCountry(e.target.value)}
-                  placeholder="e.g., USA"
-                  className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon"
-                />
-              </div>
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Passports</h3>
+              <button
+                type="button"
+                onClick={addPassport}
+                className="text-[10px] text-paragon font-bold hover:text-paragon-dark"
+              >
+                + Add Passport
+              </button>
             </div>
+            {passports.length === 0 ? (
+              <p className="text-xs text-slate-400 italic">No passports added. Click "Add Passport" to add one.</p>
+            ) : (
+              <div className="space-y-3">
+                {passports.map((passport, index) => (
+                  <div key={index} className="p-3 bg-slate-50 rounded border border-slate-200">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-[9px] font-bold text-slate-500 uppercase">Passport {index + 1}</span>
+                      <button
+                        type="button"
+                        onClick={() => removePassport(index)}
+                        className="text-red-500 hover:text-red-700 text-xs"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-[9px] font-bold uppercase tracking-widest text-slate-500 mb-1">Country *</label>
+                        <CountrySelect
+                          value={passport.country}
+                          onChange={(val) => updatePassport(index, 'country', val)}
+                          placeholder="Select country..."
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[9px] font-bold uppercase tracking-widest text-slate-500 mb-1">Passport Number *</label>
+                        <input
+                          type="text"
+                          value={passport.number}
+                          onChange={(e) => updatePassport(index, 'number', e.target.value)}
+                          placeholder="Passport number"
+                          className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[9px] font-bold uppercase tracking-widest text-slate-500 mb-1">Expiry Date</label>
+                        <input
+                          type="date"
+                          value={passport.expiry || ''}
+                          onChange={(e) => updatePassport(index, 'expiry', e.target.value)}
+                          className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Loyalty Programs */}
@@ -843,9 +927,12 @@ const CustomerListItem: React.FC<{
 const CustomerDetailModal: React.FC<{
   customer: Customer;
   primaryCustomer?: Customer;
+  agents?: AgentOption[];
   onClose: () => void;
   onEdit: (customer: Customer) => void;
-}> = ({ customer, primaryCustomer, onClose, onEdit }) => {
+}> = ({ customer, primaryCustomer, agents = [], onClose, onEdit }) => {
+  // Find agent name
+  const assignedAgent = customer.agentId ? agents.find(a => a.id === customer.agentId) : null;
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return '—';
     return new Date(dateStr).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
@@ -870,6 +957,14 @@ const CustomerDetailModal: React.FC<{
                 <span className="ml-2 text-paragon">• Under {primaryCustomer.displayName}'s account</span>
               )}
             </p>
+            {assignedAgent && (
+              <p className="text-[10px] text-teal-600 mt-1 flex items-center gap-1">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                Assigned to {assignedAgent.name}
+              </p>
+            )}
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
         </div>
@@ -899,20 +994,52 @@ const CustomerDetailModal: React.FC<{
             </div>
           </div>
 
-          {/* Travel Documents */}
-          <div className="mb-6">
-            <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Travel Documents</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="bg-slate-50 p-3 rounded">
-                <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Passport Number</p>
-                <p className="text-sm font-mono font-semibold text-slate-700">{customer.passportNumber || '—'}</p>
-              </div>
-              <div className="bg-slate-50 p-3 rounded">
-                <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Passport Expiry</p>
-                <p className="text-sm font-semibold text-slate-700">{formatDate(customer.passportExpiry)}</p>
+          {/* Travel Documents - Multiple Passports */}
+          {((customer.passports && customer.passports.length > 0) || customer.passportNumber) && (
+            <div className="mb-6">
+              <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">Travel Documents</h3>
+              <div className="space-y-3">
+                {customer.passports && customer.passports.length > 0 ? (
+                  customer.passports.map((passport, idx) => (
+                    <div key={idx} className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-3 bg-slate-50 rounded">
+                      <div>
+                        <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Passport Number</p>
+                        <p className="text-sm font-mono font-semibold text-slate-700">{passport.number || '—'}</p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Passport Expiry</p>
+                        <p className={`text-sm font-semibold ${passport.expiry && new Date(passport.expiry) < new Date(Date.now() + 6 * 30 * 24 * 60 * 60 * 1000) ? 'text-amber-600' : 'text-slate-700'}`}>
+                          {formatDate(passport.expiry)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Country</p>
+                        <p className="text-sm font-semibold text-slate-700">{passport.country || '—'}</p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  // Fallback for legacy single passport
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-3 bg-slate-50 rounded">
+                    <div>
+                      <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Passport Number</p>
+                      <p className="text-sm font-mono font-semibold text-slate-700">{customer.passportNumber || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Passport Expiry</p>
+                      <p className={`text-sm font-semibold ${customer.passportExpiry && new Date(customer.passportExpiry) < new Date(Date.now() + 6 * 30 * 24 * 60 * 60 * 1000) ? 'text-amber-600' : 'text-slate-700'}`}>
+                        {formatDate(customer.passportExpiry)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Country</p>
+                      <p className="text-sm font-semibold text-slate-700">{customer.passportCountry || '—'}</p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
-          </div>
+          )}
 
           {/* Loyalty Programs */}
           {customer.loyaltyPrograms && customer.loyaltyPrograms.length > 0 && (
@@ -999,6 +1126,7 @@ const CustomerDetailModal: React.FC<{
 const CRM: React.FC<CRMProps> = ({ requests = [], googleUser, onDeleteRequest }) => {
   const [activeSubTab, setActiveSubTab] = useState<'customers' | 'my-requests' | 'my-bookings'>('customers');
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [agents, setAgents] = useState<AgentOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -1007,6 +1135,7 @@ const CRM: React.FC<CRMProps> = ({ requests = [], googleUser, onDeleteRequest })
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedBookingId, setExpandedBookingId] = useState<string | null>(null);
   const [expandedRequestId, setExpandedRequestId] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'customer' | 'request'; id: string; name: string } | null>(null);
 
   // Fetch customers from API - filter by current agent's ID
   useEffect(() => {
@@ -1030,6 +1159,27 @@ const CRM: React.FC<CRMProps> = ({ requests = [], googleUser, onDeleteRequest })
     };
     fetchCustomers();
   }, [googleUser]);
+
+  // Fetch agents for dropdown (exclude clients)
+  useEffect(() => {
+    const fetchAgents = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/users`);
+        if (res.ok) {
+          const data = await res.json();
+          setAgents(data
+            .filter((u: { role?: string }) => u.role !== 'CLIENT')
+            .map((u: { id: string; googleId?: string; name: string }) => ({
+              id: u.googleId || u.id,
+              name: u.name
+            })));
+        }
+      } catch (error) {
+        console.error('Error fetching agents:', error);
+      }
+    };
+    fetchAgents();
+  }, []);
 
   // Filter requests for current user (check both googleId and MongoDB id for backwards compatibility)
   const isOwnRequest = (r: { agentId: string }) =>
@@ -1445,9 +1595,7 @@ const CRM: React.FC<CRMProps> = ({ requests = [], googleUser, onDeleteRequest })
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                if (confirm(`Delete this request? This cannot be undone.`)) {
-                                  onDeleteRequest(request.id);
-                                }
+                                setDeleteConfirm({ type: 'request', id: request.id, name: `${request.type} request for ${request.clientName}` });
                               }}
                               className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-red-600 bg-red-50 hover:bg-red-100 rounded-sm transition-colors"
                             >
@@ -1722,9 +1870,7 @@ const CRM: React.FC<CRMProps> = ({ requests = [], googleUser, onDeleteRequest })
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                if (confirm(`Delete this booking? This cannot be undone.`)) {
-                                  onDeleteRequest(request.id);
-                                }
+                                setDeleteConfirm({ type: 'request', id: request.id, name: `${request.type} booking for ${request.clientName}` });
                               }}
                               className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-red-600 bg-red-50 hover:bg-red-100 rounded-sm transition-colors"
                             >
@@ -1837,6 +1983,7 @@ const CRM: React.FC<CRMProps> = ({ requests = [], googleUser, onDeleteRequest })
         <CustomerDetailModal
           customer={selectedCustomer}
           primaryCustomer={getPrimaryCustomer(selectedCustomer.id)}
+          agents={agents}
           onClose={() => setSelectedCustomer(null)}
           onEdit={(c) => setEditingCustomer(c)}
         />
@@ -1846,6 +1993,8 @@ const CRM: React.FC<CRMProps> = ({ requests = [], googleUser, onDeleteRequest })
       {showAddModal && (
         <CustomerFormModal
           primaryCustomers={primaryCustomers}
+          agents={agents}
+          defaultAgentId={googleUser?.googleId || googleUser?.id || ''}
           onSave={handleSaveCustomer}
           onClose={() => setShowAddModal(false)}
         />
@@ -1856,6 +2005,8 @@ const CRM: React.FC<CRMProps> = ({ requests = [], googleUser, onDeleteRequest })
         <CustomerFormModal
           customer={editingCustomer}
           primaryCustomers={primaryCustomers}
+          agents={agents}
+          defaultAgentId={googleUser?.googleId || googleUser?.id || ''}
           onSave={handleSaveCustomer}
           onDelete={handleDeleteCustomer}
           onClose={() => setEditingCustomer(null)}
@@ -1863,6 +2014,26 @@ const CRM: React.FC<CRMProps> = ({ requests = [], googleUser, onDeleteRequest })
       )}
         </>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={!!deleteConfirm}
+        onClose={() => setDeleteConfirm(null)}
+        onConfirm={() => {
+          if (deleteConfirm) {
+            if (deleteConfirm.type === 'customer') {
+              handleDeleteCustomer(deleteConfirm.id);
+            } else if (deleteConfirm.type === 'request' && onDeleteRequest) {
+              onDeleteRequest(deleteConfirm.id);
+            }
+          }
+        }}
+        title="Confirm Delete"
+        message={`Are you sure you want to delete "${deleteConfirm?.name}"? This action cannot be undone.`}
+        confirmText="Yes, Delete"
+        cancelText="Cancel"
+        variant="danger"
+      />
     </div>
   );
 };

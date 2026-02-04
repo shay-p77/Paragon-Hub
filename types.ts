@@ -120,6 +120,12 @@ export interface CustomerPreferences {
   specialRequests?: string;
 }
 
+export interface Passport {
+  number: string;
+  country: string;
+  expiry?: string;
+}
+
 export interface Customer {
   id: string;
   // Basic Info
@@ -134,10 +140,13 @@ export interface Customer {
   // Relationship - if set, this customer belongs to a primary
   primaryCustomerId?: string;
 
-  // Travel Documents
+  // Travel Documents (legacy single passport - kept for backwards compatibility)
   passportNumber?: string;
   passportExpiry?: string;
   passportCountry?: string;
+
+  // Multiple passports support
+  passports?: Passport[];
 
   // Loyalty Programs
   loyaltyPrograms?: LoyaltyProgram[];
@@ -168,6 +177,8 @@ export interface BookingRequest {
   notes: string;
   timestamp: string;
   details?: any;
+  tripId?: string; // Link to ConciergeTrip if created from a trip
+  tripName?: string; // Name of linked trip for display
 }
 
 export interface Comment {
@@ -219,6 +230,10 @@ export interface ConvertedFlight {
   createdAt: string;
   originalRequestId?: string;
   notes?: string;
+  tripId?: string; // Link to ConciergeTrip
+  tripName?: string;
+  vendorId?: string; // Link to Vendor
+  vendorName?: string;
 }
 
 export interface ConvertedHotel {
@@ -237,6 +252,10 @@ export interface ConvertedHotel {
   createdAt: string;
   originalRequestId?: string;
   notes?: string;
+  tripId?: string; // Link to ConciergeTrip
+  tripName?: string;
+  vendorId?: string; // Link to Vendor
+  vendorName?: string;
 }
 
 export interface ConvertedLogistics {
@@ -253,22 +272,40 @@ export interface ConvertedLogistics {
   createdAt: string;
   originalRequestId?: string;
   notes?: string;
+  tripId?: string; // Link to ConciergeTrip
+  tripName?: string;
+  vendorId?: string; // Link to Vendor
+  vendorName?: string;
 }
 
 // Pipeline stages for Kanban board
 export type PipelineStage = 'NEW' | 'PLANNING' | 'IN_PROGRESS' | 'FINALIZING';
+
+// Comment for pipeline tasks
+export interface TaskComment {
+  id: string;
+  authorId: string;
+  authorName: string;
+  text: string;
+  timestamp: string;
+}
 
 // Task within a pipeline trip
 export interface PipelineTask {
   id: string;
   text: string;
   completed: boolean;
+  assignedTo?: string; // Agent user id
+  deadline?: string; // ISO date string
+  description?: string; // Additional details
+  comments?: TaskComment[]; // Task comments
 }
 
 // Pipeline trip for Kanban board
 export interface PipelineTrip {
   id: string;
   name: string;
+  clientId?: string; // Link to Customer for records
   clientName: string;
   stage: PipelineStage;
   hasFlights: boolean;
@@ -281,4 +318,71 @@ export interface PipelineTrip {
   agent: string;
   notes?: string;
   createdAt: string;
+}
+
+// Vendor types
+export type VendorType = 'FLIGHT' | 'HOTEL' | 'LOGISTICS';
+export type CollectionMethod = 'AUTOMATIC' | 'EMAIL' | 'FORM' | 'CHECK' | 'INVOICE' | 'OTHER';
+export type PaymentFrequency = 'MONTHLY' | 'WEEKLY' | 'PER_BOOKING' | 'QUARTERLY' | 'ANNUALLY' | 'OTHER';
+
+export interface Vendor {
+  id: string;
+  name: string;
+  code?: string;
+  type: VendorType;
+  commissionPercent: number;
+  collectionMethod: CollectionMethod;
+  paymentFrequency: PaymentFrequency;
+  collectionEmail?: string;
+  collectionFormUrl?: string;
+  collectionNotes?: string;
+  contactName?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  notes?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Audit log types
+export type AuditAction =
+  | 'LOGIN'
+  | 'LOGOUT'
+  | 'VIEW_CUSTOMER'
+  | 'CREATE_CUSTOMER'
+  | 'UPDATE_CUSTOMER'
+  | 'DELETE_CUSTOMER'
+  | 'VIEW_BOOKING'
+  | 'CREATE_BOOKING'
+  | 'UPDATE_BOOKING'
+  | 'DELETE_BOOKING'
+  | 'VIEW_PII'
+  | 'EXPORT_DATA'
+  | 'INVITE_USER'
+  | 'RESEND_INVITE'
+  | 'UPDATE_USER'
+  | 'DELETE_USER'
+  | 'SETTINGS_CHANGE'
+  | 'CREATE_VENDOR'
+  | 'UPDATE_VENDOR'
+  | 'DELETE_VENDOR'
+  | 'FAILED_LOGIN'
+  | 'RATE_LIMITED';
+
+export interface AuditLog {
+  id: string;
+  userId?: string;
+  userEmail?: string;
+  userName?: string;
+  userRole?: string;
+  action: AuditAction;
+  resourceType?: string;
+  resourceId?: string;
+  resourceName?: string;
+  details?: any;
+  ipAddress?: string;
+  success: boolean;
+  errorMessage?: string;
+  timestamp: string;
 }

@@ -56,7 +56,7 @@ const bookingRequestSchema = new mongoose.Schema({
   },
   notes: {
     type: String,
-    required: true,
+    default: '',
   },
   timestamp: {
     type: Date,
@@ -65,6 +65,14 @@ const bookingRequestSchema = new mongoose.Schema({
   details: {
     type: mongoose.Schema.Types.Mixed,
     default: {},
+  },
+  tripId: {
+    type: String,
+    default: null,
+  },
+  tripName: {
+    type: String,
+    default: null,
   },
 });
 

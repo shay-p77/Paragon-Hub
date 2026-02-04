@@ -1,7 +1,7 @@
 const express = require('express');
 const { Resend } = require('resend');
 const User = require('../models/User');
-const { logAudit } = require('../utils/auditLogger');
+const { logAudit, getAuditLogs } = require('../utils/auditLogger');
 
 const router = express.Router();
 
@@ -122,7 +122,7 @@ const sendInviteEmail = async (toEmail, toName, role) => {
 router.get('/', async (req, res) => {
   try {
     const users = await User.find({})
-      .select('email name role status isActive avatarColor invitedAt lastLogin lastSeen createdAt')
+      .select('email name role status isActive avatarColor invitedAt lastLogin lastSeen createdAt googleId')
       .sort({ createdAt: -1 });
 
     // Check for stale users - if lastSeen > 10 minutes ago, treat as OFFLINE
@@ -132,6 +132,8 @@ router.get('/', async (req, res) => {
 
     const usersWithStatus = users.map(user => {
       const userObj = user.toObject();
+      // Add id field for frontend consistency
+      userObj.id = userObj._id.toString();
       // If user has a lastSeen and it's stale, override status to OFFLINE
       if (userObj.lastSeen && userObj.status !== 'OFFLINE') {
         const lastSeenTime = new Date(userObj.lastSeen).getTime();
@@ -268,6 +270,57 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+// POST /api/users/:id/resend-invite - Resend invite email to a pending user
+router.post('/:id/resend-invite', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const user = await User.findById(id);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Check if user has already logged in (has a real googleId, not a placeholder)
+    if (user.googleId && !user.googleId.startsWith('invited-')) {
+      return res.status(400).json({ error: 'User has already logged in - cannot resend invite' });
+    }
+
+    // Send invite email
+    const emailResult = await sendInviteEmail(user.email, user.name, user.role);
+
+    if (!emailResult.success) {
+      return res.status(500).json({ error: 'Failed to send invite email', reason: emailResult.reason });
+    }
+
+    // Update invitedAt timestamp
+    user.invitedAt = new Date();
+    await user.save();
+
+    console.log(`Invite resent to: ${user.email}`);
+
+    // Log audit
+    await logAudit({
+      action: 'RESEND_INVITE',
+      resourceType: 'User',
+      resourceId: user._id,
+      resourceName: user.email,
+      details: { role: user.role },
+      req
+    });
+
+    res.json({
+      success: true,
+      message: 'Invite email resent successfully',
+      invitedAt: user.invitedAt
+    });
+
+  } catch (error) {
+    console.error('Resend invite error:', error);
+    res.status(500).json({ error: 'Failed to resend invite' });
+  }
+});
+
 // DELETE /api/users/:id - Delete user
 router.delete('/:id', async (req, res) => {
   try {
@@ -296,6 +349,55 @@ router.delete('/:id', async (req, res) => {
   } catch (error) {
     console.error('Delete user error:', error);
     res.status(500).json({ error: 'Failed to delete user' });
+  }
+});
+
+// GET /api/users/audit-logs - Get audit logs (admin only)
+router.get('/audit-logs', async (req, res) => {
+  try {
+    const {
+      userId,
+      action,
+      resourceType,
+      startDate,
+      endDate,
+      limit = 100,
+      skip = 0
+    } = req.query;
+
+    const logs = await getAuditLogs({
+      userId,
+      action,
+      resourceType,
+      startDate,
+      endDate,
+      limit: parseInt(limit),
+      skip: parseInt(skip)
+    });
+
+    // Format logs for frontend
+    const formattedLogs = logs.map(log => ({
+      id: log._id.toString(),
+      userId: log.userId?._id?.toString() || log.userId?.toString(),
+      userEmail: log.userId?.email || log.userEmail,
+      userName: log.userId?.name,
+      userRole: log.userId?.role || log.userRole,
+      action: log.action,
+      resourceType: log.resourceType,
+      resourceId: log.resourceId?.toString(),
+      resourceName: log.resourceName,
+      details: log.details,
+      ipAddress: log.ipAddress,
+      success: log.success,
+      errorMessage: log.errorMessage,
+      timestamp: log.timestamp
+    }));
+
+    res.json(formattedLogs);
+
+  } catch (error) {
+    console.error('Get audit logs error:', error);
+    res.status(500).json({ error: 'Failed to get audit logs' });
   }
 });
 

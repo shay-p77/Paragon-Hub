@@ -1,5 +1,28 @@
 const mongoose = require('mongoose');
 
+const taskCommentSchema = new mongoose.Schema({
+  id: {
+    type: String,
+    required: true,
+  },
+  authorId: {
+    type: String,
+    required: true,
+  },
+  authorName: {
+    type: String,
+    required: true,
+  },
+  text: {
+    type: String,
+    required: true,
+  },
+  timestamp: {
+    type: String,
+    required: true,
+  },
+}, { _id: false });
+
 const pipelineTaskSchema = new mongoose.Schema({
   id: {
     type: String,
@@ -13,12 +36,32 @@ const pipelineTaskSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  assignedTo: {
+    type: String,
+    default: null,
+  },
+  deadline: {
+    type: String,
+    default: null,
+  },
+  description: {
+    type: String,
+    default: null,
+  },
+  comments: {
+    type: [taskCommentSchema],
+    default: [],
+  },
 }, { _id: false });
 
 const pipelineTripSchema = new mongoose.Schema({
   name: {
     type: String,
     required: true,
+  },
+  clientId: {
+    type: String,
+    default: null,
   },
   clientName: {
     type: String,
