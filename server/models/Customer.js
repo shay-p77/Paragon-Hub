@@ -147,6 +147,26 @@ const customerSchema = new mongoose.Schema({
     default: '',
     index: true,
   },
+
+  // Custom markup overrides (null = use global default, 0 = no markup)
+  customMarkups: {
+    flight: {
+      amount: { type: Number, default: null },
+      type: { type: String, enum: ['FLAT', 'PERCENT', null], default: null },
+    },
+    hotel: {
+      amount: { type: Number, default: null },
+      type: { type: String, enum: ['FLAT', 'PERCENT', null], default: null },
+    },
+    logistics: {
+      amount: { type: Number, default: null },
+      type: { type: String, enum: ['FLAT', 'PERCENT', null], default: null },
+    },
+    conciergePerDay: {
+      amount: { type: Number, default: null },
+      type: { type: String, enum: ['FLAT', 'PERCENT', null], default: null },
+    },
+  },
 });
 
 // Encrypt sensitive PII fields automatically

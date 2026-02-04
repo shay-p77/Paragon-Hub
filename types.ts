@@ -120,6 +120,28 @@ export interface CustomerPreferences {
   specialRequests?: string;
 }
 
+// Markup types
+export type MarkupType = 'FLAT' | 'PERCENT';
+
+export interface MarkupSetting {
+  amount: number | null;
+  type: MarkupType | null;
+}
+
+export interface CustomMarkups {
+  flight?: MarkupSetting;
+  hotel?: MarkupSetting;
+  logistics?: MarkupSetting;
+  conciergePerDay?: MarkupSetting;
+}
+
+export interface SystemMarkups {
+  flight: { amount: number; type: MarkupType };
+  hotel: { amount: number; type: MarkupType };
+  logistics: { amount: number; type: MarkupType };
+  conciergePerDay: { amount: number; type: MarkupType };
+}
+
 export interface Passport {
   number: string;
   country: string;
@@ -163,6 +185,9 @@ export interface Customer {
 
   // Agent ownership (for CRM filtering)
   agentId?: string;
+
+  // Custom markup overrides (null = use global default)
+  customMarkups?: CustomMarkups | null;
 }
 
 export interface BookingRequest {
@@ -225,21 +250,36 @@ export interface ConvertedFlight {
   passengerCount: number;
   dates: string;
   agent: string; // Text field - agent who did the booking
-  profitLoss: number;
+  cost?: number; // What we paid
+  chargeToClient?: number; // What we charge the client
+  profitLoss: number; // chargeToClient - cost (or manual entry)
   status: 'PENDING' | 'CONFIRMED' | 'TICKETED' | 'CANCELLED';
   createdAt: string;
   originalRequestId?: string;
   notes?: string;
   tripId?: string; // Link to ConciergeTrip
   tripName?: string;
+  clientId?: string; // Link to Customer for markup lookup
   vendorId?: string; // Link to Vendor
   vendorName?: string;
 }
+
+export type HotelBookingAgency = 'PARAGON' | 'BENNISH' | 'EMBARK' | 'TAAP';
+export type HotelPaymentMethod = 'AGENCY' | 'PAY_AT_CHECKIN';
+
+// Commission split percentages by agency
+export const HOTEL_COMMISSION_SPLITS: Record<HotelBookingAgency, number> = {
+  PARAGON: 0.94,
+  BENNISH: 0.85,
+  EMBARK: 0.70,
+  TAAP: 1.00,
+};
 
 export interface ConvertedHotel {
   id: string;
   description: string; // LastName-HotelName format
   hotelName: string;
+  guestName: string; // Primary guest name
   paymentStatus: 'PAID' | 'UNPAID';
   confirmationNumber: string;
   roomType: string;
@@ -247,15 +287,39 @@ export interface ConvertedHotel {
   checkIn: string;
   checkOut: string;
   agent: string;
-  profitLoss: number;
+
+  // Booking source & payment
+  bookedVia: HotelBookingAgency;
+  paymentMethod: HotelPaymentMethod;
+  customerPayingId?: string; // Customer who is paying (may differ from guest)
+  customerPayingName?: string;
+
+  // Financial tracking
+  roomRate?: number; // Room rate without taxes
+  fullCharge?: number; // Full charge including taxes
+  commissionPercent?: number; // Expected commission % (typically 10-15%)
+  expectedCommission?: number; // Calculated: roomRate * commissionPercent
+  commissionSplit?: number; // Agency split percentage (from HOTEL_COMMISSION_SPLITS)
+  netCommission?: number; // Calculated: expectedCommission * commissionSplit
+
+  // Legacy fields (kept for compatibility)
+  cost?: number; // What we paid (same as fullCharge if agency paid)
+  chargeToClient?: number; // What we charge the client
+  profitLoss: number; // chargeToClient - cost (or manual entry)
+
   status: 'PENDING' | 'CONFIRMED' | 'CANCELLED';
   createdAt: string;
   originalRequestId?: string;
   notes?: string;
   tripId?: string; // Link to ConciergeTrip
   tripName?: string;
+  clientId?: string; // Link to Customer for markup lookup
   vendorId?: string; // Link to Vendor
   vendorName?: string;
+
+  // Automation
+  welcomeLetterSent?: boolean;
+  welcomeLetterSentAt?: string;
 }
 
 export interface ConvertedLogistics {
@@ -267,13 +331,16 @@ export interface ConvertedLogistics {
   details: string;
   date: string;
   agent: string;
-  profitLoss: number;
+  cost?: number; // What we paid
+  chargeToClient?: number; // What we charge the client
+  profitLoss: number; // chargeToClient - cost (or manual entry)
   status: 'PENDING' | 'CONFIRMED' | 'CANCELLED';
   createdAt: string;
   originalRequestId?: string;
   notes?: string;
   tripId?: string; // Link to ConciergeTrip
   tripName?: string;
+  clientId?: string; // Link to Customer for markup lookup
   vendorId?: string; // Link to Vendor
   vendorName?: string;
 }

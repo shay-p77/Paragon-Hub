@@ -36,7 +36,7 @@ const Comments: React.FC<CommentsProps> = ({ parentId, currentUser, comments, on
   };
 
   return (
-    <div className="bg-slate-50 border border-slate-200 rounded-sm mt-4">
+    <div className="bg-slate-50 border border-slate-200 rounded-xl mt-4">
       <div className="p-4 border-b border-slate-200 bg-white">
         <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Comments & Collaboration</h4>
       </div>

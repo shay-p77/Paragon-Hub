@@ -107,6 +107,11 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
   // Users/Agents state from database
   const [agents, setAgents] = useState<{ id: string; name: string; role: string }[]>([]);
 
+  // Agent filter state - SALES users see only their trips by default, ADMIN/OPERATIONS see all
+  const userRole = googleUser?.role || 'SALES';
+  const isSalesOnly = userRole === 'SALES';
+  const [agentFilter, setAgentFilter] = useState<string>(isSalesOnly ? (googleUser?.name || 'all') : 'all');
+
   // Fetch customers and agents
   useEffect(() => {
     const fetchCustomers = async () => {
@@ -540,11 +545,16 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
     { id: 'FINALIZING', label: 'Finalizing', color: 'border-emerald-500' }
   ];
 
-  // Stats
-  const totalTrips = pipelineTrips.length;
-  const urgentTrips = pipelineTrips.filter(t => t.isUrgent).length;
-  const completedTasks = pipelineTrips.reduce((sum, t) => sum + t.tasks.filter(task => task.completed).length, 0);
-  const totalTasks = pipelineTrips.reduce((sum, t) => sum + t.tasks.length, 0);
+  // Filter trips by selected agent
+  const filteredTrips = agentFilter === 'all'
+    ? pipelineTrips
+    : pipelineTrips.filter(t => t.agent === agentFilter);
+
+  // Stats (based on filtered trips)
+  const totalTrips = filteredTrips.length;
+  const urgentTrips = filteredTrips.filter(t => t.isUrgent).length;
+  const completedTasks = filteredTrips.reduce((sum, t) => sum + t.tasks.filter(task => task.completed).length, 0);
+  const totalTasks = filteredTrips.reduce((sum, t) => sum + t.tasks.length, 0);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
@@ -552,19 +562,19 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-        <div className="bg-white border border-slate-200 p-3 sm:p-4 rounded-sm">
+        <div className="bg-white border border-slate-200 p-3 sm:p-4 rounded-xl">
           <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Active Trips</p>
           <p className="text-xl sm:text-2xl font-bold text-slate-900">{totalTrips}</p>
         </div>
-        <div className="bg-white border border-slate-200 p-3 sm:p-4 rounded-sm">
+        <div className="bg-white border border-slate-200 p-3 sm:p-4 rounded-xl">
           <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Urgent</p>
           <p className="text-xl sm:text-2xl font-bold text-red-600">{urgentTrips}</p>
         </div>
-        <div className="bg-white border border-slate-200 p-3 sm:p-4 rounded-sm">
+        <div className="bg-white border border-slate-200 p-3 sm:p-4 rounded-xl">
           <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Tasks Done</p>
           <p className="text-xl sm:text-2xl font-bold text-emerald-600">{completedTasks}</p>
         </div>
-        <div className="bg-white border border-slate-200 p-3 sm:p-4 rounded-sm">
+        <div className="bg-white border border-slate-200 p-3 sm:p-4 rounded-xl">
           <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Total Tasks</p>
           <p className="text-xl sm:text-2xl font-bold text-slate-600">{totalTasks}</p>
         </div>
@@ -575,21 +585,40 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
         <div className="flex gap-2">
           <button
             onClick={() => openPipelineModal()}
-            className="bg-paragon text-white text-[10px] px-4 py-2.5 font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-sm"
+            className="bg-paragon text-white text-[10px] px-4 py-2.5 font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-xl"
           >
             + New Trip
           </button>
+        </div>
+
+        {/* Agent Filter */}
+        <div className="flex items-center gap-2">
+          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">View:</label>
+          <select
+            value={agentFilter}
+            onChange={(e) => setAgentFilter(e.target.value)}
+            className="text-xs border border-slate-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-paragon focus:border-paragon"
+          >
+            {!isSalesOnly && <option value="all">All Agents</option>}
+            {agents.map(agent => (
+              <option key={agent.id} value={agent.name}>{agent.name}</option>
+            ))}
+            {/* Fallback for current user if not in agents list yet */}
+            {googleUser?.name && !agents.find(a => a.name === googleUser.name) && (
+              <option value={googleUser.name}>{googleUser.name} (Me)</option>
+            )}
+          </select>
         </div>
       </div>
 
       {/* Kanban Board */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 overflow-x-auto">
         {pipelineStages.map(stage => {
-          const stageTrips = pipelineTrips.filter(t => t.stage === stage.id);
+          const stageTrips = filteredTrips.filter(t => t.stage === stage.id);
           return (
             <div
               key={stage.id}
-              className={`bg-slate-100 p-3 sm:p-4 border-t-4 ${stage.color} rounded-sm min-h-[200px] sm:min-h-[400px] lg:min-h-[500px] transition-colors ${dragOverStage === stage.id ? 'bg-slate-200 ring-2 ring-paragon ring-opacity-50' : ''}`}
+              className={`bg-slate-100 p-3 sm:p-4 border-t-4 ${stage.color} rounded-xl min-h-[200px] sm:min-h-[400px] lg:min-h-[500px] transition-colors ${dragOverStage === stage.id ? 'bg-slate-200 ring-2 ring-paragon ring-opacity-50' : ''}`}
               onDragOver={(e) => handleDragOver(e, stage.id)}
               onDragLeave={handleDragLeave}
               onDrop={(e) => handleDrop(e, stage.id)}
@@ -608,7 +637,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                     onDragStart={(e) => handleDragStart(e, trip.id)}
                     onDragEnd={handleDragEnd}
                     onClick={() => setViewingTrip(trip)}
-                    className={`bg-white p-4 border border-slate-200 shadow-sm rounded-sm cursor-grab hover:border-paragon transition-all ${draggingTripId === trip.id ? 'opacity-50 cursor-grabbing' : ''}`}
+                    className={`bg-white p-4 border border-slate-200 shadow-sm rounded-xl cursor-grab hover:border-paragon transition-all ${draggingTripId === trip.id ? 'opacity-50 cursor-grabbing' : ''}`}
                   >
                     {/* Card Header */}
                     <div className="flex justify-between items-start mb-2">
@@ -656,7 +685,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                               onClick={(e) => { e.stopPropagation(); handleQuickToggleTask(trip.id, task.id); }}
                               className="flex items-center gap-2 group"
                             >
-                              <div className={`w-3 h-3 rounded-sm border flex-shrink-0 flex items-center justify-center cursor-pointer ${task.completed ? 'bg-paragon border-paragon' : 'border-slate-300 hover:border-paragon'}`}>
+                              <div className={`w-3 h-3 rounded-xl border flex-shrink-0 flex items-center justify-center cursor-pointer ${task.completed ? 'bg-paragon border-paragon' : 'border-slate-300 hover:border-paragon'}`}>
                                 {task.completed && (
                                   <svg className="w-2 h-2 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
@@ -678,7 +707,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                 {/* Add New Card Button */}
                 <button
                   onClick={() => openPipelineModal(undefined, stage.id)}
-                  className="w-full py-3 border-2 border-dashed border-slate-300 rounded-sm text-[10px] text-slate-400 font-bold uppercase tracking-widest hover:border-paragon hover:text-paragon transition-colors"
+                  className="w-full py-3 border-2 border-dashed border-slate-300 rounded-xl text-[10px] text-slate-400 font-bold uppercase tracking-widest hover:border-paragon hover:text-paragon transition-colors"
                 >
                   + Add
                 </button>
@@ -695,7 +724,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
           onClick={closePipelineModal}
         >
           <div
-            className="bg-white rounded-sm shadow-2xl w-full max-w-xl mx-4 max-h-[90vh] overflow-y-auto animate-zoomIn"
+            className="bg-white rounded-xl shadow-2xl w-full max-w-xl mx-4 max-h-[90vh] overflow-y-auto animate-zoomIn"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-6 border-b border-slate-200">
@@ -717,7 +746,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                     value={tripName}
                     onChange={(e) => setTripName(e.target.value)}
                     placeholder="e.g., Paris Anniversary Trip"
-                    className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                    className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                   />
                 </div>
                 <div>
@@ -744,7 +773,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                   <select
                     value={tripStage}
                     onChange={(e) => setTripStage(e.target.value as PipelineStage)}
-                    className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                    className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                   >
                     <option value="NEW">New / Potential</option>
                     <option value="PLANNING">Planning</option>
@@ -759,7 +788,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                     value={tripAgent}
                     onChange={(e) => setTripAgent(e.target.value)}
                     placeholder="Agent name"
-                    className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                    className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                   />
                 </div>
               </div>
@@ -772,7 +801,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                     type="date"
                     value={tripStartDate}
                     onChange={(e) => setTripStartDate(e.target.value)}
-                    className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                    className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                   />
                 </div>
                 <div>
@@ -782,7 +811,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                     value={tripEndDate}
                     onChange={(e) => setTripEndDate(e.target.value)}
                     min={tripStartDate}
-                    className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                    className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                   />
                 </div>
               </div>
@@ -839,7 +868,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                   onChange={(e) => setTripNotes(e.target.value)}
                   placeholder="Additional details, preferences, or requirements..."
                   rows={3}
-                  className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon resize-none"
+                  className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon resize-none"
                 />
               </div>
 
@@ -848,11 +877,11 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                 <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Tasks</label>
                 <div className="space-y-2 mb-3">
                   {tripTasks.map(task => (
-                    <div key={task.id} className="flex items-start gap-2 group p-2 bg-slate-50 rounded-sm hover:bg-slate-100 transition-colors">
+                    <div key={task.id} className="flex items-start gap-2 group p-2 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors">
                       <button
                         type="button"
                         onClick={() => handleToggleTask(task.id)}
-                        className={`w-4 h-4 rounded-sm border flex-shrink-0 flex items-center justify-center mt-0.5 ${task.completed ? 'bg-paragon border-paragon' : 'border-slate-300 hover:border-paragon'}`}
+                        className={`w-4 h-4 rounded-xl border flex-shrink-0 flex items-center justify-center mt-0.5 ${task.completed ? 'bg-paragon border-paragon' : 'border-slate-300 hover:border-paragon'}`}
                       >
                         {task.completed && (
                           <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -867,12 +896,12 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                         <span className={`text-xs block ${task.completed ? 'text-slate-400 line-through' : 'text-slate-700'}`}>{task.text}</span>
                         <div className="flex items-center gap-2 mt-1 flex-wrap">
                           {task.assignedTo && (
-                            <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[9px] font-medium rounded-sm">
+                            <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[9px] font-medium rounded-xl">
                               {getAgentName(task.assignedTo)}
                             </span>
                           )}
                           {task.deadline && (
-                            <span className={`px-1.5 py-0.5 text-[9px] font-medium rounded-sm ${
+                            <span className={`px-1.5 py-0.5 text-[9px] font-medium rounded-xl ${
                               parseLocalDate(task.deadline) < new Date() && !task.completed
                                 ? 'bg-red-100 text-red-700'
                                 : 'bg-amber-100 text-amber-700'
@@ -895,20 +924,20 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                   ))}
                 </div>
                 {/* Add Task Form */}
-                <div className="space-y-2 p-3 bg-slate-50 rounded-sm border border-slate-200">
+                <div className="space-y-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
                   <input
                     type="text"
                     value={newTaskText}
                     onChange={(e) => setNewTaskText(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTask())}
                     placeholder="Task description..."
-                    className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon bg-white"
+                    className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon bg-white"
                   />
                   <div className="flex gap-2">
                     <select
                       value={newTaskAssignee}
                       onChange={(e) => setNewTaskAssignee(e.target.value)}
-                      className="flex-1 p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon bg-white"
+                      className="flex-1 p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon bg-white"
                     >
                       <option value="">Assign to...</option>
                       {(agents.length > 0 ? agents : MOCK_USERS.filter(u => u.role !== 'CLIENT')).map(user => (
@@ -919,7 +948,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                       type="date"
                       value={newTaskDeadline}
                       onChange={(e) => setNewTaskDeadline(e.target.value)}
-                      className="flex-1 p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon bg-white"
+                      className="flex-1 p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon bg-white"
                       placeholder="Deadline"
                     />
                   </div>
@@ -927,7 +956,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                     type="button"
                     onClick={handleAddTask}
                     disabled={!newTaskText.trim()}
-                    className="w-full px-3 py-2 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full px-3 py-2 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Add Task
                   </button>
@@ -940,7 +969,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                 {editingTrip && (
                   <button
                     onClick={() => setDeleteConfirm({ id: editingTrip.id, name: editingTrip.name || 'this trip' })}
-                    className="px-4 py-2 text-red-600 text-[10px] font-bold uppercase tracking-widest hover:bg-red-50 transition-colors rounded-sm"
+                    className="px-4 py-2 text-red-600 text-[10px] font-bold uppercase tracking-widest hover:bg-red-50 transition-colors rounded-xl"
                   >
                     Delete Trip
                   </button>
@@ -949,14 +978,14 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
               <div className="flex gap-3">
                 <button
                   onClick={closePipelineModal}
-                  className="px-6 py-2 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-sm"
+                  className="px-6 py-2 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-xl"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSubmitPipelineTrip}
                   disabled={!tripName.trim() || !tripClientName.trim()}
-                  className="px-6 py-2 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-6 py-2 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {editingTrip ? 'Save Changes' : 'Create Trip'}
                 </button>
@@ -973,7 +1002,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
           onClick={() => setViewingTrip(null)}
         >
           <div
-            className="bg-white rounded-sm shadow-2xl w-full max-w-xl mx-4 max-h-[90vh] overflow-y-auto animate-zoomIn"
+            className="bg-white rounded-xl shadow-2xl w-full max-w-xl mx-4 max-h-[90vh] overflow-y-auto animate-zoomIn"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -998,7 +1027,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
               <div className="flex gap-4">
                 <div className="flex-1">
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Stage</label>
-                  <span className={`inline-block px-3 py-1 text-xs font-bold rounded-sm ${
+                  <span className={`inline-block px-3 py-1 text-xs font-bold rounded-xl ${
                     viewingTrip.stage === 'NEW' ? 'bg-slate-100 text-slate-600' :
                     viewingTrip.stage === 'PLANNING' ? 'bg-amber-100 text-amber-700' :
                     viewingTrip.stage === 'IN_PROGRESS' ? 'bg-paragon/10 text-paragon' :
@@ -1038,7 +1067,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Services</label>
                 <div className="flex gap-3">
                   {viewingTrip.hasFlights && (
-                    <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-sm">
+                    <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-xl">
                       <svg className="w-4 h-4 text-paragon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                       </svg>
@@ -1046,7 +1075,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                     </div>
                   )}
                   {viewingTrip.hasHotels && (
-                    <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-sm">
+                    <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-xl">
                       <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                       </svg>
@@ -1054,7 +1083,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                     </div>
                   )}
                   {viewingTrip.hasLogistics && (
-                    <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-sm">
+                    <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-xl">
                       <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                       </svg>
@@ -1071,7 +1100,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
               {viewingTrip.notes && (
                 <div>
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Notes</label>
-                  <p className="text-sm text-slate-700 bg-slate-50 p-3 rounded-sm">{viewingTrip.notes}</p>
+                  <p className="text-sm text-slate-700 bg-slate-50 p-3 rounded-xl">{viewingTrip.notes}</p>
                 </div>
               )}
 
@@ -1088,13 +1117,13 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                       return (
                         <div
                           key={task.id}
-                          className={`bg-slate-50 rounded-sm border border-slate-200 overflow-hidden transition-all ${task.completed ? 'opacity-70' : ''}`}
+                          className={`bg-slate-50 rounded-xl border border-slate-200 overflow-hidden transition-all ${task.completed ? 'opacity-70' : ''}`}
                         >
                           {/* Task Header Row */}
                           <div className="flex items-center gap-3 p-3">
                             <button
                               onClick={(e) => { e.stopPropagation(); handleQuickToggleTask(viewingTrip.id, task.id); }}
-                              className={`w-5 h-5 rounded-sm border-2 flex-shrink-0 flex items-center justify-center transition-colors ${task.completed ? 'bg-paragon border-paragon' : 'border-slate-300 hover:border-paragon'}`}
+                              className={`w-5 h-5 rounded-xl border-2 flex-shrink-0 flex items-center justify-center transition-colors ${task.completed ? 'bg-paragon border-paragon' : 'border-slate-300 hover:border-paragon'}`}
                             >
                               {task.completed && (
                                 <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1107,10 +1136,10 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                               {/* Quick info badges */}
                               <div className="flex items-center gap-2 mt-1 flex-wrap">
                                 {task.assignedTo && (
-                                  <span className="px-1.5 py-0.5 bg-blue-100 text-blue-600 text-[9px] font-medium rounded-sm">{getAgentName(task.assignedTo)}</span>
+                                  <span className="px-1.5 py-0.5 bg-blue-100 text-blue-600 text-[9px] font-medium rounded-xl">{getAgentName(task.assignedTo)}</span>
                                 )}
                                 {task.deadline && (
-                                  <span className={`px-1.5 py-0.5 text-[9px] font-medium rounded-sm ${
+                                  <span className={`px-1.5 py-0.5 text-[9px] font-medium rounded-xl ${
                                     parseLocalDate(task.deadline) < new Date() && !task.completed
                                       ? 'bg-red-100 text-red-600'
                                       : 'bg-amber-100 text-amber-600'
@@ -1119,12 +1148,12 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                                   </span>
                                 )}
                                 {task.description && (
-                                  <span className="px-1.5 py-0.5 bg-slate-200 text-slate-600 text-[9px] font-medium rounded-sm">
+                                  <span className="px-1.5 py-0.5 bg-slate-200 text-slate-600 text-[9px] font-medium rounded-xl">
                                     📝 Notes
                                   </span>
                                 )}
                                 {task.comments && task.comments.length > 0 && (
-                                  <span className="px-1.5 py-0.5 bg-slate-200 text-slate-600 text-[9px] font-medium rounded-sm">
+                                  <span className="px-1.5 py-0.5 bg-slate-200 text-slate-600 text-[9px] font-medium rounded-xl">
                                     💬 {task.comments.length}
                                   </span>
                                 )}
@@ -1133,7 +1162,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                             {/* Expand/Collapse Button */}
                             <button
                               onClick={() => setExpandedTaskId(isExpanded ? null : task.id)}
-                              className={`w-7 h-7 flex items-center justify-center rounded-sm transition-colors ${hasDetails ? 'hover:bg-slate-200 text-slate-500' : 'text-slate-300 cursor-default'}`}
+                              className={`w-7 h-7 flex items-center justify-center rounded-xl transition-colors ${hasDetails ? 'hover:bg-slate-200 text-slate-500' : 'text-slate-300 cursor-default'}`}
                               title={hasDetails ? (isExpanded ? 'Collapse' : 'Expand details') : 'No additional details'}
                             >
                               <svg className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1159,7 +1188,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                                   <p className="text-[9px] font-bold text-slate-500 uppercase mb-1">Recent Comments ({task.comments.length})</p>
                                   <div className="space-y-2">
                                     {task.comments.slice(-2).map(comment => (
-                                      <div key={comment.id} className="bg-slate-50 rounded-sm p-2">
+                                      <div key={comment.id} className="bg-slate-50 rounded-xl p-2">
                                         <div className="flex justify-between items-center mb-0.5">
                                           <span className="text-[9px] font-bold text-slate-700">{comment.authorName}</span>
                                           <span className="text-[8px] text-slate-400">{new Date(comment.timestamp).toLocaleDateString()}</span>
@@ -1174,7 +1203,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                               {/* Edit Details Button */}
                               <button
                                 onClick={() => openTaskDetail(task, viewingTrip.id)}
-                                className="w-full mt-2 px-3 py-2 bg-paragon/10 text-paragon text-[10px] font-bold uppercase tracking-wider hover:bg-paragon/20 transition-colors rounded-sm flex items-center justify-center gap-2"
+                                className="w-full mt-2 px-3 py-2 bg-paragon/10 text-paragon text-[10px] font-bold uppercase tracking-wider hover:bg-paragon/20 transition-colors rounded-xl flex items-center justify-center gap-2"
                               >
                                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -1200,19 +1229,19 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                     <div className="flex gap-2">
                       <button
                         onClick={() => openAddRequestModal(viewingTrip, 'FLIGHT')}
-                        className="px-2 py-1 text-[9px] font-bold uppercase tracking-wider bg-red-50 text-red-600 hover:bg-red-100 rounded-sm transition-colors"
+                        className="px-2 py-1 text-[9px] font-bold uppercase tracking-wider bg-red-50 text-red-600 hover:bg-red-100 rounded-xl transition-colors"
                       >
                         + Flight
                       </button>
                       <button
                         onClick={() => openAddRequestModal(viewingTrip, 'HOTEL')}
-                        className="px-2 py-1 text-[9px] font-bold uppercase tracking-wider bg-amber-50 text-amber-600 hover:bg-amber-100 rounded-sm transition-colors"
+                        className="px-2 py-1 text-[9px] font-bold uppercase tracking-wider bg-amber-50 text-amber-600 hover:bg-amber-100 rounded-xl transition-colors"
                       >
                         + Hotel
                       </button>
                       <button
                         onClick={() => openAddRequestModal(viewingTrip, 'LOGISTICS')}
-                        className="px-2 py-1 text-[9px] font-bold uppercase tracking-wider bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-sm transition-colors"
+                        className="px-2 py-1 text-[9px] font-bold uppercase tracking-wider bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-xl transition-colors"
                       >
                         + Transfer
                       </button>
@@ -1226,7 +1255,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                     <p className="text-[9px] font-bold text-amber-600 uppercase tracking-wider mb-2">Pending Requests</p>
                     <div className="space-y-2">
                       {getTripRequests(viewingTrip.id).map(req => (
-                        <div key={req.id} className="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200 rounded-sm">
+                        <div key={req.id} className="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200 rounded-xl">
                           <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></div>
                           <span className="text-xs font-medium text-amber-800">{req.type}</span>
                           <span className="text-xs text-amber-600 truncate flex-1">{req.notes || 'Awaiting fulfillment'}</span>
@@ -1241,7 +1270,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                 {(getTripFlights(viewingTrip.id).length > 0 || getTripHotels(viewingTrip.id).length > 0 || getTripLogistics(viewingTrip.id).length > 0) ? (
                   <div className="space-y-2">
                     {getTripFlights(viewingTrip.id).map(f => (
-                      <div key={f.id} className="bg-slate-50 rounded-sm overflow-hidden border border-slate-100">
+                      <div key={f.id} className="bg-slate-50 rounded-xl overflow-hidden border border-slate-100">
                         <div
                           className="flex items-center gap-3 p-2 cursor-pointer hover:bg-slate-100 transition-colors"
                           onClick={() => setExpandedItemId(expandedItemId === f.id ? null : f.id)}
@@ -1296,7 +1325,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                       </div>
                     ))}
                     {getTripHotels(viewingTrip.id).map(h => (
-                      <div key={h.id} className="bg-slate-50 rounded-sm overflow-hidden border border-slate-100">
+                      <div key={h.id} className="bg-slate-50 rounded-xl overflow-hidden border border-slate-100">
                         <div
                           className="flex items-center gap-3 p-2 cursor-pointer hover:bg-slate-100 transition-colors"
                           onClick={() => setExpandedItemId(expandedItemId === h.id ? null : h.id)}
@@ -1351,7 +1380,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                       </div>
                     ))}
                     {getTripLogistics(viewingTrip.id).map(l => (
-                      <div key={l.id} className="bg-slate-50 rounded-sm overflow-hidden border border-slate-100">
+                      <div key={l.id} className="bg-slate-50 rounded-xl overflow-hidden border border-slate-100">
                         <div
                           className="flex items-center gap-3 p-2 cursor-pointer hover:bg-slate-100 transition-colors"
                           onClick={() => setExpandedItemId(expandedItemId === l.id ? null : l.id)}
@@ -1416,20 +1445,20 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
             <div className="p-6 border-t border-slate-200 flex gap-3 justify-between">
               <button
                 onClick={() => setDeleteConfirm({ id: viewingTrip.id, name: viewingTrip.name || 'this trip' })}
-                className="px-4 py-2 text-red-600 text-[10px] font-bold uppercase tracking-widest hover:bg-red-50 transition-colors rounded-sm"
+                className="px-4 py-2 text-red-600 text-[10px] font-bold uppercase tracking-widest hover:bg-red-50 transition-colors rounded-xl"
               >
                 Delete
               </button>
               <div className="flex gap-3">
                 <button
                   onClick={() => setViewingTrip(null)}
-                  className="px-6 py-2 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-sm"
+                  className="px-6 py-2 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-xl"
                 >
                   Close
                 </button>
                 <button
                   onClick={() => { openPipelineModal(viewingTrip); setViewingTrip(null); }}
-                  className="px-6 py-2 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-sm"
+                  className="px-6 py-2 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-xl"
                 >
                   Edit Trip
                 </button>
@@ -1464,7 +1493,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
           onClick={closeAddRequestModal}
         >
           <div
-            className="bg-white rounded-sm shadow-2xl w-full max-w-md mx-4 animate-zoomIn"
+            className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 animate-zoomIn"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-4 sm:p-6 border-b border-slate-200">
@@ -1486,7 +1515,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                 <div className="flex gap-2">
                   <button
                     onClick={() => setRequestType('FLIGHT')}
-                    className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider rounded-sm transition-colors ${
+                    className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider rounded-xl transition-colors ${
                       requestType === 'FLIGHT' ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
                   >
@@ -1494,7 +1523,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                   </button>
                   <button
                     onClick={() => setRequestType('HOTEL')}
-                    className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider rounded-sm transition-colors ${
+                    className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider rounded-xl transition-colors ${
                       requestType === 'HOTEL' ? 'bg-amber-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
                   >
@@ -1502,7 +1531,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                   </button>
                   <button
                     onClick={() => setRequestType('LOGISTICS')}
-                    className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider rounded-sm transition-colors ${
+                    className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider rounded-xl transition-colors ${
                       requestType === 'LOGISTICS' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
                   >
@@ -1514,7 +1543,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
               {/* Client Name (read-only from trip) */}
               <div>
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Client</label>
-                <p className="text-sm text-slate-900 bg-slate-50 p-2 rounded-sm">{requestClientName}</p>
+                <p className="text-sm text-slate-900 bg-slate-50 p-2 rounded-xl">{requestClientName}</p>
               </div>
 
               {/* Target Date */}
@@ -1526,7 +1555,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                   type="date"
                   value={requestTargetDate}
                   onChange={(e) => setRequestTargetDate(e.target.value)}
-                  className="w-full border border-slate-200 rounded-sm p-2 text-sm focus:outline-none focus:border-paragon"
+                  className="w-full border border-slate-200 rounded-xl p-2 text-sm focus:outline-none focus:border-paragon"
                 />
               </div>
 
@@ -1536,7 +1565,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                 <div className="flex gap-2">
                   <button
                     onClick={() => setRequestPriority('NORMAL')}
-                    className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider rounded-sm transition-colors ${
+                    className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider rounded-xl transition-colors ${
                       requestPriority === 'NORMAL' ? 'bg-paragon text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
                   >
@@ -1544,7 +1573,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                   </button>
                   <button
                     onClick={() => setRequestPriority('URGENT')}
-                    className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider rounded-sm transition-colors ${
+                    className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider rounded-xl transition-colors ${
                       requestPriority === 'URGENT' ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
                   >
@@ -1567,7 +1596,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                     'e.g., Airport pickup, sedan for 2 pax, flight arrives 3pm...'
                   }
                   rows={4}
-                  className="w-full border border-slate-200 rounded-sm p-2 text-sm focus:outline-none focus:border-paragon resize-none"
+                  className="w-full border border-slate-200 rounded-xl p-2 text-sm focus:outline-none focus:border-paragon resize-none"
                 />
               </div>
             </div>
@@ -1575,13 +1604,13 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
             <div className="p-6 border-t border-slate-200 flex gap-3">
               <button
                 onClick={closeAddRequestModal}
-                className="flex-1 py-2 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-sm"
+                className="flex-1 py-2 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-xl"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSubmitRequest}
-                className="flex-1 py-2 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-sm"
+                className="flex-1 py-2 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-xl"
               >
                 Submit to Operations
               </button>
@@ -1597,7 +1626,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
           onClick={closeTaskDetail}
         >
           <div
-            className="bg-white rounded-sm shadow-2xl w-full max-w-lg mx-4 animate-zoomIn max-h-[90vh] flex flex-col"
+            className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 animate-zoomIn max-h-[90vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-4 sm:p-6 border-b border-slate-200">
@@ -1620,7 +1649,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                         }
                       }
                     }}
-                    className={`w-5 h-5 rounded-sm border flex-shrink-0 flex items-center justify-center mt-0.5 ${viewingTask.completed ? 'bg-paragon border-paragon' : 'border-slate-300 hover:border-paragon'}`}
+                    className={`w-5 h-5 rounded-xl border flex-shrink-0 flex items-center justify-center mt-0.5 ${viewingTask.completed ? 'bg-paragon border-paragon' : 'border-slate-300 hover:border-paragon'}`}
                   >
                     {viewingTask.completed && (
                       <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1634,12 +1663,12 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                     </h2>
                     <div className="flex items-center gap-2 mt-1 flex-wrap">
                       {viewingTask.assignedTo && (
-                        <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[9px] font-medium rounded-sm">
+                        <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[9px] font-medium rounded-xl">
                           {getAgentName(viewingTask.assignedTo)}
                         </span>
                       )}
                       {viewingTask.deadline && (
-                        <span className={`px-1.5 py-0.5 text-[9px] font-medium rounded-sm ${
+                        <span className={`px-1.5 py-0.5 text-[9px] font-medium rounded-xl ${
                           parseLocalDate(viewingTask.deadline) < new Date() && !viewingTask.completed
                             ? 'bg-red-100 text-red-700'
                             : 'bg-amber-100 text-amber-700'
@@ -1662,7 +1691,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                   <select
                     value={viewingTask.assignedTo || ''}
                     onChange={(e) => updateTaskAssignee(viewingTask.id, e.target.value)}
-                    className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                    className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                   >
                     <option value="">Unassigned</option>
                     {(agents.length > 0 ? agents : MOCK_USERS.filter(u => u.role !== 'CLIENT')).map(user => (
@@ -1676,7 +1705,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                     type="date"
                     value={viewingTask.deadline || ''}
                     onChange={(e) => updateTaskDeadline(viewingTask.id, e.target.value)}
-                    className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                    className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                   />
                 </div>
               </div>
@@ -1690,7 +1719,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                   onBlur={saveTaskDescription}
                   placeholder="Add more details about this task..."
                   rows={3}
-                  className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon resize-none"
+                  className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon resize-none"
                 />
               </div>
 
@@ -1705,7 +1734,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                       const isOwner = comment.authorId === (googleUser?.googleId || currentUser.id);
                       const isEditing = editingCommentId === comment.id;
                       return (
-                        <div key={comment.id} className="bg-slate-50 rounded-sm p-3 group">
+                        <div key={comment.id} className="bg-slate-50 rounded-xl p-3 group">
                           <div className="flex justify-between items-center mb-1">
                             <span className="text-[10px] font-bold text-slate-700">{comment.authorName}</span>
                             <div className="flex items-center gap-2">
@@ -1739,7 +1768,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                               <textarea
                                 value={editingCommentText}
                                 onChange={(e) => setEditingCommentText(e.target.value)}
-                                className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon resize-none"
+                                className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon resize-none"
                                 rows={2}
                                 autoFocus
                               />
@@ -1753,7 +1782,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                                 <button
                                   onClick={saveEditedComment}
                                   disabled={!editingCommentText.trim()}
-                                  className="px-2 py-1 text-[9px] bg-paragon text-white rounded-sm hover:bg-paragon-dark disabled:opacity-50"
+                                  className="px-2 py-1 text-[9px] bg-paragon text-white rounded-xl hover:bg-paragon-dark disabled:opacity-50"
                                 >
                                   Save
                                 </button>
@@ -1774,13 +1803,13 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
                     onChange={(e) => setNewTaskComment(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && addTaskComment()}
                     placeholder="Add a comment..."
-                    className="flex-1 p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                    className="flex-1 p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                   />
                   <button
                     type="button"
                     onClick={addTaskComment}
                     disabled={!newTaskComment.trim()}
-                    className="px-3 py-2 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-sm disabled:opacity-50"
+                    className="px-3 py-2 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-xl disabled:opacity-50"
                   >
                     Send
                   </button>
@@ -1791,7 +1820,7 @@ const ConciergeTrips: React.FC<ConciergeTripsProps> = ({
             <div className="p-6 border-t border-slate-200 flex justify-end">
               <button
                 onClick={closeTaskDetail}
-                className="px-6 py-2 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-sm"
+                className="px-6 py-2 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-xl"
               >
                 Close
               </button>

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { SectionHeader, DataTable, Badge, ConfirmModal, ClientAutocomplete, QuickAddCustomerModal, VendorAutocomplete, QuickAddVendorModal } from './Shared';
 import { MOCK_USERS } from '../constants'; // Fallback only
-import { BookingRequest, User, ConvertedFlight, ConvertedHotel, ConvertedLogistics, PipelineTrip, PipelineStage, PipelineTask, Vendor, VendorType } from '../types';
+import { BookingRequest, User, ConvertedFlight, ConvertedHotel, ConvertedLogistics, PipelineTrip, PipelineStage, PipelineTask, Vendor, VendorType, SystemMarkups, Customer, MarkupType, HotelBookingAgency, HotelPaymentMethod, HOTEL_COMMISSION_SPLITS } from '../types';
 import { GoogleUser } from './Login';
 import { API_URL } from '../config';
 
@@ -79,6 +79,8 @@ const Operations: React.FC<OperationsProps> = ({
   const [flightPassengerCount, setFlightPassengerCount] = useState(1);
   const [flightDates, setFlightDates] = useState('');
   const [flightAgent, setFlightAgent] = useState('');
+  const [flightCost, setFlightCost] = useState<number>(0);
+  const [flightChargeToClient, setFlightChargeToClient] = useState<number>(0);
   const [flightProfitLoss, setFlightProfitLoss] = useState(0);
   const [flightStatus, setFlightStatus] = useState<'PENDING' | 'CONFIRMED' | 'TICKETED' | 'CANCELLED'>('PENDING');
   const [flightNotes, setFlightNotes] = useState('');
@@ -86,6 +88,7 @@ const Operations: React.FC<OperationsProps> = ({
   // Hotel form state
   const [hotelDescription, setHotelDescription] = useState('');
   const [hotelName, setHotelName] = useState('');
+  const [hotelGuestName, setHotelGuestName] = useState('');
   const [hotelPaymentStatus, setHotelPaymentStatus] = useState<'PAID' | 'UNPAID'>('UNPAID');
   const [hotelConfirmation, setHotelConfirmation] = useState('');
   const [hotelRoomType, setHotelRoomType] = useState('');
@@ -93,6 +96,15 @@ const Operations: React.FC<OperationsProps> = ({
   const [hotelCheckIn, setHotelCheckIn] = useState('');
   const [hotelCheckOut, setHotelCheckOut] = useState('');
   const [hotelAgent, setHotelAgent] = useState('');
+  const [hotelBookedVia, setHotelBookedVia] = useState<'PARAGON' | 'BENNISH' | 'EMBARK' | 'TAAP'>('PARAGON');
+  const [hotelPaymentMethod, setHotelPaymentMethod] = useState<'AGENCY' | 'PAY_AT_CHECKIN'>('AGENCY');
+  const [hotelCustomerPayingId, setHotelCustomerPayingId] = useState<string | null>(null);
+  const [hotelCustomerPayingName, setHotelCustomerPayingName] = useState('');
+  const [hotelRoomRate, setHotelRoomRate] = useState<number>(0);
+  const [hotelFullCharge, setHotelFullCharge] = useState<number>(0);
+  const [hotelCommissionPercent, setHotelCommissionPercent] = useState<number>(10);
+  const [hotelCost, setHotelCost] = useState<number>(0);
+  const [hotelChargeToClient, setHotelChargeToClient] = useState<number>(0);
   const [hotelProfitLoss, setHotelProfitLoss] = useState(0);
   const [hotelStatus, setHotelStatus] = useState<'PENDING' | 'CONFIRMED' | 'CANCELLED'>('PENDING');
   const [hotelNotes, setHotelNotes] = useState('');
@@ -105,9 +117,15 @@ const Operations: React.FC<OperationsProps> = ({
   const [logisticsDetails, setLogisticsDetails] = useState('');
   const [logisticsDate, setLogisticsDate] = useState('');
   const [logisticsAgent, setLogisticsAgent] = useState('');
+  const [logisticsCost, setLogisticsCost] = useState<number>(0);
+  const [logisticsChargeToClient, setLogisticsChargeToClient] = useState<number>(0);
   const [logisticsProfitLoss, setLogisticsProfitLoss] = useState(0);
   const [logisticsStatus, setLogisticsStatus] = useState<'PENDING' | 'CONFIRMED' | 'CANCELLED'>('PENDING');
   const [logisticsNotes, setLogisticsNotes] = useState('');
+
+  // Global markup settings for auto-calculation
+  const [globalMarkups, setGlobalMarkups] = useState<SystemMarkups | null>(null);
+  const [customerDataMap, setCustomerDataMap] = useState<Record<string, Customer>>({});
 
   // Edit modal state
   const [showEditModal, setShowEditModal] = useState(false);
@@ -177,7 +195,7 @@ const Operations: React.FC<OperationsProps> = ({
   const [quickAddVendorType, setQuickAddVendorType] = useState<VendorType>('FLIGHT');
   const [quickAddVendorInitialName, setQuickAddVendorInitialName] = useState('');
 
-  // Fetch customers, agents, and vendors
+  // Fetch customers, agents, vendors, and global markup settings
   React.useEffect(() => {
     const fetchCustomers = async () => {
       try {
@@ -185,6 +203,12 @@ const Operations: React.FC<OperationsProps> = ({
         if (res.ok) {
           const data = await res.json();
           setCustomers(data.map((c: any) => ({ id: c.id, name: c.displayName || `${c.legalFirstName} ${c.legalLastName}`, email: c.email })));
+          // Also build a map of full customer data for markup lookup
+          const customerMap: Record<string, Customer> = {};
+          data.forEach((c: Customer) => {
+            customerMap[c.id] = c;
+          });
+          setCustomerDataMap(customerMap);
         }
       } catch (error) {
         console.error('Error fetching customers:', error);
@@ -220,10 +244,54 @@ const Operations: React.FC<OperationsProps> = ({
       }
     };
 
+    const fetchGlobalMarkups = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/settings`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.markups) {
+            setGlobalMarkups(data.markups);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching global markups:', error);
+      }
+    };
+
     fetchCustomers();
     fetchAgents();
     fetchVendors();
+    fetchGlobalMarkups();
   }, []);
+
+  // Calculate charge to client based on cost and markup
+  const calculateChargeFromMarkup = (cost: number, markupType: 'FLIGHT' | 'HOTEL' | 'LOGISTICS', clientId?: string): number => {
+    if (!cost || cost <= 0) return 0;
+
+    // Get markup setting - first check customer's custom markup, then fall back to global
+    let markupAmount = 0;
+    let markupIsFlatOrPercent: MarkupType = 'FLAT';
+
+    const customer = clientId ? customerDataMap[clientId] : null;
+    const markupKey = markupType.toLowerCase() as 'flight' | 'hotel' | 'logistics';
+
+    // Check for customer-specific markup
+    if (customer?.customMarkups?.[markupKey]?.amount !== null && customer?.customMarkups?.[markupKey]?.amount !== undefined) {
+      markupAmount = customer.customMarkups[markupKey]!.amount!;
+      markupIsFlatOrPercent = customer.customMarkups[markupKey]!.type || 'FLAT';
+    } else if (globalMarkups?.[markupKey]) {
+      // Fall back to global default
+      markupAmount = globalMarkups[markupKey].amount;
+      markupIsFlatOrPercent = globalMarkups[markupKey].type;
+    }
+
+    // Calculate charge based on markup type
+    if (markupIsFlatOrPercent === 'PERCENT') {
+      return cost * (1 + markupAmount / 100);
+    } else {
+      return cost + markupAmount;
+    }
+  };
 
   const closeDispatchModal = () => {
     setShowDispatchModal(false);
@@ -528,15 +596,15 @@ const Operations: React.FC<OperationsProps> = ({
     // Reset all form fields
     setFlightDescription(''); setFlightAirline(''); setFlightPaymentStatus('UNPAID');
     setFlightPnr(''); setFlightRoutes(''); setFlightPassengerCount(1);
-    setFlightDates(''); setFlightAgent(''); setFlightProfitLoss(0); setFlightStatus('PENDING'); setFlightNotes('');
+    setFlightDates(''); setFlightAgent(''); setFlightCost(0); setFlightChargeToClient(0); setFlightProfitLoss(0); setFlightStatus('PENDING'); setFlightNotes('');
     setFlightVendorId(''); setFlightVendorName('');
     setHotelDescription(''); setHotelName(''); setHotelPaymentStatus('UNPAID');
     setHotelConfirmation(''); setHotelRoomType(''); setHotelGuestCount(1);
-    setHotelCheckIn(''); setHotelCheckOut(''); setHotelAgent(''); setHotelProfitLoss(0); setHotelStatus('PENDING'); setHotelNotes('');
+    setHotelCheckIn(''); setHotelCheckOut(''); setHotelAgent(''); setHotelCost(0); setHotelChargeToClient(0); setHotelProfitLoss(0); setHotelStatus('PENDING'); setHotelNotes('');
     setHotelVendorId(''); setHotelVendorName('');
     setLogisticsDescription(''); setLogisticsServiceType(''); setLogisticsPaymentStatus('UNPAID');
     setLogisticsConfirmation(''); setLogisticsDetails(''); setLogisticsDate('');
-    setLogisticsAgent(''); setLogisticsProfitLoss(0); setLogisticsStatus('PENDING'); setLogisticsNotes('');
+    setLogisticsAgent(''); setLogisticsCost(0); setLogisticsChargeToClient(0); setLogisticsProfitLoss(0); setLogisticsStatus('PENDING'); setLogisticsNotes('');
     setLogisticsVendorId(''); setLogisticsVendorName('');
   };
 
@@ -554,6 +622,8 @@ const Operations: React.FC<OperationsProps> = ({
         passengerCount: flightPassengerCount,
         dates: flightDates,
         agent: flightAgent,
+        cost: flightCost || undefined,
+        chargeToClient: flightChargeToClient || undefined,
         profitLoss: flightProfitLoss,
         status: flightStatus,
         createdAt: new Date().toISOString(),
@@ -561,15 +631,19 @@ const Operations: React.FC<OperationsProps> = ({
         notes: flightNotes || undefined,
         tripId: convertingRequest.tripId,
         tripName: convertingRequest.tripName,
+        clientId: convertingRequest.clientId || undefined,
         vendorId: flightVendorId || undefined,
         vendorName: flightVendorName || undefined,
       };
       onConvertToFlight(newFlight, convertingRequest.id);
     } else if (convertingRequest.type === 'HOTEL') {
+      const expectedComm = hotelRoomRate * hotelCommissionPercent / 100;
+      const netComm = expectedComm * HOTEL_COMMISSION_SPLITS[hotelBookedVia];
       const newHotel: ConvertedHotel = {
         id: `ch-${Date.now()}`,
         description: hotelDescription,
         hotelName: hotelName,
+        guestName: hotelGuestName,
         paymentStatus: hotelPaymentStatus,
         confirmationNumber: hotelConfirmation,
         roomType: hotelRoomType,
@@ -577,6 +651,18 @@ const Operations: React.FC<OperationsProps> = ({
         checkIn: hotelCheckIn,
         checkOut: hotelCheckOut,
         agent: hotelAgent,
+        bookedVia: hotelBookedVia,
+        paymentMethod: hotelPaymentMethod,
+        customerPayingId: hotelCustomerPayingId || undefined,
+        customerPayingName: hotelCustomerPayingName || undefined,
+        roomRate: hotelRoomRate || undefined,
+        fullCharge: hotelFullCharge || undefined,
+        commissionPercent: hotelCommissionPercent,
+        expectedCommission: expectedComm || undefined,
+        commissionSplit: HOTEL_COMMISSION_SPLITS[hotelBookedVia],
+        netCommission: netComm || undefined,
+        cost: hotelCost || undefined,
+        chargeToClient: hotelChargeToClient || undefined,
         profitLoss: hotelProfitLoss,
         status: hotelStatus,
         createdAt: new Date().toISOString(),
@@ -584,6 +670,7 @@ const Operations: React.FC<OperationsProps> = ({
         notes: hotelNotes || undefined,
         tripId: convertingRequest.tripId,
         tripName: convertingRequest.tripName,
+        clientId: convertingRequest.clientId || undefined,
         vendorId: hotelVendorId || undefined,
         vendorName: hotelVendorName || undefined,
       };
@@ -598,6 +685,8 @@ const Operations: React.FC<OperationsProps> = ({
         details: logisticsDetails,
         date: logisticsDate,
         agent: logisticsAgent,
+        cost: logisticsCost || undefined,
+        chargeToClient: logisticsChargeToClient || undefined,
         profitLoss: logisticsProfitLoss,
         status: logisticsStatus,
         createdAt: new Date().toISOString(),
@@ -605,6 +694,7 @@ const Operations: React.FC<OperationsProps> = ({
         notes: logisticsNotes || undefined,
         tripId: convertingRequest.tripId,
         tripName: convertingRequest.tripName,
+        clientId: convertingRequest.clientId || undefined,
         vendorId: logisticsVendorId || undefined,
         vendorName: logisticsVendorName || undefined,
       };
@@ -627,6 +717,8 @@ const Operations: React.FC<OperationsProps> = ({
         setFlightPassengerCount(flight.passengerCount);
         setFlightDates(flight.dates);
         setFlightAgent(flight.agent);
+        setFlightCost(flight.cost || 0);
+        setFlightChargeToClient(flight.chargeToClient || 0);
         setFlightProfitLoss(flight.profitLoss);
         setFlightStatus(flight.status);
         setFlightNotes(flight.notes || '');
@@ -638,6 +730,7 @@ const Operations: React.FC<OperationsProps> = ({
       if (hotel) {
         setHotelDescription(hotel.description);
         setHotelName(hotel.hotelName);
+        setHotelGuestName(hotel.guestName || '');
         setHotelPaymentStatus(hotel.paymentStatus);
         setHotelConfirmation(hotel.confirmationNumber);
         setHotelRoomType(hotel.roomType);
@@ -645,6 +738,15 @@ const Operations: React.FC<OperationsProps> = ({
         setHotelCheckIn(hotel.checkIn);
         setHotelCheckOut(hotel.checkOut);
         setHotelAgent(hotel.agent);
+        setHotelBookedVia(hotel.bookedVia || 'PARAGON');
+        setHotelPaymentMethod(hotel.paymentMethod || 'AGENCY');
+        setHotelCustomerPayingId(hotel.customerPayingId || null);
+        setHotelCustomerPayingName(hotel.customerPayingName || '');
+        setHotelRoomRate(hotel.roomRate || 0);
+        setHotelFullCharge(hotel.fullCharge || 0);
+        setHotelCommissionPercent(hotel.commissionPercent || 10);
+        setHotelCost(hotel.cost || 0);
+        setHotelChargeToClient(hotel.chargeToClient || 0);
         setHotelProfitLoss(hotel.profitLoss);
         setHotelStatus(hotel.status);
         setHotelNotes(hotel.notes || '');
@@ -661,6 +763,8 @@ const Operations: React.FC<OperationsProps> = ({
         setLogisticsDetails(logistics.details);
         setLogisticsDate(logistics.date);
         setLogisticsAgent(logistics.agent);
+        setLogisticsCost(logistics.cost || 0);
+        setLogisticsChargeToClient(logistics.chargeToClient || 0);
         setLogisticsProfitLoss(logistics.profitLoss);
         setLogisticsStatus(logistics.status);
         setLogisticsNotes(logistics.notes || '');
@@ -677,15 +781,15 @@ const Operations: React.FC<OperationsProps> = ({
     // Reset all form fields
     setFlightDescription(''); setFlightAirline(''); setFlightPaymentStatus('UNPAID');
     setFlightPnr(''); setFlightRoutes(''); setFlightPassengerCount(1);
-    setFlightDates(''); setFlightAgent(''); setFlightProfitLoss(0); setFlightStatus('PENDING'); setFlightNotes('');
+    setFlightDates(''); setFlightAgent(''); setFlightCost(0); setFlightChargeToClient(0); setFlightProfitLoss(0); setFlightStatus('PENDING'); setFlightNotes('');
     setFlightVendorId(''); setFlightVendorName('');
     setHotelDescription(''); setHotelName(''); setHotelPaymentStatus('UNPAID');
     setHotelConfirmation(''); setHotelRoomType(''); setHotelGuestCount(1);
-    setHotelCheckIn(''); setHotelCheckOut(''); setHotelAgent(''); setHotelProfitLoss(0); setHotelStatus('PENDING'); setHotelNotes('');
+    setHotelCheckIn(''); setHotelCheckOut(''); setHotelAgent(''); setHotelCost(0); setHotelChargeToClient(0); setHotelProfitLoss(0); setHotelStatus('PENDING'); setHotelNotes('');
     setHotelVendorId(''); setHotelVendorName('');
     setLogisticsDescription(''); setLogisticsServiceType(''); setLogisticsPaymentStatus('UNPAID');
     setLogisticsConfirmation(''); setLogisticsDetails(''); setLogisticsDate('');
-    setLogisticsAgent(''); setLogisticsProfitLoss(0); setLogisticsStatus('PENDING'); setLogisticsNotes('');
+    setLogisticsAgent(''); setLogisticsCost(0); setLogisticsChargeToClient(0); setLogisticsProfitLoss(0); setLogisticsStatus('PENDING'); setLogisticsNotes('');
     setLogisticsVendorId(''); setLogisticsVendorName('');
   };
 
@@ -702,6 +806,8 @@ const Operations: React.FC<OperationsProps> = ({
         passengerCount: flightPassengerCount,
         dates: flightDates,
         agent: flightAgent,
+        cost: flightCost || undefined,
+        chargeToClient: flightChargeToClient || undefined,
         profitLoss: flightProfitLoss,
         status: flightStatus,
         notes: flightNotes || undefined,
@@ -709,9 +815,12 @@ const Operations: React.FC<OperationsProps> = ({
         vendorName: flightVendorName || undefined,
       });
     } else if (editingItem.type === 'hotel') {
+      const expectedComm = hotelRoomRate * hotelCommissionPercent / 100;
+      const netComm = expectedComm * HOTEL_COMMISSION_SPLITS[hotelBookedVia];
       onUpdateHotel(editingItem.id, {
         description: hotelDescription,
         hotelName: hotelName,
+        guestName: hotelGuestName,
         paymentStatus: hotelPaymentStatus,
         confirmationNumber: hotelConfirmation,
         roomType: hotelRoomType,
@@ -719,6 +828,18 @@ const Operations: React.FC<OperationsProps> = ({
         checkIn: hotelCheckIn,
         checkOut: hotelCheckOut,
         agent: hotelAgent,
+        bookedVia: hotelBookedVia,
+        paymentMethod: hotelPaymentMethod,
+        customerPayingId: hotelCustomerPayingId || undefined,
+        customerPayingName: hotelCustomerPayingName || undefined,
+        roomRate: hotelRoomRate || undefined,
+        fullCharge: hotelFullCharge || undefined,
+        commissionPercent: hotelCommissionPercent,
+        expectedCommission: expectedComm || undefined,
+        commissionSplit: HOTEL_COMMISSION_SPLITS[hotelBookedVia],
+        netCommission: netComm || undefined,
+        cost: hotelCost || undefined,
+        chargeToClient: hotelChargeToClient || undefined,
         profitLoss: hotelProfitLoss,
         status: hotelStatus,
         notes: hotelNotes || undefined,
@@ -734,6 +855,8 @@ const Operations: React.FC<OperationsProps> = ({
         details: logisticsDetails,
         date: logisticsDate,
         agent: logisticsAgent,
+        cost: logisticsCost || undefined,
+        chargeToClient: logisticsChargeToClient || undefined,
         profitLoss: logisticsProfitLoss,
         status: logisticsStatus,
         notes: logisticsNotes || undefined,
@@ -983,7 +1106,7 @@ const Operations: React.FC<OperationsProps> = ({
       {subTab === 'dashboard' && (
         <div className="space-y-6 sm:space-y-8">
           {/* Requests Queue - Main Feature */}
-          <div className="bg-white border border-slate-200 rounded-sm shadow-sm">
+          <div className="bg-white border border-slate-200 rounded-xl shadow-sm">
             <div className="bg-slate-900 p-3 sm:p-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></div>
@@ -1019,7 +1142,7 @@ const Operations: React.FC<OperationsProps> = ({
                       return (
                         <div
                           key={r.id}
-                          className={`border rounded-sm transition-all ${isExpanded ? 'border-paragon bg-slate-50' : 'border-slate-200 hover:border-slate-300'}`}
+                          className={`border rounded-xl transition-all ${isExpanded ? 'border-paragon bg-slate-50' : 'border-slate-200 hover:border-slate-300'}`}
                         >
                           <div
                             className="p-3 flex items-center gap-3 cursor-pointer"
@@ -1090,13 +1213,13 @@ const Operations: React.FC<OperationsProps> = ({
                               <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100">
                                 <button
                                   onClick={(e) => { e.stopPropagation(); setConvertingRequest(r); setShowConvertModal(true); }}
-                                  className="flex-1 bg-paragon text-white text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-paragon-dark transition-colors rounded-sm"
+                                  className="flex-1 bg-paragon text-white text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-paragon-dark transition-colors rounded-xl"
                                 >
                                   Convert to Booking
                                 </button>
                                 <button
                                   onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ type: 'request', id: r.id, name: `${r.type} request for ${clientName}` }); }}
-                                  className="bg-red-100 text-red-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-red-200 transition-colors rounded-sm"
+                                  className="bg-red-100 text-red-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-red-200 transition-colors rounded-xl"
                                 >
                                   Delete
                                 </button>
@@ -1116,7 +1239,7 @@ const Operations: React.FC<OperationsProps> = ({
             {/* Flights Box */}
             <button
               onClick={() => setSubTab('flights')}
-              className="bg-white border border-slate-200 rounded-sm shadow-sm p-4 sm:p-6 hover:border-paragon hover:shadow-md transition-all text-left group"
+              className="bg-white border border-slate-200 rounded-xl shadow-sm p-4 sm:p-6 hover:border-paragon hover:shadow-md transition-all text-left group"
             >
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center group-hover:bg-red-600 group-hover:text-white transition-colors">
@@ -1152,7 +1275,7 @@ const Operations: React.FC<OperationsProps> = ({
             {/* Hotels Box */}
             <button
               onClick={() => setSubTab('hotels')}
-              className="bg-white border border-slate-200 rounded-sm shadow-sm p-4 sm:p-6 hover:border-paragon hover:shadow-md transition-all text-left group"
+              className="bg-white border border-slate-200 rounded-xl shadow-sm p-4 sm:p-6 hover:border-paragon hover:shadow-md transition-all text-left group"
             >
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center group-hover:bg-amber-600 group-hover:text-white transition-colors">
@@ -1188,7 +1311,7 @@ const Operations: React.FC<OperationsProps> = ({
             {/* Logistics Box */}
             <button
               onClick={() => setSubTab('logistics')}
-              className="bg-white border border-slate-200 rounded-sm shadow-sm p-4 sm:p-6 hover:border-paragon hover:shadow-md transition-all text-left group"
+              className="bg-white border border-slate-200 rounded-xl shadow-sm p-4 sm:p-6 hover:border-paragon hover:shadow-md transition-all text-left group"
             >
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-colors">
@@ -1238,7 +1361,7 @@ const Operations: React.FC<OperationsProps> = ({
             const renderFlightCardMobile = (f: ConvertedFlight) => {
               const isExpanded = expandedItemId === f.id;
               return (
-                <div key={f.id} className="bg-white border border-slate-200 rounded-sm transition-all">
+                <div key={f.id} className="bg-white border border-slate-200 rounded-xl transition-all">
                   <div className="p-3 flex items-center gap-3 cursor-pointer" onClick={() => setExpandedItemId(isExpanded ? null : f.id)}>
                     <div className="w-8 h-8 rounded-full bg-red-100 text-red-600 flex items-center justify-center flex-shrink-0">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1276,8 +1399,8 @@ const Operations: React.FC<OperationsProps> = ({
                         </div>
                       )}
                       <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100">
-                        <button onClick={(e) => { e.stopPropagation(); openEditModal('flight', f.id); }} className="flex-1 bg-slate-100 text-slate-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-slate-200 transition-colors rounded-sm">Edit</button>
-                        <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ type: 'flight', id: f.id, name: f.description || f.pnr || 'this flight' }); }} className="flex-1 bg-red-100 text-red-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-red-200 transition-colors rounded-sm">Delete</button>
+                        <button onClick={(e) => { e.stopPropagation(); openEditModal('flight', f.id); }} className="flex-1 bg-slate-100 text-slate-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-slate-200 transition-colors rounded-xl">Edit</button>
+                        <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ type: 'flight', id: f.id, name: f.description || f.pnr || 'this flight' }); }} className="flex-1 bg-red-100 text-red-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-red-200 transition-colors rounded-xl">Delete</button>
                       </div>
                     </div>
                   )}
@@ -1322,8 +1445,8 @@ const Operations: React.FC<OperationsProps> = ({
                               </div>
                             )}
                             <div className="flex gap-3 items-center">
-                              <button onClick={(e) => { e.stopPropagation(); openEditModal('flight', f.id); }} className="bg-slate-200 text-slate-700 text-[10px] py-2 px-4 font-bold uppercase tracking-wider hover:bg-slate-300 transition-colors rounded-sm">Edit</button>
-                              <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ type: 'flight', id: f.id, name: f.description || f.pnr || 'this flight' }); }} className="bg-red-100 text-red-600 text-[10px] py-2 px-4 font-bold uppercase tracking-wider hover:bg-red-200 transition-colors rounded-sm">Delete</button>
+                              <button onClick={(e) => { e.stopPropagation(); openEditModal('flight', f.id); }} className="bg-slate-200 text-slate-700 text-[10px] py-2 px-4 font-bold uppercase tracking-wider hover:bg-slate-300 transition-colors rounded-xl">Edit</button>
+                              <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ type: 'flight', id: f.id, name: f.description || f.pnr || 'this flight' }); }} className="bg-red-100 text-red-600 text-[10px] py-2 px-4 font-bold uppercase tracking-wider hover:bg-red-200 transition-colors rounded-xl">Delete</button>
                               <span className="text-[10px] text-slate-400 ml-auto">Created: {formatDisplayDate(f.createdAt)}</span>
                             </div>
                           </td>
@@ -1380,7 +1503,7 @@ const Operations: React.FC<OperationsProps> = ({
             const renderHotelCardMobile = (h: ConvertedHotel) => {
               const isExpanded = expandedItemId === h.id;
               return (
-                <div key={h.id} className="bg-white border border-slate-200 rounded-sm transition-all">
+                <div key={h.id} className="bg-white border border-slate-200 rounded-xl transition-all">
                   <div className="p-3 flex items-center gap-3 cursor-pointer" onClick={() => setExpandedItemId(isExpanded ? null : h.id)}>
                     <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center flex-shrink-0">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1420,8 +1543,8 @@ const Operations: React.FC<OperationsProps> = ({
                         </div>
                       )}
                       <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100">
-                        <button onClick={(e) => { e.stopPropagation(); openEditModal('hotel', h.id); }} className="flex-1 bg-slate-100 text-slate-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-slate-200 transition-colors rounded-sm">Edit</button>
-                        <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ type: 'hotel', id: h.id, name: h.hotelName || h.description || 'this hotel booking' }); }} className="flex-1 bg-red-100 text-red-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-red-200 transition-colors rounded-sm">Delete</button>
+                        <button onClick={(e) => { e.stopPropagation(); openEditModal('hotel', h.id); }} className="flex-1 bg-slate-100 text-slate-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-slate-200 transition-colors rounded-xl">Edit</button>
+                        <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ type: 'hotel', id: h.id, name: h.hotelName || h.description || 'this hotel booking' }); }} className="flex-1 bg-red-100 text-red-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-red-200 transition-colors rounded-xl">Delete</button>
                       </div>
                     </div>
                   )}
@@ -1466,8 +1589,8 @@ const Operations: React.FC<OperationsProps> = ({
                               </div>
                             )}
                             <div className="flex gap-3 items-center">
-                              <button onClick={(e) => { e.stopPropagation(); openEditModal('hotel', h.id); }} className="bg-slate-200 text-slate-700 text-[10px] py-2 px-4 font-bold uppercase tracking-wider hover:bg-slate-300 transition-colors rounded-sm">Edit</button>
-                              <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ type: 'hotel', id: h.id, name: h.hotelName || h.description || 'this hotel booking' }); }} className="bg-red-100 text-red-600 text-[10px] py-2 px-4 font-bold uppercase tracking-wider hover:bg-red-200 transition-colors rounded-sm">Delete</button>
+                              <button onClick={(e) => { e.stopPropagation(); openEditModal('hotel', h.id); }} className="bg-slate-200 text-slate-700 text-[10px] py-2 px-4 font-bold uppercase tracking-wider hover:bg-slate-300 transition-colors rounded-xl">Edit</button>
+                              <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ type: 'hotel', id: h.id, name: h.hotelName || h.description || 'this hotel booking' }); }} className="bg-red-100 text-red-600 text-[10px] py-2 px-4 font-bold uppercase tracking-wider hover:bg-red-200 transition-colors rounded-xl">Delete</button>
                               <span className="text-[10px] text-slate-400 ml-auto">Created: {formatDisplayDate(h.createdAt)}</span>
                             </div>
                           </td>
@@ -1524,7 +1647,7 @@ const Operations: React.FC<OperationsProps> = ({
             const renderLogisticsCardMobile = (l: ConvertedLogistics) => {
               const isExpanded = expandedItemId === l.id;
               return (
-                <div key={l.id} className="bg-white border border-slate-200 rounded-sm transition-all">
+                <div key={l.id} className="bg-white border border-slate-200 rounded-xl transition-all">
                   <div className="p-3 flex items-center gap-3 cursor-pointer" onClick={() => setExpandedItemId(isExpanded ? null : l.id)}>
                     <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center flex-shrink-0">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1567,8 +1690,8 @@ const Operations: React.FC<OperationsProps> = ({
                         </div>
                       )}
                       <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100">
-                        <button onClick={(e) => { e.stopPropagation(); openEditModal('logistics', l.id); }} className="flex-1 bg-slate-100 text-slate-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-slate-200 transition-colors rounded-sm">Edit</button>
-                        <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ type: 'logistics', id: l.id, name: l.serviceType || l.description || 'this logistics booking' }); }} className="flex-1 bg-red-100 text-red-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-red-200 transition-colors rounded-sm">Delete</button>
+                        <button onClick={(e) => { e.stopPropagation(); openEditModal('logistics', l.id); }} className="flex-1 bg-slate-100 text-slate-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-slate-200 transition-colors rounded-xl">Edit</button>
+                        <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ type: 'logistics', id: l.id, name: l.serviceType || l.description || 'this logistics booking' }); }} className="flex-1 bg-red-100 text-red-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-red-200 transition-colors rounded-xl">Delete</button>
                       </div>
                     </div>
                   )}
@@ -1612,8 +1735,8 @@ const Operations: React.FC<OperationsProps> = ({
                               </div>
                             )}
                             <div className="flex gap-3 items-center">
-                              <button onClick={(e) => { e.stopPropagation(); openEditModal('logistics', l.id); }} className="bg-slate-200 text-slate-700 text-[10px] py-2 px-4 font-bold uppercase tracking-wider hover:bg-slate-300 transition-colors rounded-sm">Edit</button>
-                              <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ type: 'logistics', id: l.id, name: l.serviceType || l.description || 'this logistics booking' }); }} className="bg-red-100 text-red-600 text-[10px] py-2 px-4 font-bold uppercase tracking-wider hover:bg-red-200 transition-colors rounded-sm">Delete</button>
+                              <button onClick={(e) => { e.stopPropagation(); openEditModal('logistics', l.id); }} className="bg-slate-200 text-slate-700 text-[10px] py-2 px-4 font-bold uppercase tracking-wider hover:bg-slate-300 transition-colors rounded-xl">Edit</button>
+                              <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ type: 'logistics', id: l.id, name: l.serviceType || l.description || 'this logistics booking' }); }} className="bg-red-100 text-red-600 text-[10px] py-2 px-4 font-bold uppercase tracking-wider hover:bg-red-200 transition-colors rounded-xl">Delete</button>
                               <span className="text-[10px] text-slate-400 ml-auto">Created: {formatDisplayDate(l.createdAt)}</span>
                             </div>
                           </td>
@@ -1684,7 +1807,7 @@ const Operations: React.FC<OperationsProps> = ({
                     return (
                       <div
                         key={r.id}
-                        className="bg-white border border-slate-200 rounded-sm transition-all"
+                        className="bg-white border border-slate-200 rounded-xl transition-all"
                       >
                         {/* Header Row - Always Visible */}
                         <div
@@ -1715,7 +1838,7 @@ const Operations: React.FC<OperationsProps> = ({
                               <span className="font-semibold text-xs text-slate-900 truncate">{clientName}</span>
                               <Badge color={r.type === 'FLIGHT' ? 'red' : r.type === 'HOTEL' ? 'gold' : 'slate'}>{r.type}</Badge>
                               {r.tripName && (
-                                <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 text-[8px] font-bold rounded-sm border border-purple-200 flex items-center gap-1">
+                                <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 text-[8px] font-bold rounded-xl border border-purple-200 flex items-center gap-1">
                                   <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
                                   </svg>
@@ -1763,14 +1886,14 @@ const Operations: React.FC<OperationsProps> = ({
                             <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100">
                               <button
                                 onClick={(e) => { e.stopPropagation(); openConvertModal(r); }}
-                                className="flex-1 bg-paragon text-white text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-paragon-dark transition-colors rounded-sm"
+                                className="flex-1 bg-paragon text-white text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-paragon-dark transition-colors rounded-xl"
                               >
                                 Complete
                               </button>
                               {isOwnRequest && onDeleteRequest && (
                                 <button
                                   onClick={(e) => { e.stopPropagation(); if (confirm('Delete this request?')) onDeleteRequest(r.id); }}
-                                  className="bg-red-100 text-red-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-red-200 transition-colors rounded-sm"
+                                  className="bg-red-100 text-red-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-red-200 transition-colors rounded-xl"
                                 >
                                   Delete
                                 </button>
@@ -1814,7 +1937,7 @@ const Operations: React.FC<OperationsProps> = ({
                           <div className="flex items-center gap-1 flex-wrap">
                             <Badge color={r.type === 'FLIGHT' ? 'red' : r.type === 'HOTEL' ? 'gold' : 'slate'}>{r.type}</Badge>
                             {r.tripName && (
-                              <span className="px-1 py-0.5 bg-purple-100 text-purple-700 text-[8px] font-bold rounded-sm border border-purple-200">
+                              <span className="px-1 py-0.5 bg-purple-100 text-purple-700 text-[8px] font-bold rounded-xl border border-purple-200">
                                 {r.tripName}
                               </span>
                             )}
@@ -1854,7 +1977,7 @@ const Operations: React.FC<OperationsProps> = ({
         {/* Collaboration Panel - commented out for later
         {selectedElementId && (
           <div className="lg:col-span-4 fixed inset-x-0 bottom-0 lg:relative lg:inset-auto lg:sticky lg:top-20 lg:h-fit z-40">
-            <div className="bg-white border-t lg:border border-slate-200 p-4 sm:p-6 rounded-t-lg lg:rounded-sm shadow-lg max-h-[60vh] lg:max-h-none overflow-auto animate-slideUp">
+            <div className="bg-white border-t lg:border border-slate-200 p-4 sm:p-6 rounded-t-lg lg:rounded-xl shadow-lg max-h-[60vh] lg:max-h-none overflow-auto animate-slideUp">
               <div className="flex justify-between items-center mb-4">
                  <h3 className="text-xs font-bold uppercase tracking-widest text-paragon">Collaboration Panel</h3>
                  <button onClick={() => setSelectedElementId(null)} className="text-slate-400 hover:text-slate-600 text-xl">&times;</button>
@@ -1883,7 +2006,7 @@ const Operations: React.FC<OperationsProps> = ({
           onClick={closeConvertModal}
         >
           <div
-            className="bg-white rounded-sm shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto animate-zoomIn"
+            className="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto animate-zoomIn"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-4 sm:p-6 border-b border-slate-200">
@@ -1908,7 +2031,7 @@ const Operations: React.FC<OperationsProps> = ({
                         value={flightDescription}
                         onChange={(e) => setFlightDescription(e.target.value)}
                         placeholder="Smith-AA123"
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       />
                     </div>
                     <div>
@@ -1918,7 +2041,7 @@ const Operations: React.FC<OperationsProps> = ({
                         value={flightAirline}
                         onChange={(e) => setFlightAirline(e.target.value)}
                         placeholder="American Airlines"
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       />
                     </div>
                   </div>
@@ -1929,7 +2052,7 @@ const Operations: React.FC<OperationsProps> = ({
                       <select
                         value={flightPaymentStatus}
                         onChange={(e) => setFlightPaymentStatus(e.target.value as 'PAID' | 'UNPAID')}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       >
                         <option value="UNPAID">Unpaid</option>
                         <option value="PAID">Paid</option>
@@ -1942,7 +2065,7 @@ const Operations: React.FC<OperationsProps> = ({
                         value={flightPnr}
                         onChange={(e) => setFlightPnr(e.target.value)}
                         placeholder="ABC123"
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       />
                     </div>
                   </div>
@@ -1954,7 +2077,7 @@ const Operations: React.FC<OperationsProps> = ({
                       value={flightRoutes}
                       onChange={(e) => setFlightRoutes(e.target.value)}
                       placeholder="JFK-LAX, LAX-SFO"
-                      className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                      className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                     />
                   </div>
 
@@ -1966,7 +2089,7 @@ const Operations: React.FC<OperationsProps> = ({
                         min="1"
                         value={flightPassengerCount}
                         onChange={(e) => setFlightPassengerCount(parseInt(e.target.value) || 1)}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       />
                     </div>
                     <div>
@@ -1976,32 +2099,69 @@ const Operations: React.FC<OperationsProps> = ({
                         value={flightDates}
                         onChange={(e) => setFlightDates(e.target.value)}
                         placeholder="Jan 15 - Jan 20"
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       />
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Agent</label>
+                    <select
+                      value={flightAgent}
+                      onChange={(e) => setFlightAgent(e.target.value)}
+                      className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon bg-white"
+                    >
+                      <option value="">Select agent...</option>
+                      {(agents.length > 0 ? agents : MOCK_USERS.filter(u => u.role !== 'CLIENT')).map(user => (
+                        <option key={user.id} value={user.name}>{user.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Cost, Charge, and Profit/Loss */}
+                  <div className="grid grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Agent</label>
-                      <select
-                        value={flightAgent}
-                        onChange={(e) => setFlightAgent(e.target.value)}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon bg-white"
-                      >
-                        <option value="">Select agent...</option>
-                        {(agents.length > 0 ? agents : MOCK_USERS.filter(u => u.role !== 'CLIENT')).map(user => (
-                          <option key={user.id} value={user.name}>{user.name}</option>
-                        ))}
-                      </select>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Cost ($)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={flightCost || ''}
+                        onChange={(e) => {
+                          const cost = parseFloat(e.target.value) || 0;
+                          setFlightCost(cost);
+                          // Auto-calculate charge based on client markup
+                          const charge = calculateChargeFromMarkup(cost, 'FLIGHT', convertingRequest?.clientId);
+                          setFlightChargeToClient(charge);
+                          setFlightProfitLoss(charge - cost);
+                        }}
+                        placeholder="0.00"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Charge to Client ($)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={flightChargeToClient || ''}
+                        onChange={(e) => {
+                          const charge = parseFloat(e.target.value) || 0;
+                          setFlightChargeToClient(charge);
+                          setFlightProfitLoss(charge - flightCost);
+                        }}
+                        placeholder="0.00"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
+                      />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Profit/Loss ($)</label>
                       <input
                         type="number"
                         value={flightProfitLoss}
-                        onChange={(e) => setFlightProfitLoss(parseFloat(e.target.value) || 0)}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        readOnly
+                        className={`w-full p-2 border border-slate-200 text-xs rounded-xl bg-slate-50 ${flightProfitLoss >= 0 ? 'text-emerald-600' : 'text-red-600'} font-semibold`}
                       />
                     </div>
                   </div>
@@ -2028,7 +2188,7 @@ const Operations: React.FC<OperationsProps> = ({
                       <select
                         value={flightStatus}
                         onChange={(e) => setFlightStatus(e.target.value as 'PENDING' | 'CONFIRMED' | 'TICKETED' | 'CANCELLED')}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       >
                         <option value="PENDING">Pending</option>
                         <option value="CONFIRMED">Confirmed</option>
@@ -2045,7 +2205,7 @@ const Operations: React.FC<OperationsProps> = ({
                       onChange={(e) => setFlightNotes(e.target.value)}
                       placeholder="Additional notes about this booking..."
                       rows={3}
-                      className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon resize-none"
+                      className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon resize-none"
                     />
                   </div>
                 </div>
@@ -2062,7 +2222,7 @@ const Operations: React.FC<OperationsProps> = ({
                         value={hotelDescription}
                         onChange={(e) => setHotelDescription(e.target.value)}
                         placeholder="Smith-RitzCarlton"
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       />
                     </div>
                     <div>
@@ -2072,8 +2232,46 @@ const Operations: React.FC<OperationsProps> = ({
                         value={hotelName}
                         onChange={(e) => setHotelName(e.target.value)}
                         placeholder="The Ritz-Carlton"
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Guest Name</label>
+                    <input
+                      type="text"
+                      value={hotelGuestName}
+                      onChange={(e) => setHotelGuestName(e.target.value)}
+                      placeholder="John Smith"
+                      className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Booked Via</label>
+                      <select
+                        value={hotelBookedVia}
+                        onChange={(e) => setHotelBookedVia(e.target.value as HotelBookingAgency)}
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
+                      >
+                        <option value="PARAGON">Paragon (94% split)</option>
+                        <option value="BENNISH">Bennish (85% split)</option>
+                        <option value="EMBARK">Embark (70% split)</option>
+                        <option value="TAAP">TAAP (100% split)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Payment Method</label>
+                      <select
+                        value={hotelPaymentMethod}
+                        onChange={(e) => setHotelPaymentMethod(e.target.value as HotelPaymentMethod)}
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
+                      >
+                        <option value="AGENCY">Paid by Agency</option>
+                        <option value="PAY_AT_CHECKIN">Pay at Check-in</option>
+                      </select>
                     </div>
                   </div>
 
@@ -2083,7 +2281,7 @@ const Operations: React.FC<OperationsProps> = ({
                       <select
                         value={hotelPaymentStatus}
                         onChange={(e) => setHotelPaymentStatus(e.target.value as 'PAID' | 'UNPAID')}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       >
                         <option value="UNPAID">Unpaid</option>
                         <option value="PAID">Paid</option>
@@ -2096,7 +2294,7 @@ const Operations: React.FC<OperationsProps> = ({
                         value={hotelConfirmation}
                         onChange={(e) => setHotelConfirmation(e.target.value)}
                         placeholder="CONF123456"
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       />
                     </div>
                   </div>
@@ -2109,7 +2307,7 @@ const Operations: React.FC<OperationsProps> = ({
                         value={hotelRoomType}
                         onChange={(e) => setHotelRoomType(e.target.value)}
                         placeholder="Deluxe Suite"
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       />
                     </div>
                     <div>
@@ -2119,7 +2317,7 @@ const Operations: React.FC<OperationsProps> = ({
                         min="1"
                         value={hotelGuestCount}
                         onChange={(e) => setHotelGuestCount(parseInt(e.target.value) || 1)}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       />
                     </div>
                   </div>
@@ -2132,7 +2330,7 @@ const Operations: React.FC<OperationsProps> = ({
                         value={hotelCheckIn}
                         onChange={(e) => setHotelCheckIn(e.target.value)}
                         min={new Date().toISOString().split('T')[0]}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       />
                     </div>
                     <div>
@@ -2142,34 +2340,164 @@ const Operations: React.FC<OperationsProps> = ({
                         value={hotelCheckOut}
                         onChange={(e) => setHotelCheckOut(e.target.value)}
                         min={hotelCheckIn || new Date().toISOString().split('T')[0]}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       />
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Agent</label>
+                    <select
+                      value={hotelAgent}
+                      onChange={(e) => setHotelAgent(e.target.value)}
+                      className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon bg-white"
+                    >
+                      <option value="">Select agent...</option>
+                      {(agents.length > 0 ? agents : MOCK_USERS.filter(u => u.role !== 'CLIENT')).map(user => (
+                        <option key={user.id} value={user.name}>{user.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Room Rate & Full Charge */}
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Agent</label>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Room Rate (w/o taxes) ($)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={hotelRoomRate || ''}
+                        onChange={(e) => {
+                          const rate = parseFloat(e.target.value) || 0;
+                          setHotelRoomRate(rate);
+                        }}
+                        placeholder="0.00"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Full Charge (w/ taxes) ($)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={hotelFullCharge || ''}
+                        onChange={(e) => {
+                          const fullCharge = parseFloat(e.target.value) || 0;
+                          setHotelFullCharge(fullCharge);
+                          setHotelCost(fullCharge);
+                          const charge = calculateChargeFromMarkup(fullCharge, 'HOTEL', convertingRequest?.clientId);
+                          setHotelChargeToClient(charge);
+                          setHotelProfitLoss(charge - fullCharge);
+                        }}
+                        placeholder="0.00"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Commission Calculation */}
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Comm. % (of room rate)</label>
                       <select
-                        value={hotelAgent}
-                        onChange={(e) => setHotelAgent(e.target.value)}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon bg-white"
+                        value={hotelCommissionPercent}
+                        onChange={(e) => setHotelCommissionPercent(parseInt(e.target.value))}
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       >
-                        <option value="">Select agent...</option>
-                        {(agents.length > 0 ? agents : MOCK_USERS.filter(u => u.role !== 'CLIENT')).map(user => (
-                          <option key={user.id} value={user.name}>{user.name}</option>
-                        ))}
+                        <option value={10}>10%</option>
+                        <option value={15}>15%</option>
+                        <option value={12}>12%</option>
+                        <option value={8}>8%</option>
+                        <option value={20}>20%</option>
                       </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Expected Comm. ($)</label>
+                      <input
+                        type="number"
+                        value={(hotelRoomRate * hotelCommissionPercent / 100).toFixed(2)}
+                        readOnly
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl bg-slate-50 text-slate-600"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Net Comm. ({Math.round(HOTEL_COMMISSION_SPLITS[hotelBookedVia] * 100)}%)</label>
+                      <input
+                        type="number"
+                        value={(hotelRoomRate * hotelCommissionPercent / 100 * HOTEL_COMMISSION_SPLITS[hotelBookedVia]).toFixed(2)}
+                        readOnly
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl bg-emerald-50 text-emerald-600 font-semibold"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Cost, Charge, and Profit/Loss */}
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Cost ($)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={hotelCost || ''}
+                        onChange={(e) => {
+                          const cost = parseFloat(e.target.value) || 0;
+                          setHotelCost(cost);
+                          // Auto-calculate charge based on client markup
+                          const charge = calculateChargeFromMarkup(cost, 'HOTEL', convertingRequest?.clientId);
+                          setHotelChargeToClient(charge);
+                          setHotelProfitLoss(charge - cost);
+                        }}
+                        placeholder="0.00"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Charge to Client ($)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={hotelChargeToClient || ''}
+                        onChange={(e) => {
+                          const charge = parseFloat(e.target.value) || 0;
+                          setHotelChargeToClient(charge);
+                          setHotelProfitLoss(charge - hotelCost);
+                        }}
+                        placeholder="0.00"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
+                      />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Profit/Loss ($)</label>
                       <input
                         type="number"
                         value={hotelProfitLoss}
-                        onChange={(e) => setHotelProfitLoss(parseFloat(e.target.value) || 0)}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        readOnly
+                        className={`w-full p-2 border border-slate-200 text-xs rounded-xl bg-slate-50 ${hotelProfitLoss >= 0 ? 'text-emerald-600' : 'text-red-600'} font-semibold`}
                       />
                     </div>
+                  </div>
+
+                  {/* Customer Paying */}
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Customer Paying (if different from guest)</label>
+                    <ClientAutocomplete
+                      value={hotelCustomerPayingName}
+                      onChange={(val) => setHotelCustomerPayingName(val)}
+                      customers={customers}
+                      onSelectCustomer={(c) => {
+                        setHotelCustomerPayingId(c.id);
+                        setHotelCustomerPayingName(c.name);
+                      }}
+                      onAddNewClient={() => {
+                        setNewCustomerInitialName(hotelCustomerPayingName);
+                        setShowAddCustomerModal(true);
+                      }}
+                      placeholder="Search or leave blank if same as guest..."
+                    />
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -2194,7 +2522,7 @@ const Operations: React.FC<OperationsProps> = ({
                       <select
                         value={hotelStatus}
                         onChange={(e) => setHotelStatus(e.target.value as 'PENDING' | 'CONFIRMED' | 'CANCELLED')}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       >
                         <option value="PENDING">Pending</option>
                         <option value="CONFIRMED">Confirmed</option>
@@ -2210,7 +2538,7 @@ const Operations: React.FC<OperationsProps> = ({
                       onChange={(e) => setHotelNotes(e.target.value)}
                       placeholder="Additional notes about this booking..."
                       rows={3}
-                      className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon resize-none"
+                      className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon resize-none"
                     />
                   </div>
                 </div>
@@ -2227,7 +2555,7 @@ const Operations: React.FC<OperationsProps> = ({
                         value={logisticsDescription}
                         onChange={(e) => setLogisticsDescription(e.target.value)}
                         placeholder="Smith-Transfer"
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       />
                     </div>
                     <div>
@@ -2237,7 +2565,7 @@ const Operations: React.FC<OperationsProps> = ({
                         value={logisticsServiceType}
                         onChange={(e) => setLogisticsServiceType(e.target.value)}
                         placeholder="Car Service, Transfer, etc."
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       />
                     </div>
                   </div>
@@ -2248,7 +2576,7 @@ const Operations: React.FC<OperationsProps> = ({
                       <select
                         value={logisticsPaymentStatus}
                         onChange={(e) => setLogisticsPaymentStatus(e.target.value as 'PAID' | 'UNPAID')}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       >
                         <option value="UNPAID">Unpaid</option>
                         <option value="PAID">Paid</option>
@@ -2261,7 +2589,7 @@ const Operations: React.FC<OperationsProps> = ({
                         value={logisticsConfirmation}
                         onChange={(e) => setLogisticsConfirmation(e.target.value)}
                         placeholder="CONF123456"
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       />
                     </div>
                   </div>
@@ -2273,7 +2601,7 @@ const Operations: React.FC<OperationsProps> = ({
                       onChange={(e) => setLogisticsDetails(e.target.value)}
                       placeholder="Pickup location, special instructions, etc."
                       rows={3}
-                      className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon resize-none"
+                      className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon resize-none"
                     />
                   </div>
 
@@ -2285,7 +2613,7 @@ const Operations: React.FC<OperationsProps> = ({
                         value={logisticsDate}
                         onChange={(e) => setLogisticsDate(e.target.value)}
                         min={new Date().toISOString().split('T')[0]}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       />
                     </div>
                     <div>
@@ -2293,13 +2621,61 @@ const Operations: React.FC<OperationsProps> = ({
                       <select
                         value={logisticsAgent}
                         onChange={(e) => setLogisticsAgent(e.target.value)}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon bg-white"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon bg-white"
                       >
                         <option value="">Select agent...</option>
                         {(agents.length > 0 ? agents : MOCK_USERS.filter(u => u.role !== 'CLIENT')).map(user => (
                           <option key={user.id} value={user.name}>{user.name}</option>
                         ))}
                       </select>
+                    </div>
+                  </div>
+
+                  {/* Cost, Charge, and Profit/Loss */}
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Cost ($)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={logisticsCost || ''}
+                        onChange={(e) => {
+                          const cost = parseFloat(e.target.value) || 0;
+                          setLogisticsCost(cost);
+                          // Auto-calculate charge based on client markup
+                          const charge = calculateChargeFromMarkup(cost, 'LOGISTICS', convertingRequest?.clientId);
+                          setLogisticsChargeToClient(charge);
+                          setLogisticsProfitLoss(charge - cost);
+                        }}
+                        placeholder="0.00"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Charge to Client ($)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={logisticsChargeToClient || ''}
+                        onChange={(e) => {
+                          const charge = parseFloat(e.target.value) || 0;
+                          setLogisticsChargeToClient(charge);
+                          setLogisticsProfitLoss(charge - logisticsCost);
+                        }}
+                        placeholder="0.00"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Profit/Loss ($)</label>
+                      <input
+                        type="number"
+                        value={logisticsProfitLoss}
+                        readOnly
+                        className={`w-full p-2 border border-slate-200 text-xs rounded-xl bg-slate-50 ${logisticsProfitLoss >= 0 ? 'text-emerald-600' : 'text-red-600'} font-semibold`}
+                      />
                     </div>
                   </div>
 
@@ -2321,23 +2697,11 @@ const Operations: React.FC<OperationsProps> = ({
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Profit/Loss ($)</label>
-                      <input
-                        type="number"
-                        value={logisticsProfitLoss}
-                        onChange={(e) => setLogisticsProfitLoss(parseFloat(e.target.value) || 0)}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Status</label>
                       <select
                         value={logisticsStatus}
                         onChange={(e) => setLogisticsStatus(e.target.value as 'PENDING' | 'CONFIRMED' | 'CANCELLED')}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       >
                         <option value="PENDING">Pending</option>
                         <option value="CONFIRMED">Confirmed</option>
@@ -2353,7 +2717,7 @@ const Operations: React.FC<OperationsProps> = ({
                       onChange={(e) => setLogisticsNotes(e.target.value)}
                       placeholder="Additional notes about this booking..."
                       rows={3}
-                      className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon resize-none"
+                      className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon resize-none"
                     />
                   </div>
                 </div>
@@ -2363,13 +2727,13 @@ const Operations: React.FC<OperationsProps> = ({
             <div className="p-6 border-t border-slate-200 flex gap-3 justify-end">
               <button
                 onClick={closeConvertModal}
-                className="px-6 py-2 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-sm"
+                className="px-6 py-2 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-xl"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSubmitConvert}
-                className="px-6 py-2 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-sm"
+                className="px-6 py-2 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-xl"
               >
                 Complete Booking
               </button>
@@ -2385,7 +2749,7 @@ const Operations: React.FC<OperationsProps> = ({
           onClick={closeEditModal}
         >
           <div
-            className="bg-white rounded-sm shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto animate-zoomIn"
+            className="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto animate-zoomIn"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-4 sm:p-6 border-b border-slate-200">
@@ -2408,7 +2772,7 @@ const Operations: React.FC<OperationsProps> = ({
                         type="text"
                         value={flightDescription}
                         onChange={(e) => setFlightDescription(e.target.value)}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       />
                     </div>
                     <div>
@@ -2417,7 +2781,7 @@ const Operations: React.FC<OperationsProps> = ({
                         type="text"
                         value={flightAirline}
                         onChange={(e) => setFlightAirline(e.target.value)}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       />
                     </div>
                   </div>
@@ -2427,7 +2791,7 @@ const Operations: React.FC<OperationsProps> = ({
                       <select
                         value={flightPaymentStatus}
                         onChange={(e) => setFlightPaymentStatus(e.target.value as 'PAID' | 'UNPAID')}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       >
                         <option value="UNPAID">Unpaid</option>
                         <option value="PAID">Paid</option>
@@ -2439,7 +2803,7 @@ const Operations: React.FC<OperationsProps> = ({
                         type="text"
                         value={flightPnr}
                         onChange={(e) => setFlightPnr(e.target.value)}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       />
                     </div>
                   </div>
@@ -2449,7 +2813,7 @@ const Operations: React.FC<OperationsProps> = ({
                       type="text"
                       value={flightRoutes}
                       onChange={(e) => setFlightRoutes(e.target.value)}
-                      className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                      className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                     />
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -2460,7 +2824,7 @@ const Operations: React.FC<OperationsProps> = ({
                         min="1"
                         value={flightPassengerCount}
                         onChange={(e) => setFlightPassengerCount(parseInt(e.target.value) || 1)}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       />
                     </div>
                     <div>
@@ -2469,7 +2833,7 @@ const Operations: React.FC<OperationsProps> = ({
                         type="text"
                         value={flightDates}
                         onChange={(e) => setFlightDates(e.target.value)}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       />
                     </div>
                   </div>
@@ -2479,7 +2843,7 @@ const Operations: React.FC<OperationsProps> = ({
                       <select
                         value={flightAgent}
                         onChange={(e) => setFlightAgent(e.target.value)}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon bg-white"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon bg-white"
                       >
                         <option value="">Select agent...</option>
                         {(agents.length > 0 ? agents : MOCK_USERS.filter(u => u.role !== 'CLIENT')).map(user => (
@@ -2487,13 +2851,48 @@ const Operations: React.FC<OperationsProps> = ({
                         ))}
                       </select>
                     </div>
+                  </div>
+                  {/* Cost, Charge, and Profit/Loss */}
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Cost ($)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={flightCost || ''}
+                        onChange={(e) => {
+                          const cost = parseFloat(e.target.value) || 0;
+                          setFlightCost(cost);
+                          setFlightProfitLoss(flightChargeToClient - cost);
+                        }}
+                        placeholder="0.00"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Charge to Client ($)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={flightChargeToClient || ''}
+                        onChange={(e) => {
+                          const charge = parseFloat(e.target.value) || 0;
+                          setFlightChargeToClient(charge);
+                          setFlightProfitLoss(charge - flightCost);
+                        }}
+                        placeholder="0.00"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
+                      />
+                    </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Profit/Loss ($)</label>
                       <input
                         type="number"
                         value={flightProfitLoss}
-                        onChange={(e) => setFlightProfitLoss(parseFloat(e.target.value) || 0)}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        readOnly
+                        className={`w-full p-2 border border-slate-200 text-xs rounded-xl bg-slate-50 ${flightProfitLoss >= 0 ? 'text-emerald-600' : 'text-red-600'} font-semibold`}
                       />
                     </div>
                   </div>
@@ -2519,7 +2918,7 @@ const Operations: React.FC<OperationsProps> = ({
                       <select
                         value={flightStatus}
                         onChange={(e) => setFlightStatus(e.target.value as 'PENDING' | 'CONFIRMED' | 'TICKETED' | 'CANCELLED')}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       >
                         <option value="PENDING">Pending</option>
                         <option value="CONFIRMED">Confirmed</option>
@@ -2535,7 +2934,7 @@ const Operations: React.FC<OperationsProps> = ({
                       onChange={(e) => setFlightNotes(e.target.value)}
                       placeholder="Additional notes about this booking..."
                       rows={3}
-                      className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon resize-none"
+                      className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon resize-none"
                     />
                   </div>
                 </div>
@@ -2551,7 +2950,7 @@ const Operations: React.FC<OperationsProps> = ({
                         type="text"
                         value={hotelDescription}
                         onChange={(e) => setHotelDescription(e.target.value)}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       />
                     </div>
                     <div>
@@ -2560,8 +2959,44 @@ const Operations: React.FC<OperationsProps> = ({
                         type="text"
                         value={hotelName}
                         onChange={(e) => setHotelName(e.target.value)}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Guest Name</label>
+                    <input
+                      type="text"
+                      value={hotelGuestName}
+                      onChange={(e) => setHotelGuestName(e.target.value)}
+                      placeholder="John Smith"
+                      className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Booked Via</label>
+                      <select
+                        value={hotelBookedVia}
+                        onChange={(e) => setHotelBookedVia(e.target.value as HotelBookingAgency)}
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
+                      >
+                        <option value="PARAGON">Paragon (94% split)</option>
+                        <option value="BENNISH">Bennish (85% split)</option>
+                        <option value="EMBARK">Embark (70% split)</option>
+                        <option value="TAAP">TAAP (100% split)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Payment Method</label>
+                      <select
+                        value={hotelPaymentMethod}
+                        onChange={(e) => setHotelPaymentMethod(e.target.value as HotelPaymentMethod)}
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
+                      >
+                        <option value="AGENCY">Paid by Agency</option>
+                        <option value="PAY_AT_CHECKIN">Pay at Check-in</option>
+                      </select>
                     </div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -2570,7 +3005,7 @@ const Operations: React.FC<OperationsProps> = ({
                       <select
                         value={hotelPaymentStatus}
                         onChange={(e) => setHotelPaymentStatus(e.target.value as 'PAID' | 'UNPAID')}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       >
                         <option value="UNPAID">Unpaid</option>
                         <option value="PAID">Paid</option>
@@ -2582,7 +3017,7 @@ const Operations: React.FC<OperationsProps> = ({
                         type="text"
                         value={hotelConfirmation}
                         onChange={(e) => setHotelConfirmation(e.target.value)}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       />
                     </div>
                   </div>
@@ -2593,7 +3028,7 @@ const Operations: React.FC<OperationsProps> = ({
                         type="text"
                         value={hotelRoomType}
                         onChange={(e) => setHotelRoomType(e.target.value)}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       />
                     </div>
                     <div>
@@ -2603,7 +3038,7 @@ const Operations: React.FC<OperationsProps> = ({
                         min="1"
                         value={hotelGuestCount}
                         onChange={(e) => setHotelGuestCount(parseInt(e.target.value) || 1)}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       />
                     </div>
                   </div>
@@ -2614,7 +3049,7 @@ const Operations: React.FC<OperationsProps> = ({
                         type="date"
                         value={hotelCheckIn}
                         onChange={(e) => setHotelCheckIn(e.target.value)}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       />
                     </div>
                     <div>
@@ -2623,33 +3058,151 @@ const Operations: React.FC<OperationsProps> = ({
                         type="date"
                         value={hotelCheckOut}
                         onChange={(e) => setHotelCheckOut(e.target.value)}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Agent</label>
+                    <select
+                      value={hotelAgent}
+                      onChange={(e) => setHotelAgent(e.target.value)}
+                      className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon bg-white"
+                    >
+                      <option value="">Select agent...</option>
+                      {(agents.length > 0 ? agents : MOCK_USERS.filter(u => u.role !== 'CLIENT')).map(user => (
+                        <option key={user.id} value={user.name}>{user.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {/* Room Rate & Full Charge */}
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Agent</label>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Room Rate (w/o taxes) ($)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={hotelRoomRate || ''}
+                        onChange={(e) => setHotelRoomRate(parseFloat(e.target.value) || 0)}
+                        placeholder="0.00"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Full Charge (w/ taxes) ($)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={hotelFullCharge || ''}
+                        onChange={(e) => {
+                          const fullCharge = parseFloat(e.target.value) || 0;
+                          setHotelFullCharge(fullCharge);
+                          setHotelCost(fullCharge);
+                          setHotelProfitLoss(hotelChargeToClient - fullCharge);
+                        }}
+                        placeholder="0.00"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
+                      />
+                    </div>
+                  </div>
+                  {/* Commission Calculation */}
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Comm. %</label>
                       <select
-                        value={hotelAgent}
-                        onChange={(e) => setHotelAgent(e.target.value)}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon bg-white"
+                        value={hotelCommissionPercent}
+                        onChange={(e) => setHotelCommissionPercent(parseInt(e.target.value))}
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       >
-                        <option value="">Select agent...</option>
-                        {(agents.length > 0 ? agents : MOCK_USERS.filter(u => u.role !== 'CLIENT')).map(user => (
-                          <option key={user.id} value={user.name}>{user.name}</option>
-                        ))}
+                        <option value={10}>10%</option>
+                        <option value={15}>15%</option>
+                        <option value={12}>12%</option>
+                        <option value={8}>8%</option>
+                        <option value={20}>20%</option>
                       </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Expected Comm.</label>
+                      <input
+                        type="number"
+                        value={(hotelRoomRate * hotelCommissionPercent / 100).toFixed(2)}
+                        readOnly
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl bg-slate-50 text-slate-600"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Net Comm. ({Math.round(HOTEL_COMMISSION_SPLITS[hotelBookedVia] * 100)}%)</label>
+                      <input
+                        type="number"
+                        value={(hotelRoomRate * hotelCommissionPercent / 100 * HOTEL_COMMISSION_SPLITS[hotelBookedVia]).toFixed(2)}
+                        readOnly
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl bg-emerald-50 text-emerald-600 font-semibold"
+                      />
+                    </div>
+                  </div>
+                  {/* Cost, Charge, and Profit/Loss */}
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Cost ($)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={hotelCost || ''}
+                        onChange={(e) => {
+                          const cost = parseFloat(e.target.value) || 0;
+                          setHotelCost(cost);
+                          setHotelProfitLoss(hotelChargeToClient - cost);
+                        }}
+                        placeholder="0.00"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Charge to Client ($)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={hotelChargeToClient || ''}
+                        onChange={(e) => {
+                          const charge = parseFloat(e.target.value) || 0;
+                          setHotelChargeToClient(charge);
+                          setHotelProfitLoss(charge - hotelCost);
+                        }}
+                        placeholder="0.00"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
+                      />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Profit/Loss ($)</label>
                       <input
                         type="number"
                         value={hotelProfitLoss}
-                        onChange={(e) => setHotelProfitLoss(parseFloat(e.target.value) || 0)}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        readOnly
+                        className={`w-full p-2 border border-slate-200 text-xs rounded-xl bg-slate-50 ${hotelProfitLoss >= 0 ? 'text-emerald-600' : 'text-red-600'} font-semibold`}
                       />
                     </div>
+                  </div>
+                  {/* Customer Paying */}
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Customer Paying (if different)</label>
+                    <ClientAutocomplete
+                      value={hotelCustomerPayingName}
+                      onChange={(val) => setHotelCustomerPayingName(val)}
+                      customers={customers}
+                      onSelectCustomer={(c) => {
+                        setHotelCustomerPayingId(c.id);
+                        setHotelCustomerPayingName(c.name);
+                      }}
+                      onAddNewClient={() => {
+                        setNewCustomerInitialName(hotelCustomerPayingName);
+                        setShowAddCustomerModal(true);
+                      }}
+                      placeholder="Search or leave blank..."
+                    />
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
@@ -2673,7 +3226,7 @@ const Operations: React.FC<OperationsProps> = ({
                       <select
                         value={hotelStatus}
                         onChange={(e) => setHotelStatus(e.target.value as 'PENDING' | 'CONFIRMED' | 'CANCELLED')}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       >
                         <option value="PENDING">Pending</option>
                         <option value="CONFIRMED">Confirmed</option>
@@ -2688,7 +3241,7 @@ const Operations: React.FC<OperationsProps> = ({
                       onChange={(e) => setHotelNotes(e.target.value)}
                       placeholder="Additional notes about this booking..."
                       rows={3}
-                      className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon resize-none"
+                      className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon resize-none"
                     />
                   </div>
                 </div>
@@ -2704,7 +3257,7 @@ const Operations: React.FC<OperationsProps> = ({
                         type="text"
                         value={logisticsDescription}
                         onChange={(e) => setLogisticsDescription(e.target.value)}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       />
                     </div>
                     <div>
@@ -2713,7 +3266,7 @@ const Operations: React.FC<OperationsProps> = ({
                         type="text"
                         value={logisticsServiceType}
                         onChange={(e) => setLogisticsServiceType(e.target.value)}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       />
                     </div>
                   </div>
@@ -2723,7 +3276,7 @@ const Operations: React.FC<OperationsProps> = ({
                       <select
                         value={logisticsPaymentStatus}
                         onChange={(e) => setLogisticsPaymentStatus(e.target.value as 'PAID' | 'UNPAID')}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       >
                         <option value="UNPAID">Unpaid</option>
                         <option value="PAID">Paid</option>
@@ -2735,7 +3288,7 @@ const Operations: React.FC<OperationsProps> = ({
                         type="text"
                         value={logisticsConfirmation}
                         onChange={(e) => setLogisticsConfirmation(e.target.value)}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       />
                     </div>
                   </div>
@@ -2745,7 +3298,7 @@ const Operations: React.FC<OperationsProps> = ({
                       value={logisticsDetails}
                       onChange={(e) => setLogisticsDetails(e.target.value)}
                       rows={3}
-                      className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon resize-none"
+                      className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon resize-none"
                     />
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -2755,7 +3308,7 @@ const Operations: React.FC<OperationsProps> = ({
                         type="date"
                         value={logisticsDate}
                         onChange={(e) => setLogisticsDate(e.target.value)}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       />
                     </div>
                     <div>
@@ -2763,13 +3316,57 @@ const Operations: React.FC<OperationsProps> = ({
                       <select
                         value={logisticsAgent}
                         onChange={(e) => setLogisticsAgent(e.target.value)}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon bg-white"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon bg-white"
                       >
                         <option value="">Select agent...</option>
                         {(agents.length > 0 ? agents : MOCK_USERS.filter(u => u.role !== 'CLIENT')).map(user => (
                           <option key={user.id} value={user.name}>{user.name}</option>
                         ))}
                       </select>
+                    </div>
+                  </div>
+                  {/* Cost, Charge, and Profit/Loss */}
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Cost ($)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={logisticsCost || ''}
+                        onChange={(e) => {
+                          const cost = parseFloat(e.target.value) || 0;
+                          setLogisticsCost(cost);
+                          setLogisticsProfitLoss(logisticsChargeToClient - cost);
+                        }}
+                        placeholder="0.00"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Charge to Client ($)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={logisticsChargeToClient || ''}
+                        onChange={(e) => {
+                          const charge = parseFloat(e.target.value) || 0;
+                          setLogisticsChargeToClient(charge);
+                          setLogisticsProfitLoss(charge - logisticsCost);
+                        }}
+                        placeholder="0.00"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Profit/Loss ($)</label>
+                      <input
+                        type="number"
+                        value={logisticsProfitLoss}
+                        readOnly
+                        className={`w-full p-2 border border-slate-200 text-xs rounded-xl bg-slate-50 ${logisticsProfitLoss >= 0 ? 'text-emerald-600' : 'text-red-600'} font-semibold`}
+                      />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -2790,22 +3387,11 @@ const Operations: React.FC<OperationsProps> = ({
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Profit/Loss ($)</label>
-                      <input
-                        type="number"
-                        value={logisticsProfitLoss}
-                        onChange={(e) => setLogisticsProfitLoss(parseFloat(e.target.value) || 0)}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Status</label>
                       <select
                         value={logisticsStatus}
                         onChange={(e) => setLogisticsStatus(e.target.value as 'PENDING' | 'CONFIRMED' | 'CANCELLED')}
-                        className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                       >
                         <option value="PENDING">Pending</option>
                         <option value="CONFIRMED">Confirmed</option>
@@ -2820,7 +3406,7 @@ const Operations: React.FC<OperationsProps> = ({
                       onChange={(e) => setLogisticsNotes(e.target.value)}
                       placeholder="Additional notes about this booking..."
                       rows={3}
-                      className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon resize-none"
+                      className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon resize-none"
                     />
                   </div>
                 </div>
@@ -2830,13 +3416,13 @@ const Operations: React.FC<OperationsProps> = ({
             <div className="p-6 border-t border-slate-200 flex gap-3 justify-end">
               <button
                 onClick={closeEditModal}
-                className="px-6 py-2 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-sm"
+                className="px-6 py-2 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-xl"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSubmitEdit}
-                className="px-6 py-2 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-sm"
+                className="px-6 py-2 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-xl"
               >
                 Save Changes
               </button>
@@ -2852,7 +3438,7 @@ const Operations: React.FC<OperationsProps> = ({
           onClick={() => setViewingTrip(null)}
         >
           <div
-            className="bg-white rounded-sm shadow-2xl w-full max-w-xl mx-4 max-h-[90vh] overflow-y-auto animate-zoomIn"
+            className="bg-white rounded-xl shadow-2xl w-full max-w-xl mx-4 max-h-[90vh] overflow-y-auto animate-zoomIn"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -2877,7 +3463,7 @@ const Operations: React.FC<OperationsProps> = ({
               <div className="flex gap-4">
                 <div className="flex-1">
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Stage</label>
-                  <span className={`inline-block px-3 py-1 text-xs font-bold rounded-sm ${
+                  <span className={`inline-block px-3 py-1 text-xs font-bold rounded-xl ${
                     viewingTrip.stage === 'NEW' ? 'bg-slate-100 text-slate-600' :
                     viewingTrip.stage === 'PLANNING' ? 'bg-amber-100 text-amber-700' :
                     viewingTrip.stage === 'IN_PROGRESS' ? 'bg-paragon/10 text-paragon' :
@@ -2917,7 +3503,7 @@ const Operations: React.FC<OperationsProps> = ({
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Services</label>
                 <div className="flex gap-3">
                   {viewingTrip.hasFlights && (
-                    <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-sm">
+                    <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-xl">
                       <svg className="w-4 h-4 text-paragon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                       </svg>
@@ -2925,7 +3511,7 @@ const Operations: React.FC<OperationsProps> = ({
                     </div>
                   )}
                   {viewingTrip.hasHotels && (
-                    <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-sm">
+                    <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-xl">
                       <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                       </svg>
@@ -2933,7 +3519,7 @@ const Operations: React.FC<OperationsProps> = ({
                     </div>
                   )}
                   {viewingTrip.hasLogistics && (
-                    <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-sm">
+                    <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-xl">
                       <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                       </svg>
@@ -2950,7 +3536,7 @@ const Operations: React.FC<OperationsProps> = ({
               {viewingTrip.notes && (
                 <div>
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Notes</label>
-                  <p className="text-sm text-slate-700 bg-slate-50 p-3 rounded-sm">{viewingTrip.notes}</p>
+                  <p className="text-sm text-slate-700 bg-slate-50 p-3 rounded-xl">{viewingTrip.notes}</p>
                 </div>
               )}
 
@@ -2960,14 +3546,14 @@ const Operations: React.FC<OperationsProps> = ({
                   Tasks ({viewingTrip.tasks.filter(t => t.completed).length}/{viewingTrip.tasks.length} completed)
                 </label>
                 {viewingTrip.tasks.length > 0 ? (
-                  <div className="space-y-2 bg-slate-50 p-3 rounded-sm">
+                  <div className="space-y-2 bg-slate-50 p-3 rounded-xl">
                     {viewingTrip.tasks.map(task => (
                       <div
                         key={task.id}
                         onClick={() => handleQuickToggleTask(viewingTrip.id, task.id)}
                         className="flex items-center gap-3 cursor-pointer group"
                       >
-                        <div className={`w-4 h-4 rounded-sm border-2 flex-shrink-0 flex items-center justify-center transition-colors ${task.completed ? 'bg-paragon border-paragon' : 'border-slate-300 group-hover:border-paragon'}`}>
+                        <div className={`w-4 h-4 rounded-xl border-2 flex-shrink-0 flex items-center justify-center transition-colors ${task.completed ? 'bg-paragon border-paragon' : 'border-slate-300 group-hover:border-paragon'}`}>
                           {task.completed && (
                             <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
@@ -2988,20 +3574,20 @@ const Operations: React.FC<OperationsProps> = ({
             <div className="p-6 border-t border-slate-200 flex gap-3 justify-between">
               <button
                 onClick={() => { onDeletePipelineTrip(viewingTrip.id); setViewingTrip(null); }}
-                className="px-4 py-2 text-red-600 text-[10px] font-bold uppercase tracking-widest hover:bg-red-50 transition-colors rounded-sm"
+                className="px-4 py-2 text-red-600 text-[10px] font-bold uppercase tracking-widest hover:bg-red-50 transition-colors rounded-xl"
               >
                 Delete
               </button>
               <div className="flex gap-3">
                 <button
                   onClick={() => setViewingTrip(null)}
-                  className="px-6 py-2 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-sm"
+                  className="px-6 py-2 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-xl"
                 >
                   Close
                 </button>
                 <button
                   onClick={() => { openPipelineModal(viewingTrip); setViewingTrip(null); }}
-                  className="px-6 py-2 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-sm"
+                  className="px-6 py-2 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-xl"
                 >
                   Edit Trip
                 </button>
@@ -3018,7 +3604,7 @@ const Operations: React.FC<OperationsProps> = ({
           onClick={closeDispatchModal}
         >
           <div
-            className="bg-white rounded-sm shadow-2xl w-full max-w-2xl mx-4 max-h-[85vh] flex flex-col animate-zoomIn"
+            className="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[85vh] flex flex-col animate-zoomIn"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-6 border-b border-slate-200 flex-shrink-0">
@@ -3031,7 +3617,7 @@ const Operations: React.FC<OperationsProps> = ({
 
             {/* Mode Toggle */}
             <div className="px-6 pt-4 flex-shrink-0">
-              <div className="flex border border-slate-200 rounded-sm overflow-hidden">
+              <div className="flex border border-slate-200 rounded-xl overflow-hidden">
                 <button
                   type="button"
                   onClick={() => { setDispatchMode('QUICK'); setAiParseStep('input'); }}
@@ -3093,7 +3679,7 @@ const Operations: React.FC<OperationsProps> = ({
                       <button
                         type="button"
                         onClick={() => setDispatchServiceType('FLIGHT')}
-                        className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-sm ${
+                        className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-xl ${
                           dispatchServiceType === 'FLIGHT'
                             ? 'bg-red-600 text-white'
                             : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
@@ -3104,7 +3690,7 @@ const Operations: React.FC<OperationsProps> = ({
                       <button
                         type="button"
                         onClick={() => setDispatchServiceType('HOTEL')}
-                        className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-sm ${
+                        className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-xl ${
                           dispatchServiceType === 'HOTEL'
                             ? 'bg-amber-600 text-white'
                             : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
@@ -3115,7 +3701,7 @@ const Operations: React.FC<OperationsProps> = ({
                       <button
                         type="button"
                         onClick={() => setDispatchServiceType('LOGISTICS')}
-                        className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-sm ${
+                        className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-xl ${
                           dispatchServiceType === 'LOGISTICS'
                             ? 'bg-blue-600 text-white'
                             : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
@@ -3129,7 +3715,7 @@ const Operations: React.FC<OperationsProps> = ({
                     value={dispatchSnippet}
                     onChange={(e) => setDispatchSnippet(e.target.value)}
                     placeholder="Describe the booking request details..."
-                    className="w-full flex-1 p-4 bg-white border border-slate-300 text-sm text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon rounded-sm resize-none min-h-[100px]"
+                    className="w-full flex-1 p-4 bg-white border border-slate-300 text-sm text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon rounded-xl resize-none min-h-[100px]"
                     required
                   />
                   <div className="mt-4 flex-shrink-0">
@@ -3138,7 +3724,7 @@ const Operations: React.FC<OperationsProps> = ({
                       <button
                         type="button"
                         onClick={() => setDispatchPriority('NORMAL')}
-                        className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-sm ${
+                        className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-xl ${
                           dispatchPriority === 'NORMAL'
                             ? 'bg-paragon-gold text-slate-900'
                             : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
@@ -3149,7 +3735,7 @@ const Operations: React.FC<OperationsProps> = ({
                       <button
                         type="button"
                         onClick={() => setDispatchPriority('URGENT')}
-                        className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-sm ${
+                        className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-xl ${
                           dispatchPriority === 'URGENT'
                             ? 'bg-red-600 text-white'
                             : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
@@ -3161,7 +3747,7 @@ const Operations: React.FC<OperationsProps> = ({
                   </div>
                   <button
                     type="submit"
-                    className="mt-4 w-full py-3 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-sm"
+                    className="mt-4 w-full py-3 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-xl"
                   >
                     Submit Request
                   </button>
@@ -3171,7 +3757,7 @@ const Operations: React.FC<OperationsProps> = ({
                   {aiParseStep === 'input' ? (
                     <>
                       {/* AI Parse Input */}
-                      <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-sm">
+                      <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xl">
                         <div className="flex items-center gap-2 mb-2">
                           <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -3196,11 +3782,11 @@ Hotel: The Ritz-Carlton, New York
 Check-in: January 25, 2026
 Check-out: January 28, 2026
 Room Type: Deluxe King"
-                        className="w-full flex-1 p-4 bg-white border border-slate-300 text-sm text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-amber-400 rounded-sm resize-none min-h-[180px]"
+                        className="w-full flex-1 p-4 bg-white border border-slate-300 text-sm text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-amber-400 rounded-xl resize-none min-h-[180px]"
                       />
 
                       {aiParseError && (
-                        <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-sm">
+                        <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-xl">
                           <p className="text-xs text-red-700">{aiParseError}</p>
                         </div>
                       )}
@@ -3210,7 +3796,7 @@ Room Type: Deluxe King"
                           type="button"
                           onClick={handleAiParseText}
                           disabled={aiParsing || !aiParseText.trim()}
-                          className="flex-1 py-3 bg-amber-500 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-amber-600 transition-colors rounded-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                          className="flex-1 py-3 bg-amber-500 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-amber-600 transition-colors rounded-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
                           {aiParsing ? (
                             <>
@@ -3238,7 +3824,7 @@ Room Type: Deluxe King"
                           type="button"
                           onClick={() => fileInputRef.current?.click()}
                           disabled={aiParsing}
-                          className="flex-1 py-3 bg-slate-700 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-slate-800 transition-colors rounded-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                          className="flex-1 py-3 bg-slate-700 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-slate-800 transition-colors rounded-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
                           {aiParsing ? (
                             <>
@@ -3259,7 +3845,7 @@ Room Type: Deluxe King"
                   ) : (
                     <div className="flex-1 flex flex-col overflow-hidden min-h-0">
                       {/* AI Parse Review */}
-                      <div className="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-sm flex-shrink-0">
+                      <div className="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex-shrink-0">
                         <div className="flex items-center gap-2 mb-2">
                           <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -3275,20 +3861,20 @@ Room Type: Deluxe King"
                       </div>
 
                       <div className="flex-1 overflow-y-auto space-y-3 min-h-0">
-                        <div className="p-3 bg-slate-50 border border-slate-200 rounded-sm">
+                        <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
                           <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Booking Type</div>
                           <div className="text-sm font-bold text-slate-900">{aiParsedData?.bookingType || 'Unknown'}</div>
                         </div>
 
                         {aiParsedData?.clientName && (
-                          <div className="p-3 bg-slate-50 border border-slate-200 rounded-sm">
+                          <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
                             <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Client Name</div>
                             <div className="text-sm text-slate-900">{aiParsedData.clientName}</div>
                           </div>
                         )}
 
                         {aiParsedData?.bookingType === 'FLIGHT' && aiParsedData.flight && (
-                          <div className="p-3 bg-blue-50 border border-blue-200 rounded-sm">
+                          <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl">
                             <div className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-2">Flight Details</div>
                             <div className="grid grid-cols-2 gap-2 text-xs">
                               {aiParsedData.flight.pnr && <div><span className="text-slate-500">PNR:</span> <span className="font-mono font-bold">{aiParsedData.flight.pnr}</span></div>}
@@ -3301,7 +3887,7 @@ Room Type: Deluxe King"
                         )}
 
                         {aiParsedData?.bookingType === 'HOTEL' && aiParsedData.hotel && (
-                          <div className="p-3 bg-amber-50 border border-amber-200 rounded-sm">
+                          <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
                             <div className="text-[10px] font-bold text-amber-600 uppercase tracking-widest mb-2">Hotel Details</div>
                             <div className="grid grid-cols-2 gap-2 text-xs">
                               {aiParsedData.hotel.confirmationNumber && <div><span className="text-slate-500">Conf #:</span> <span className="font-mono font-bold">{aiParsedData.hotel.confirmationNumber}</span></div>}
@@ -3315,7 +3901,7 @@ Room Type: Deluxe King"
                         )}
 
                         {aiParsedData?.bookingType === 'LOGISTICS' && aiParsedData.logistics && (
-                          <div className="p-3 bg-purple-50 border border-purple-200 rounded-sm">
+                          <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl">
                             <div className="text-[10px] font-bold text-purple-600 uppercase tracking-widest mb-2">Logistics Details</div>
                             <div className="grid grid-cols-2 gap-2 text-xs">
                               {aiParsedData.logistics.confirmationNumber && <div><span className="text-slate-500">Conf #:</span> <span className="font-mono font-bold">{aiParsedData.logistics.confirmationNumber}</span></div>}
@@ -3329,7 +3915,7 @@ Room Type: Deluxe King"
                         )}
 
                         {aiParsedData?.notes && (
-                          <div className="p-3 bg-slate-50 border border-slate-200 rounded-sm">
+                          <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
                             <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Notes</div>
                             <div className="text-xs text-slate-700">{aiParsedData.notes}</div>
                           </div>
@@ -3340,14 +3926,14 @@ Room Type: Deluxe King"
                         <button
                           type="button"
                           onClick={() => { setAiParseStep('input'); setAiParsedData(null); }}
-                          className="flex-1 py-3 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-sm"
+                          className="flex-1 py-3 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-xl"
                         >
                           Back
                         </button>
                         <button
                           type="button"
                           onClick={handleAiParseSubmit}
-                          className="flex-1 py-3 bg-emerald-600 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-emerald-700 transition-colors rounded-sm"
+                          className="flex-1 py-3 bg-emerald-600 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-emerald-700 transition-colors rounded-xl"
                         >
                           Use This Data
                         </button>
@@ -3363,7 +3949,7 @@ Room Type: Deluxe King"
                       <select
                         value={dispatchServiceType}
                         onChange={(e) => setDispatchServiceType(e.target.value as any)}
-                        className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                        className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon rounded-xl"
                       >
                         <option value="FLIGHT">Aviation (Flight)</option>
                         <option value="HOTEL">Hotel</option>
@@ -3391,7 +3977,7 @@ Room Type: Deluxe King"
                         value={dispatchTargetDate}
                         onChange={(e) => setDispatchTargetDate(e.target.value)}
                         min={new Date().toISOString().split('T')[0]}
-                        className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                        className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon rounded-xl"
                       />
                     </div>
                   </div>
@@ -3405,7 +3991,7 @@ Room Type: Deluxe King"
                           value={dispatchOrigin}
                           onChange={(e) => setDispatchOrigin(e.target.value)}
                           placeholder="e.g. JFK, New York"
-                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon rounded-xl"
                         />
                       </div>
                       <div>
@@ -3415,7 +4001,7 @@ Room Type: Deluxe King"
                           value={dispatchDestination}
                           onChange={(e) => setDispatchDestination(e.target.value)}
                           placeholder="e.g. LAX, Los Angeles"
-                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon rounded-xl"
                         />
                       </div>
                       <div>
@@ -3424,7 +4010,7 @@ Room Type: Deluxe King"
                           type="date"
                           value={dispatchDepartDate}
                           onChange={(e) => setDispatchDepartDate(e.target.value)}
-                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon rounded-xl"
                         />
                       </div>
                       <div>
@@ -3433,7 +4019,7 @@ Room Type: Deluxe King"
                           type="date"
                           value={dispatchReturnDate}
                           onChange={(e) => setDispatchReturnDate(e.target.value)}
-                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon rounded-xl"
                         />
                       </div>
                     </div>
@@ -3447,7 +4033,7 @@ Room Type: Deluxe King"
                           value={dispatchDestination}
                           onChange={(e) => setDispatchDestination(e.target.value)}
                           placeholder="e.g. Four Seasons NYC"
-                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon rounded-xl"
                         />
                       </div>
                       <div>
@@ -3456,7 +4042,7 @@ Room Type: Deluxe King"
                           type="date"
                           value={dispatchDepartDate}
                           onChange={(e) => setDispatchDepartDate(e.target.value)}
-                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon rounded-xl"
                         />
                       </div>
                       <div>
@@ -3465,7 +4051,7 @@ Room Type: Deluxe King"
                           type="date"
                           value={dispatchReturnDate}
                           onChange={(e) => setDispatchReturnDate(e.target.value)}
-                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon rounded-xl"
                         />
                       </div>
                     </div>
@@ -3479,7 +4065,7 @@ Room Type: Deluxe King"
                           value={dispatchOrigin}
                           onChange={(e) => setDispatchOrigin(e.target.value)}
                           placeholder="e.g. JFK Airport"
-                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon rounded-xl"
                         />
                       </div>
                       <div>
@@ -3489,7 +4075,7 @@ Room Type: Deluxe King"
                           value={dispatchDestination}
                           onChange={(e) => setDispatchDestination(e.target.value)}
                           placeholder="e.g. Four Seasons NYC"
-                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon rounded-xl"
                         />
                       </div>
                       <div>
@@ -3498,7 +4084,7 @@ Room Type: Deluxe King"
                           type="date"
                           value={dispatchDepartDate}
                           onChange={(e) => setDispatchDepartDate(e.target.value)}
-                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon rounded-xl"
                         />
                       </div>
                     </div>
@@ -3509,7 +4095,7 @@ Room Type: Deluxe King"
                       value={dispatchSpecs}
                       onChange={(e) => setDispatchSpecs(e.target.value)}
                       placeholder="Enter detailed flight numbers, hotel preferences, or special instructions..."
-                      className="w-full p-3 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon resize-none rounded-sm min-h-[100px]"
+                      className="w-full p-3 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon resize-none rounded-xl min-h-[100px]"
                       required
                     />
                   </div>
@@ -3519,7 +4105,7 @@ Room Type: Deluxe King"
                       <button
                         type="button"
                         onClick={() => setDispatchPriority('NORMAL')}
-                        className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-sm ${
+                        className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-xl ${
                           dispatchPriority === 'NORMAL'
                             ? 'bg-paragon-gold text-slate-900'
                             : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
@@ -3530,7 +4116,7 @@ Room Type: Deluxe King"
                       <button
                         type="button"
                         onClick={() => setDispatchPriority('URGENT')}
-                        className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-sm ${
+                        className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-xl ${
                           dispatchPriority === 'URGENT'
                             ? 'bg-red-600 text-white'
                             : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
@@ -3542,7 +4128,7 @@ Room Type: Deluxe King"
                   </div>
                   <button
                     type="submit"
-                    className="w-full py-3 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-sm"
+                    className="w-full py-3 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-xl"
                   >
                     Submit Detailed Request
                   </button>

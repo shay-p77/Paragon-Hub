@@ -69,13 +69,13 @@ const WorldClock: React.FC = () => {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-4 mb-6 sm:mb-8">
       {mainCities.map((city) => (
-        <div key={city} className="bg-slate-900 border border-slate-800 p-2 sm:p-4 rounded-sm text-center">
+        <div key={city} className="bg-slate-900 border border-slate-800 p-2 sm:p-4 rounded-xl text-center">
           <div className="text-[8px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">{city}</div>
           <div className="text-sm sm:text-xl font-mono text-paragon-gold font-bold">{times[city]}</div>
         </div>
       ))}
       {/* 6th clock - only visible on mobile for even 2-column grid */}
-      <div className="bg-slate-900 border border-slate-800 p-2 sm:p-4 rounded-sm text-center sm:hidden">
+      <div className="bg-slate-900 border border-slate-800 p-2 sm:p-4 rounded-xl text-center sm:hidden">
         <div className="text-[8px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">{mobileOnlyCity}</div>
         <div className="text-sm sm:text-xl font-mono text-paragon-gold font-bold">{times[mobileOnlyCity]}</div>
       </div>
@@ -158,6 +158,20 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
 
   // On Duty expanded state
   const [onDutyExpanded, setOnDutyExpanded] = useState(false);
+  const onDutyRef = useRef<HTMLDivElement>(null);
+
+  // Click outside to close On Duty dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (onDutyRef.current && !onDutyRef.current.contains(event.target as Node)) {
+        setOnDutyExpanded(false);
+      }
+    };
+    if (onDutyExpanded) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [onDutyExpanded]);
 
   // Real users from backend for On Duty section
   const [allUsers, setAllUsers] = useState<Array<{
@@ -463,85 +477,105 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
     }
   };
 
-  // AI Parse function - parse PDF
+  // AI Parse function - parse PDFs (supports multiple files)
   const handleAiParsePdf = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
     setIsParsing(true);
     setAiParseError(null);
 
     try {
-      const formData = new FormData();
-      formData.append('pdf', file);
+      const allSpecs: string[] = [];
+      let lastData: any = null;
 
-      const response = await fetch(`${API_URL}/api/parse/pdf`, {
-        method: 'POST',
-        body: formData,
-      });
+      // Process each file
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const formData = new FormData();
+        formData.append('pdf', file);
 
-      const result = await response.json();
+        const response = await fetch(`${API_URL}/api/parse/pdf`, {
+          method: 'POST',
+          body: formData,
+        });
 
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to parse PDF');
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.error || `Failed to parse PDF: ${file.name}`);
+        }
+
+        lastData = result.data;
+
+        // Build specs for this file
+        let specs = files.length > 1 ? `--- ${file.name} ---\n` : '';
+
+        if (result.data.bookingType === 'FLIGHT' && result.data.flight) {
+          const f = result.data.flight;
+          specs += [
+            f.pnr ? `PNR: ${f.pnr}` : '',
+            f.airline ? `Airline: ${f.airline}` : '',
+            f.routes ? `Routes: ${f.routes}` : '',
+            f.dates ? `Dates: ${f.dates}` : '',
+            f.passengerCount ? `Passengers: ${f.passengerCount}` : '',
+            f.flightNumbers?.length ? `Flights: ${f.flightNumbers.join(', ')}` : '',
+          ].filter(Boolean).join('\n');
+        } else if (result.data.bookingType === 'HOTEL' && result.data.hotel) {
+          const h = result.data.hotel;
+          specs += [
+            h.confirmationNumber ? `Confirmation: ${h.confirmationNumber}` : '',
+            h.hotelName ? `Hotel: ${h.hotelName}` : '',
+            h.roomType ? `Room: ${h.roomType}` : '',
+            h.checkIn ? `Check-in: ${h.checkIn}` : '',
+            h.checkOut ? `Check-out: ${h.checkOut}` : '',
+            h.guestCount ? `Guests: ${h.guestCount}` : '',
+          ].filter(Boolean).join('\n');
+        } else if (result.data.bookingType === 'LOGISTICS' && result.data.logistics) {
+          const l = result.data.logistics;
+          specs += [
+            l.confirmationNumber ? `Confirmation: ${l.confirmationNumber}` : '',
+            l.serviceType ? `Service: ${l.serviceType}` : '',
+            l.provider ? `Provider: ${l.provider}` : '',
+            l.date ? `Date: ${l.date}` : '',
+            l.time ? `Time: ${l.time}` : '',
+            l.pickupLocation ? `Pickup: ${l.pickupLocation}` : '',
+            l.dropoffLocation ? `Dropoff: ${l.dropoffLocation}` : '',
+          ].filter(Boolean).join('\n');
+        }
+
+        if (result.data.notes) {
+          specs += specs ? `\nNotes: ${result.data.notes}` : `Notes: ${result.data.notes}`;
+        }
+
+        allSpecs.push(specs);
       }
 
-      setAiParsedData(result.data);
-      setAiParseStep('review');
+      // Use the last parsed data for form pre-fill
+      if (lastData) {
+        setAiParsedData(lastData);
+        setAiParseStep('review');
 
-      // Pre-fill the detail form (same logic as text parse)
-      if (result.data.bookingType) {
-        setDetailServiceType(result.data.bookingType as 'FLIGHT' | 'HOTEL' | 'LOGISTICS');
-      }
-      if (result.data.clientName) {
-        setDetailClientName(result.data.clientName);
-      }
-
-      let specs = '';
-      if (result.data.bookingType === 'FLIGHT' && result.data.flight) {
-        const f = result.data.flight;
-        specs = [
-          f.pnr ? `PNR: ${f.pnr}` : '',
-          f.airline ? `Airline: ${f.airline}` : '',
-          f.routes ? `Routes: ${f.routes}` : '',
-          f.dates ? `Dates: ${f.dates}` : '',
-          f.passengerCount ? `Passengers: ${f.passengerCount}` : '',
-          f.flightNumbers?.length ? `Flights: ${f.flightNumbers.join(', ')}` : '',
-        ].filter(Boolean).join('\n');
-        if (f.dates) setDetailTargetDate(f.dates.split(',')[0].trim());
-      } else if (result.data.bookingType === 'HOTEL' && result.data.hotel) {
-        const h = result.data.hotel;
-        specs = [
-          h.confirmationNumber ? `Confirmation: ${h.confirmationNumber}` : '',
-          h.hotelName ? `Hotel: ${h.hotelName}` : '',
-          h.roomType ? `Room: ${h.roomType}` : '',
-          h.checkIn ? `Check-in: ${h.checkIn}` : '',
-          h.checkOut ? `Check-out: ${h.checkOut}` : '',
-          h.guestCount ? `Guests: ${h.guestCount}` : '',
-        ].filter(Boolean).join('\n');
-        if (h.checkIn) setDetailTargetDate(h.checkIn);
-      } else if (result.data.bookingType === 'LOGISTICS' && result.data.logistics) {
-        const l = result.data.logistics;
-        specs = [
-          l.confirmationNumber ? `Confirmation: ${l.confirmationNumber}` : '',
-          l.serviceType ? `Service: ${l.serviceType}` : '',
-          l.provider ? `Provider: ${l.provider}` : '',
-          l.date ? `Date: ${l.date}` : '',
-          l.time ? `Time: ${l.time}` : '',
-          l.pickupLocation ? `Pickup: ${l.pickupLocation}` : '',
-          l.dropoffLocation ? `Dropoff: ${l.dropoffLocation}` : '',
-        ].filter(Boolean).join('\n');
-        if (l.date) setDetailTargetDate(l.date);
+        if (lastData.bookingType) {
+          setDetailServiceType(lastData.bookingType as 'FLIGHT' | 'HOTEL' | 'LOGISTICS');
+        }
+        if (lastData.clientName) {
+          setDetailClientName(lastData.clientName);
+        }
+        if (lastData.bookingType === 'FLIGHT' && lastData.flight?.dates) {
+          setDetailTargetDate(lastData.flight.dates.split(',')[0].trim());
+        } else if (lastData.bookingType === 'HOTEL' && lastData.hotel?.checkIn) {
+          setDetailTargetDate(lastData.hotel.checkIn);
+        } else if (lastData.bookingType === 'LOGISTICS' && lastData.logistics?.date) {
+          setDetailTargetDate(lastData.logistics.date);
+        }
       }
 
-      if (result.data.notes) {
-        specs += specs ? `\n\nNotes: ${result.data.notes}` : `Notes: ${result.data.notes}`;
-      }
-
-      setDetailSpecs(specs);
+      // Combine all specs
+      setDetailSpecs(allSpecs.join('\n\n'));
 
     } catch (error: any) {
-      setAiParseError(error.message || 'Failed to parse PDF');
+      setAiParseError(error.message || 'Failed to parse PDF(s)');
     } finally {
       setIsParsing(false);
       // Reset file input
@@ -636,52 +670,48 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto">
-      <div className="mb-6 sm:mb-8">
-        <h1 className="font-cinzel text-xl sm:text-2xl lg:text-3xl font-bold text-slate-900 uppercase tracking-widest">Command Center</h1>
-        <p className="text-[10px] sm:text-xs text-slate-500 mt-1 uppercase tracking-tight">System Status: <span className="text-emerald-500 font-bold">OPERATIONAL</span> / Active Agents: <span className="font-bold">{allUsers.filter(u => u.status !== 'OFFLINE' && u.role !== 'CLIENT').length}</span></p>
-      </div>
+      {/* Header with On Duty Widget */}
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6 sm:mb-8">
+        <div>
+          <h1 className="font-cinzel text-xl sm:text-2xl lg:text-3xl font-bold text-slate-900 uppercase tracking-widest">Command Center</h1>
+          <p className="text-[10px] sm:text-xs text-slate-500 mt-1 uppercase tracking-tight">System Status: <span className="text-emerald-500 font-bold">OPERATIONAL</span> / Active Agents: <span className="font-bold">{allUsers.filter(u => u.status !== 'OFFLINE' && u.role !== 'CLIENT').length}</span></p>
+        </div>
 
-      <WorldClock />
+        {/* On Duty - Compact Expandable Widget */}
+        {(() => {
+          const onDutyUsers = allUsers.filter(u => u.status !== 'OFFLINE' && u.role !== 'CLIENT');
+          const getInitials = (name: string) => name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+          const getStatusColor = (status: string) => {
+            switch (status) {
+              case 'AVAILABLE': return 'bg-emerald-500';
+              case 'BUSY': return 'bg-red-500';
+              case 'AWAY': return 'bg-amber-500';
+              default: return 'bg-slate-400';
+            }
+          };
+          const getRoleLabel = (role: string) => {
+            switch (role) {
+              case 'ADMIN': return 'Administrator';
+              case 'OPERATIONS': return 'Operations';
+              case 'SALES': return 'Concierge';
+              case 'ACCOUNTING': return 'Accounting';
+              default: return 'Team Member';
+            }
+          };
 
-      {/* On Duty Now - Expandable Indicator */}
-      {(() => {
-        // Filter users who are not OFFLINE and not CLIENT role (staff only)
-        const onDutyUsers = allUsers.filter(u => u.status !== 'OFFLINE' && u.role !== 'CLIENT');
-        const getInitials = (name: string) => name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-        const getStatusColor = (status: string) => {
-          switch (status) {
-            case 'AVAILABLE': return 'bg-emerald-500';
-            case 'BUSY': return 'bg-red-500';
-            case 'AWAY': return 'bg-amber-500';
-            default: return 'bg-slate-400';
-          }
-        };
-        const getRoleLabel = (role: string) => {
-          switch (role) {
-            case 'ADMIN': return 'Administrator';
-            case 'OPERATIONS': return 'Operations';
-            case 'SALES': return 'Concierge';
-            case 'ACCOUNTING': return 'Accounting';
-            default: return 'Team Member';
-          }
-        };
-
-        return (
-          <div className="mb-6 sm:mb-8">
-            <button
-              onClick={() => setOnDutyExpanded(!onDutyExpanded)}
-              className="w-full bg-white border border-slate-200 rounded-sm shadow-sm p-3 sm:p-4 flex items-center justify-between hover:border-paragon transition-colors"
-            >
-              <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${onDutyUsers.length > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></div>
-                  <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-widest text-slate-900">On Duty Now</span>
-                </div>
-                <div className="flex -space-x-2">
+          return (
+            <div className="relative" ref={onDutyRef}>
+              <button
+                onClick={() => setOnDutyExpanded(!onDutyExpanded)}
+                className="bg-white border border-slate-200 rounded-xl shadow-sm px-3 py-2 flex items-center gap-2 hover:border-paragon transition-colors"
+              >
+                <div className={`w-2 h-2 rounded-full ${onDutyUsers.length > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></div>
+                <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-slate-700">On Duty</span>
+                <div className="flex -space-x-1.5">
                   {onDutyUsers.slice(0, 3).map(user => (
                     <div
                       key={user.googleId}
-                      className="w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-white font-bold text-[8px] sm:text-[10px] border-2 border-white"
+                      className="w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-white font-bold text-[7px] sm:text-[8px] border-2 border-white"
                       style={{ backgroundColor: user.avatarColor }}
                       title={user.name}
                     >
@@ -689,64 +719,68 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                     </div>
                   ))}
                   {onDutyUsers.length > 3 && (
-                    <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-slate-300 flex items-center justify-center text-slate-600 font-bold text-[8px] sm:text-[10px] border-2 border-white">
+                    <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold text-[7px] sm:text-[8px] border-2 border-white">
                       +{onDutyUsers.length - 3}
                     </div>
                   )}
                 </div>
-                <span className="text-[9px] sm:text-[10px] text-slate-400 font-semibold hidden sm:inline">
-                  {onDutyUsers.length} team member{onDutyUsers.length !== 1 ? 's' : ''} online
-                </span>
-              </div>
-              <svg className={`w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ${onDutyExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
+                <svg className={`w-3 h-3 text-slate-400 transition-transform ${onDutyExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
 
-            {onDutyExpanded && (
-              <div className="bg-white border border-t-0 border-slate-200 rounded-b-sm shadow-sm p-4 sm:p-6 animate-slideUp">
-                {onDutyUsers.length === 0 ? (
-                  <p className="text-sm text-slate-400 text-center py-4">No team members currently on duty</p>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                    {onDutyUsers.map(user => (
-                      <div key={user.googleId} className="flex items-center gap-3">
-                        <div className="relative flex-shrink-0">
-                          <div
-                            className="w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-white font-bold text-xs sm:text-sm"
-                            style={{ backgroundColor: user.avatarColor }}
-                          >
-                            {getInitials(user.name)}
-                          </div>
-                          <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full ${getStatusColor(user.status)} border-2 border-white`}></div>
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-xs sm:text-sm font-bold text-slate-900 truncate">{user.name}</div>
-                          <div className="text-[9px] sm:text-[10px] uppercase tracking-wider text-slate-400 font-semibold">{getRoleLabel(user.role)}</div>
-                        </div>
-                      </div>
-                    ))}
+              {onDutyExpanded && (
+                <div className="absolute right-0 top-full mt-2 w-72 sm:w-80 bg-white border border-slate-200 rounded-xl shadow-lg z-50 animate-slideUp">
+                  <div className="p-3 border-b border-slate-100">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                      {onDutyUsers.length} team member{onDutyUsers.length !== 1 ? 's' : ''} online
+                    </span>
                   </div>
-                )}
-              </div>
-            )}
-          </div>
-        );
-      })()}
+                  <div className="p-3 max-h-64 overflow-y-auto">
+                    {onDutyUsers.length === 0 ? (
+                      <p className="text-xs text-slate-400 text-center py-4">No team members on duty</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {onDutyUsers.map(user => (
+                          <div key={user.googleId} className="flex items-center gap-2">
+                            <div className="relative flex-shrink-0">
+                              <div
+                                className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-[10px]"
+                                style={{ backgroundColor: user.avatarColor }}
+                              >
+                                {getInitials(user.name)}
+                              </div>
+                              <div className={`absolute bottom-0 right-0 w-2 h-2 rounded-full ${getStatusColor(user.status)} border border-white`}></div>
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-xs font-semibold text-slate-900 truncate">{user.name}</div>
+                              <div className="text-[9px] uppercase tracking-wider text-slate-400">{getRoleLabel(user.role)}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 lg:gap-8">
-        {/* Main Content - Operational Dispatch */}
-        <div className="lg:col-span-8 order-2 lg:order-1">
-           {/* Quick Add Operational Dispatch */}
-           <div className="bg-white border border-slate-200 rounded-sm shadow-sm h-auto lg:h-[400px] flex flex-col">
-              <div className="bg-slate-900 p-3 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0 flex-shrink-0">
+      <WorldClock />
+
+      {/* Main Content - Operational Dispatch (Full Width, Primary Focus) */}
+      <div className="mb-6 sm:mb-8">
+           <div className="bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col min-h-[400px] sm:min-h-[450px]">
+              <div className="bg-slate-900 rounded-t-xl p-3 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0 flex-shrink-0">
                 <div className="flex items-center gap-2">
                   <svg className="w-4 h-4 sm:w-5 sm:h-5 text-paragon-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
                   </svg>
                   <h3 className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-paragon-gold">Operational Dispatch</h3>
                 </div>
-                <div className="flex gap-1 sm:gap-0 w-full sm:w-auto border border-slate-600 rounded-sm overflow-hidden">
+                <div className="flex gap-1 sm:gap-0 w-full sm:w-auto border border-slate-600 rounded-xl overflow-hidden">
                   <button
                     onClick={() => {
                       setRequestMode('QUICK');
@@ -814,7 +848,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                         <select
                           value={quickServiceType}
                           onChange={(e) => setQuickServiceType(e.target.value as any)}
-                          className="w-full p-2 border border-slate-300 text-xs rounded-sm focus:outline-none focus:ring-2 focus:ring-paragon-gold bg-white"
+                          className="w-full p-2 border border-slate-300 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-paragon-gold bg-white"
                         >
                           <option value="GENERAL">General</option>
                           <option value="FLIGHT">Flight</option>
@@ -827,7 +861,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                       value={quickSnippet}
                       onChange={(e) => setQuickSnippet(e.target.value)}
                       placeholder="Paste a request snippet, PNR, or client note here..."
-                      className="w-full flex-1 p-4 bg-white border border-slate-300 text-sm text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon-gold rounded-sm resize-none min-h-[80px]"
+                      className="w-full flex-1 p-4 bg-white border border-slate-300 text-sm text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon-gold rounded-xl resize-none min-h-[80px]"
                       required
                     />
                     <div className="mt-3 flex-shrink-0">
@@ -836,7 +870,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                         <button
                           type="button"
                           onClick={() => setRequestPriority('NORMAL')}
-                          className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-sm ${
+                          className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-xl ${
                             requestPriority === 'NORMAL'
                               ? 'bg-paragon-gold text-slate-900'
                               : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
@@ -847,7 +881,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                         <button
                           type="button"
                           onClick={() => setRequestPriority('URGENT')}
-                          className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-sm ${
+                          className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-xl ${
                             requestPriority === 'URGENT'
                               ? 'bg-red-600 text-white'
                               : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
@@ -860,7 +894,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                     <button
                       type="submit"
                       disabled={isSavingRequest}
-                      className="mt-3 w-full bg-paragon text-white py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors flex-shrink-0 rounded-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      className="mt-3 w-full bg-paragon text-white py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors flex-shrink-0 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                       {isSavingRequest ? (
                         <>
@@ -877,7 +911,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                     {aiParseStep === 'input' ? (
                       <>
                         {/* AI Parse Input */}
-                        <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-sm">
+                        <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl">
                           <div className="flex items-center gap-2 mb-1">
                             <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -893,11 +927,11 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                           value={aiParseText}
                           onChange={(e) => setAiParseText(e.target.value)}
                           placeholder="Paste your booking confirmation, itinerary, or PNR details here..."
-                          className="w-full flex-1 p-4 bg-white border border-slate-300 text-sm text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-amber-400 rounded-sm resize-none min-h-[120px]"
+                          className="w-full flex-1 p-4 bg-white border border-slate-300 text-sm text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-amber-400 rounded-xl resize-none min-h-[120px]"
                         />
 
                         {aiParseError && (
-                          <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-sm">
+                          <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-xl">
                             <p className="text-xs text-red-700">{aiParseError}</p>
                           </div>
                         )}
@@ -907,7 +941,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                             type="button"
                             onClick={handleAiParseText}
                             disabled={isParsing || !aiParseText.trim()}
-                            className="flex-1 py-3 bg-amber-500 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-amber-600 transition-colors rounded-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            className="flex-1 py-3 bg-amber-500 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-amber-600 transition-colors rounded-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                           >
                             {isParsing ? (
                               <>
@@ -928,6 +962,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                             type="file"
                             ref={fileInputRef}
                             accept=".pdf"
+                            multiple
                             onChange={handleAiParsePdf}
                             className="hidden"
                           />
@@ -935,7 +970,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                             type="button"
                             onClick={() => fileInputRef.current?.click()}
                             disabled={isParsing}
-                            className="flex-1 py-3 bg-slate-700 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-slate-800 transition-colors rounded-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            className="flex-1 py-3 bg-slate-700 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-slate-800 transition-colors rounded-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                           >
                             {isParsing ? (
                               <>
@@ -947,7 +982,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                                 </svg>
-                                Upload PDF
+                                Upload PDF(s)
                               </>
                             )}
                           </button>
@@ -956,7 +991,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                     ) : (
                       <div className="flex-1 flex flex-col overflow-hidden min-h-0">
                         {/* AI Parse Review */}
-                        <div className="mb-3 p-3 bg-emerald-50 border border-emerald-200 rounded-sm flex-shrink-0">
+                        <div className="mb-3 p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex-shrink-0">
                           <div className="flex items-center gap-2 mb-1">
                             <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -972,20 +1007,20 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                         </div>
 
                         <div className="flex-1 overflow-y-auto space-y-2 min-h-0">
-                          <div className="p-2 bg-slate-50 border border-slate-200 rounded-sm">
+                          <div className="p-2 bg-slate-50 border border-slate-200 rounded-xl">
                             <div className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1">Booking Type</div>
                             <div className="text-xs font-bold text-slate-900">{aiParsedData?.bookingType || 'Unknown'}</div>
                           </div>
 
                           {aiParsedData?.clientName && (
-                            <div className="p-2 bg-slate-50 border border-slate-200 rounded-sm">
+                            <div className="p-2 bg-slate-50 border border-slate-200 rounded-xl">
                               <div className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1">Client Name</div>
                               <div className="text-xs text-slate-900">{aiParsedData.clientName}</div>
                             </div>
                           )}
 
                           {aiParsedData?.bookingType === 'FLIGHT' && aiParsedData.flight && (
-                            <div className="p-2 bg-blue-50 border border-blue-200 rounded-sm">
+                            <div className="p-2 bg-blue-50 border border-blue-200 rounded-xl">
                               <div className="text-[9px] font-bold text-blue-600 uppercase tracking-widest mb-1">Flight Details</div>
                               <div className="grid grid-cols-2 gap-1 text-[11px]">
                                 {aiParsedData.flight.pnr && <div><span className="text-slate-500">PNR:</span> <span className="font-mono font-bold">{aiParsedData.flight.pnr}</span></div>}
@@ -997,7 +1032,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                           )}
 
                           {aiParsedData?.bookingType === 'HOTEL' && aiParsedData.hotel && (
-                            <div className="p-2 bg-amber-50 border border-amber-200 rounded-sm">
+                            <div className="p-2 bg-amber-50 border border-amber-200 rounded-xl">
                               <div className="text-[9px] font-bold text-amber-600 uppercase tracking-widest mb-1">Hotel Details</div>
                               <div className="grid grid-cols-2 gap-1 text-[11px]">
                                 {aiParsedData.hotel.hotelName && <div className="col-span-2"><span className="text-slate-500">Hotel:</span> {aiParsedData.hotel.hotelName}</div>}
@@ -1008,7 +1043,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                           )}
 
                           {aiParsedData?.bookingType === 'LOGISTICS' && aiParsedData.logistics && (
-                            <div className="p-2 bg-purple-50 border border-purple-200 rounded-sm">
+                            <div className="p-2 bg-purple-50 border border-purple-200 rounded-xl">
                               <div className="text-[9px] font-bold text-purple-600 uppercase tracking-widest mb-1">Logistics Details</div>
                               <div className="grid grid-cols-2 gap-1 text-[11px]">
                                 {aiParsedData.logistics.serviceType && <div><span className="text-slate-500">Service:</span> {aiParsedData.logistics.serviceType}</div>}
@@ -1022,14 +1057,14 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                           <button
                             type="button"
                             onClick={() => { setAiParseStep('input'); setAiParsedData(null); }}
-                            className="flex-1 py-2.5 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-sm"
+                            className="flex-1 py-2.5 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-xl"
                           >
                             Back
                           </button>
                           <button
                             type="button"
                             onClick={handleAiParseSubmit}
-                            className="flex-1 py-2.5 bg-emerald-500 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-emerald-600 transition-colors rounded-sm"
+                            className="flex-1 py-2.5 bg-emerald-500 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-emerald-600 transition-colors rounded-xl"
                           >
                             Use This Data
                           </button>
@@ -1041,7 +1076,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                   <div className="flex flex-col gap-4 overflow-y-auto">
                     {/* AI Parsed indicator */}
                     {aiParsedData && (
-                      <div className="flex items-center gap-2 px-3 py-2 rounded-sm text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-700">
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-700">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                         </svg>
@@ -1063,7 +1098,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                         <select
                           value={detailServiceType}
                           onChange={(e) => setDetailServiceType(e.target.value as any)}
-                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon-gold rounded-sm"
+                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon-gold rounded-xl"
                         >
                           <option value="FLIGHT">Aviation (Flight)</option>
                           <option value="HOTEL">Hotel</option>
@@ -1092,7 +1127,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                           value={detailTargetDate}
                           onChange={(e) => setDetailTargetDate(e.target.value)}
                           min={new Date().toISOString().split('T')[0]}
-                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon-gold rounded-sm"
+                          className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon-gold rounded-xl"
                         />
                       </div>
                     </div>
@@ -1106,7 +1141,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                             value={detailOrigin}
                             onChange={(e) => setDetailOrigin(e.target.value)}
                             placeholder="e.g. JFK, NYC"
-                            className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon-gold rounded-sm"
+                            className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon-gold rounded-xl"
                           />
                         </div>
                         <div>
@@ -1116,7 +1151,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                             value={detailDestination}
                             onChange={(e) => setDetailDestination(e.target.value)}
                             placeholder="e.g. LAX, Los Angeles"
-                            className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon-gold rounded-sm"
+                            className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon-gold rounded-xl"
                           />
                         </div>
                         <div>
@@ -1125,7 +1160,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                             type="date"
                             value={detailDepartDate}
                             onChange={(e) => setDetailDepartDate(e.target.value)}
-                            className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon-gold rounded-sm"
+                            className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon-gold rounded-xl"
                           />
                         </div>
                         <div>
@@ -1134,7 +1169,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                             type="date"
                             value={detailReturnDate}
                             onChange={(e) => setDetailReturnDate(e.target.value)}
-                            className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon-gold rounded-sm"
+                            className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon-gold rounded-xl"
                           />
                         </div>
                       </div>
@@ -1148,7 +1183,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                             value={detailDestination}
                             onChange={(e) => setDetailDestination(e.target.value)}
                             placeholder="e.g. Four Seasons NYC"
-                            className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon-gold rounded-sm"
+                            className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon-gold rounded-xl"
                           />
                         </div>
                         <div>
@@ -1157,7 +1192,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                             type="date"
                             value={detailDepartDate}
                             onChange={(e) => setDetailDepartDate(e.target.value)}
-                            className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon-gold rounded-sm"
+                            className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon-gold rounded-xl"
                           />
                         </div>
                         <div>
@@ -1166,7 +1201,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                             type="date"
                             value={detailReturnDate}
                             onChange={(e) => setDetailReturnDate(e.target.value)}
-                            className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon-gold rounded-sm"
+                            className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon-gold rounded-xl"
                           />
                         </div>
                       </div>
@@ -1180,7 +1215,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                             value={detailOrigin}
                             onChange={(e) => setDetailOrigin(e.target.value)}
                             placeholder="e.g. JFK Airport"
-                            className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon-gold rounded-sm"
+                            className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon-gold rounded-xl"
                           />
                         </div>
                         <div>
@@ -1190,7 +1225,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                             value={detailDestination}
                             onChange={(e) => setDetailDestination(e.target.value)}
                             placeholder="e.g. Four Seasons NYC"
-                            className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon-gold rounded-sm"
+                            className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon-gold rounded-xl"
                           />
                         </div>
                         <div>
@@ -1199,7 +1234,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                             type="date"
                             value={detailDepartDate}
                             onChange={(e) => setDetailDepartDate(e.target.value)}
-                            className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon-gold rounded-sm"
+                            className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-paragon-gold rounded-xl"
                           />
                         </div>
                       </div>
@@ -1210,7 +1245,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                         value={detailSpecs}
                         onChange={(e) => setDetailSpecs(e.target.value)}
                         placeholder="Enter detailed flight numbers, hotel preferences, or special instructions..."
-                        className="w-full p-3 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon-gold resize-none rounded-sm min-h-[80px]"
+                        className="w-full p-3 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon-gold resize-none rounded-xl min-h-[80px]"
                         required
                       />
                     </div>
@@ -1220,7 +1255,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                         <button
                           type="button"
                           onClick={() => setRequestPriority('NORMAL')}
-                          className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-sm ${
+                          className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-xl ${
                             requestPriority === 'NORMAL'
                               ? 'bg-paragon-gold text-slate-900'
                               : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
@@ -1231,7 +1266,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                         <button
                           type="button"
                           onClick={() => setRequestPriority('URGENT')}
-                          className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-sm ${
+                          className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest transition-all rounded-xl ${
                             requestPriority === 'URGENT'
                               ? 'bg-red-600 text-white'
                               : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
@@ -1244,7 +1279,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                     <button
                       type="submit"
                       disabled={isSavingRequest}
-                      className="w-full bg-paragon-gold text-slate-900 py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-amber-500 transition-colors rounded-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      className="w-full bg-paragon-gold text-slate-900 py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-amber-500 transition-colors rounded-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                       {isSavingRequest ? (
                         <>
@@ -1259,11 +1294,13 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                 )}
               </form>
            </div>
-        </div>
+      </div>
 
-        {/* Bulletin Board - Sidebar */}
-        <div className="lg:col-span-4 order-1 lg:order-2">
-           <div className="bg-white border border-slate-200 p-4 sm:p-6 rounded-sm shadow-sm h-auto max-h-[350px] sm:max-h-[400px] lg:h-[400px] flex flex-col">
+      {/* Bulletin Board and Inbound Queue - Side by Side */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
+        {/* Bulletin Board */}
+        <div>
+           <div className="bg-white border border-slate-200 p-4 sm:p-6 rounded-xl shadow-sm h-[350px] sm:h-[400px] flex flex-col">
               <div className="flex justify-between items-center mb-4 flex-shrink-0">
                 <SectionHeader title="Bulletin Board" />
                 <button onClick={() => setShowCreateModal(true)} className="text-[10px] font-bold text-paragon hover:underline uppercase tracking-widest">+ Post</button>
@@ -1395,7 +1432,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                                 const authorInitial = displayName.charAt(0);
                                 const avatarColor = c.authorAvatarColor || '#94a3b8';
                                 return (
-                                  <div key={c.id} className={`flex gap-2 group ${c.isPinned ? 'bg-amber-50 -mx-3 px-3 py-1.5 rounded-sm' : ''}`}>
+                                  <div key={c.id} className={`flex gap-2 group ${c.isPinned ? 'bg-amber-50 -mx-3 px-3 py-1.5 rounded-xl' : ''}`}>
                                     <div className="relative">
                                       <div
                                         className="w-5 h-5 rounded-full flex items-center justify-center text-[7px] font-bold flex-shrink-0 text-white"
@@ -1491,7 +1528,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                                   placeholder="Comment..."
                                   value={commentText}
                                   onChange={(e) => setCommentText(e.target.value)}
-                                  className="flex-1 p-1.5 text-[10px] border border-slate-200 outline-none focus:ring-1 focus:ring-paragon rounded-sm"
+                                  className="flex-1 p-1.5 text-[10px] border border-slate-200 outline-none focus:ring-1 focus:ring-paragon rounded-xl"
                                 />
                                 <button type="submit" className="px-2 py-1.5 bg-paragon text-white text-[9px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors">
                                   Post
@@ -1508,18 +1545,17 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
               </div>
            </div>
         </div>
-      </div>
 
-      {/* Inbound Queue (All Pending Requests) */}
-      {requests && requests.filter(r => r.status === 'PENDING').length > 0 && (
-        <div className="mt-6 sm:mt-8 bg-white border border-slate-200 rounded-sm shadow-sm p-4 sm:p-6">
-          <div className="flex items-center mb-4">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-amber-500"></div>
-              <h3 className="text-[11px] font-bold uppercase tracking-widest text-slate-900">Inbound Queue ({requests.filter(r => r.status === 'PENDING').length})</h3>
+        {/* Inbound Queue */}
+        <div>
+          <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-4 sm:p-6 h-[350px] sm:h-[400px] flex flex-col">
+            <div className="flex items-center mb-4 flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></div>
+                <h3 className="text-[11px] font-bold uppercase tracking-widest text-slate-900">Inbound Queue ({requests.filter(r => r.status === 'PENDING').length})</h3>
+              </div>
             </div>
-          </div>
-          <div className="space-y-2">
+            <div className="space-y-2 flex-1 overflow-y-auto">
             {requests
               .filter(r => r.status === 'PENDING')
               .sort((a, b) => {
@@ -1539,7 +1575,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                 return (
                   <div
                     key={r.id}
-                    className={`bg-white border rounded-sm transition-all ${r.priority === 'URGENT' || r.priority === 'CRITICAL' ? 'border-red-300' : 'border-slate-200'}`}
+                    className={`bg-white border rounded-xl transition-all ${r.priority === 'URGENT' || r.priority === 'CRITICAL' ? 'border-red-300' : 'border-slate-200'}`}
                   >
                     {/* Header Row - Always Visible */}
                     <div
@@ -1621,7 +1657,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                           <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100">
                             <button
                               onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ type: 'request', id: r.id }); }}
-                              className="flex-1 bg-red-50 text-red-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-red-100 transition-colors rounded-sm"
+                              className="flex-1 bg-red-50 text-red-600 text-[10px] py-2 px-3 font-bold uppercase tracking-wider hover:bg-red-100 transition-colors rounded-xl"
                             >
                               Delete Request
                             </button>
@@ -1632,9 +1668,19 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                   </div>
                 );
               })}
+              {requests.filter(r => r.status === 'PENDING').length === 0 && (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <svg className="w-12 h-12 text-slate-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                  </svg>
+                  <p className="text-xs text-slate-400 font-semibold uppercase tracking-widest mb-1">Queue Empty</p>
+                  <p className="text-[10px] text-slate-400">No pending requests at the moment</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      )}
+      </div>
 
       {/* Create Post Modal */}
       {showCreateModal && (
@@ -1643,7 +1689,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
           onClick={() => setShowCreateModal(false)}
         >
           <div
-            className="bg-white rounded-sm shadow-2xl w-full max-w-lg mx-4 animate-zoomIn"
+            className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 animate-zoomIn"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-6 border-b border-slate-200">
@@ -1660,7 +1706,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                   type="text"
                   value={newPostTitle}
                   onChange={(e) => setNewPostTitle(e.target.value)}
-                  className="w-full p-3 border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                  className="w-full p-3 border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-xl"
                   placeholder="Post title..."
                   required
                 />
@@ -1671,7 +1717,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                 <textarea
                   value={newPostContent}
                   onChange={(e) => setNewPostContent(e.target.value)}
-                  className="w-full p-3 border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm h-32"
+                  className="w-full p-3 border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-xl h-32"
                   placeholder="Post content..."
                   required
                 />
@@ -1683,7 +1729,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                   <button
                     type="button"
                     onClick={() => setNewPostPriority('NORMAL')}
-                    className={`flex-1 py-2 px-4 rounded-sm text-[10px] font-bold uppercase tracking-widest transition-all ${
+                    className={`flex-1 py-2 px-4 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${
                       newPostPriority === 'NORMAL'
                         ? 'bg-paragon text-white'
                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -1694,7 +1740,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                   <button
                     type="button"
                     onClick={() => setNewPostPriority('HIGH')}
-                    className={`flex-1 py-2 px-4 rounded-sm text-[10px] font-bold uppercase tracking-widest transition-all ${
+                    className={`flex-1 py-2 px-4 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${
                       newPostPriority === 'HIGH'
                         ? 'bg-red-600 text-white'
                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -1709,14 +1755,14 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="flex-1 py-3 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-sm"
+                  className="flex-1 py-3 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-xl"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSavingPost}
-                  className="flex-1 py-3 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="flex-1 py-3 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {isSavingPost ? (
                     <>
@@ -1740,7 +1786,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
           onClick={() => setDeleteConfirm(null)}
         >
           <div
-            className="bg-white rounded-sm shadow-2xl w-full max-w-sm mx-4 animate-zoomIn"
+            className="bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4 animate-zoomIn"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-6">
@@ -1761,14 +1807,14 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
               <div className="flex gap-3">
                 <button
                   onClick={() => setDeleteConfirm(null)}
-                  className="flex-1 py-2.5 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-sm"
+                  className="flex-1 py-2.5 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-xl"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleConfirmDelete}
                   disabled={isDeleting}
-                  className="flex-1 py-2.5 bg-red-600 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-red-700 transition-colors rounded-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="flex-1 py-2.5 bg-red-600 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-red-700 transition-colors rounded-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {isDeleting ? (
                     <>
@@ -1792,7 +1838,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
           onClick={() => setEditingAnnouncement(null)}
         >
           <div
-            className="bg-white rounded-sm shadow-2xl w-full max-w-lg mx-4 animate-zoomIn"
+            className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 animate-zoomIn"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-6 border-b border-slate-200">
@@ -1809,7 +1855,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                   type="text"
                   value={editTitle}
                   onChange={(e) => setEditTitle(e.target.value)}
-                  className="w-full p-3 border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                  className="w-full p-3 border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-xl"
                   placeholder="Post title..."
                   required
                 />
@@ -1820,7 +1866,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                 <textarea
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}
-                  className="w-full p-3 border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm h-32"
+                  className="w-full p-3 border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-xl h-32"
                   placeholder="Post content..."
                   required
                 />
@@ -1832,7 +1878,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                   <button
                     type="button"
                     onClick={() => setEditPriority('NORMAL')}
-                    className={`flex-1 py-2 px-4 rounded-sm text-[10px] font-bold uppercase tracking-widest transition-all ${
+                    className={`flex-1 py-2 px-4 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${
                       editPriority === 'NORMAL'
                         ? 'bg-paragon text-white'
                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -1843,7 +1889,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                   <button
                     type="button"
                     onClick={() => setEditPriority('HIGH')}
-                    className={`flex-1 py-2 px-4 rounded-sm text-[10px] font-bold uppercase tracking-widest transition-all ${
+                    className={`flex-1 py-2 px-4 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${
                       editPriority === 'HIGH'
                         ? 'bg-red-600 text-white'
                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -1858,14 +1904,14 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                 <button
                   type="button"
                   onClick={() => setEditingAnnouncement(null)}
-                  className="flex-1 py-3 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-sm"
+                  className="flex-1 py-3 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-xl"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSavingEdit}
-                  className="flex-1 py-3 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="flex-1 py-3 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {isSavingEdit ? (
                     <>
@@ -1884,7 +1930,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
 
       {/* Error Toast */}
       {errorToast && (
-        <div className="fixed bottom-20 sm:bottom-6 left-4 right-4 sm:left-auto sm:right-6 bg-red-600 text-white px-4 sm:px-6 py-3 sm:py-4 rounded-sm shadow-lg flex items-center gap-3 animate-slideUp z-50">
+        <div className="fixed bottom-20 sm:bottom-6 left-4 right-4 sm:left-auto sm:right-6 bg-red-600 text-white px-4 sm:px-6 py-3 sm:py-4 rounded-xl shadow-lg flex items-center gap-3 animate-slideUp z-50">
           <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>

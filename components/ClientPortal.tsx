@@ -50,7 +50,7 @@ const ClientPortal: React.FC = () => {
                 </div>
              </div>
 
-             <div className="bg-slate-50 border-2 border-dashed border-slate-200 p-12 text-center rounded-sm">
+             <div className="bg-slate-50 border-2 border-dashed border-slate-200 p-12 text-center rounded-xl">
                  <h4 className="font-cinzel text-lg mb-2">ADD TRAVEL DOCUMENT</h4>
                  <p className="text-[10px] text-slate-500 mb-6 uppercase tracking-wider font-bold">Secure Passport & Visa Vault</p>
                  <div className="flex justify-center gap-4">

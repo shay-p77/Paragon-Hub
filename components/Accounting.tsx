@@ -48,7 +48,7 @@ const Accounting: React.FC = () => {
 
       {view === 'ar' && (
         <div className="grid grid-cols-1 gap-6">
-          <div className="bg-white border border-slate-200 p-6 rounded-sm shadow-sm">
+          <div className="bg-white border border-slate-200 p-6 rounded-xl shadow-sm">
             <h3 className="text-xs font-bold mb-4 uppercase text-slate-500">Accounts Receivable Aging</h3>
             <div className="flex gap-4">
               {[ { l: 'Current', v: 45000 }, { l: '31-60', v: 12000 }, { l: '61-90', v: 5500 }, { l: '90+', v: 2100 }].map((d, i) => (

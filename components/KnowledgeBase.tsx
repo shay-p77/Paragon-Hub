@@ -908,7 +908,7 @@ const KnowledgeBase: React.FC = () => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search procedures, locations, contacts..."
-            className="w-full pl-10 pr-4 py-2.5 sm:py-3 bg-white border border-slate-200 text-xs sm:text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+            className="w-full pl-10 pr-4 py-2.5 sm:py-3 bg-white border border-slate-200 text-xs sm:text-sm outline-none focus:ring-2 focus:ring-paragon rounded-xl"
           />
         </div>
       </div>
@@ -959,7 +959,7 @@ const KnowledgeBase: React.FC = () => {
                 <div
                   key={proc.id}
                   onClick={() => setSelectedEntry(proc)}
-                  className={`bg-white border border-slate-200 p-5 rounded-sm cursor-pointer hover:shadow-md transition-shadow ${
+                  className={`bg-white border border-slate-200 p-5 rounded-xl cursor-pointer hover:shadow-md transition-shadow ${
                     selectedEntry?.id === proc.id ? 'ring-2 ring-paragon' : ''
                   }`}
                 >
@@ -995,7 +995,7 @@ const KnowledgeBase: React.FC = () => {
                 <div
                   key={loc.id}
                   onClick={() => setSelectedEntry(loc)}
-                  className={`bg-white border border-slate-200 p-5 rounded-sm cursor-pointer hover:shadow-md transition-shadow ${
+                  className={`bg-white border border-slate-200 p-5 rounded-xl cursor-pointer hover:shadow-md transition-shadow ${
                     selectedEntry?.id === loc.id ? 'ring-2 ring-paragon' : ''
                   }`}
                 >
@@ -1032,7 +1032,7 @@ const KnowledgeBase: React.FC = () => {
                 <div
                   key={contact.id}
                   onClick={() => setSelectedEntry(contact)}
-                  className={`bg-white border border-slate-200 p-4 rounded-sm cursor-pointer hover:shadow-md transition-shadow ${
+                  className={`bg-white border border-slate-200 p-4 rounded-xl cursor-pointer hover:shadow-md transition-shadow ${
                     selectedEntry?.id === contact.id ? 'ring-2 ring-paragon' : ''
                   }`}
                 >
@@ -1073,7 +1073,7 @@ const KnowledgeBase: React.FC = () => {
                 <div
                   key={note.id}
                   onClick={() => setSelectedEntry(note)}
-                  className={`bg-white border border-slate-200 p-5 rounded-sm cursor-pointer hover:shadow-md transition-shadow ${
+                  className={`bg-white border border-slate-200 p-5 rounded-xl cursor-pointer hover:shadow-md transition-shadow ${
                     selectedEntry?.id === note.id ? 'ring-2 ring-paragon' : ''
                   }`}
                 >
@@ -1108,7 +1108,7 @@ const KnowledgeBase: React.FC = () => {
         {/* Detail Panel */}
         {selectedEntry && (
           <div className="lg:col-span-5">
-            <div className="bg-white border border-slate-200 p-4 sm:p-6 rounded-sm sticky top-4">
+            <div className="bg-white border border-slate-200 p-4 sm:p-6 rounded-xl sticky top-4">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-xs font-bold uppercase tracking-widest text-paragon">Details</h3>
                 <div className="flex items-center gap-2">
@@ -1171,7 +1171,7 @@ const KnowledgeBase: React.FC = () => {
                   </div>
 
                   {selectedEntry.notes && (
-                    <div className="bg-slate-50 p-4 rounded-sm mb-4">
+                    <div className="bg-slate-50 p-4 rounded-xl mb-4">
                       <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 block">Notes</label>
                       <p className="text-xs text-slate-700 leading-relaxed">{selectedEntry.notes}</p>
                     </div>
@@ -1198,7 +1198,7 @@ const KnowledgeBase: React.FC = () => {
                     </div>
                   )}
 
-                  <div className="bg-slate-50 p-4 rounded-sm mb-4">
+                  <div className="bg-slate-50 p-4 rounded-xl mb-4">
                     <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{selectedEntry.content}</p>
                   </div>
 
@@ -1225,7 +1225,7 @@ const KnowledgeBase: React.FC = () => {
       {/* Quick Add Modal */}
       {showQuickAdd && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 pb-20 md:pb-4 animate-fadeIn">
-          <div ref={quickAddRef} className="bg-white w-full max-w-lg max-h-[70vh] md:max-h-[80vh] flex flex-col rounded-sm shadow-2xl animate-zoomIn overflow-hidden">
+          <div ref={quickAddRef} className="bg-white w-full max-w-lg max-h-[70vh] md:max-h-[80vh] flex flex-col rounded-xl shadow-2xl animate-zoomIn overflow-hidden">
             <div className="p-3 sm:p-4 border-b border-slate-200 flex justify-between items-center">
               <div className="flex items-center gap-2">
                 {quickAddCategory && (
@@ -1255,7 +1255,7 @@ const KnowledgeBase: React.FC = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <button
                     onClick={() => setQuickAddCategory('PROCEDURE')}
-                    className="p-4 border border-slate-200 rounded-sm hover:border-paragon hover:bg-paragon/5 transition-all text-left group"
+                    className="p-4 border border-slate-200 rounded-xl hover:border-paragon hover:bg-paragon/5 transition-all text-left group"
                   >
                     <div className="flex items-center gap-3 mb-2">
                       <div className="w-8 h-8 rounded-full bg-teal-100 flex items-center justify-center">
@@ -1270,7 +1270,7 @@ const KnowledgeBase: React.FC = () => {
 
                   <button
                     onClick={() => setQuickAddCategory('LOCATION')}
-                    className="p-4 border border-slate-200 rounded-sm hover:border-paragon hover:bg-paragon/5 transition-all text-left group"
+                    className="p-4 border border-slate-200 rounded-xl hover:border-paragon hover:bg-paragon/5 transition-all text-left group"
                   >
                     <div className="flex items-center gap-3 mb-2">
                       <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
@@ -1286,7 +1286,7 @@ const KnowledgeBase: React.FC = () => {
 
                   <button
                     onClick={() => setQuickAddCategory('CONTACT')}
-                    className="p-4 border border-slate-200 rounded-sm hover:border-paragon hover:bg-paragon/5 transition-all text-left group"
+                    className="p-4 border border-slate-200 rounded-xl hover:border-paragon hover:bg-paragon/5 transition-all text-left group"
                   >
                     <div className="flex items-center gap-3 mb-2">
                       <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
@@ -1301,7 +1301,7 @@ const KnowledgeBase: React.FC = () => {
 
                   <button
                     onClick={() => setQuickAddCategory('NOTE')}
-                    className="p-4 border border-slate-200 rounded-sm hover:border-paragon hover:bg-paragon/5 transition-all text-left group"
+                    className="p-4 border border-slate-200 rounded-xl hover:border-paragon hover:bg-paragon/5 transition-all text-left group"
                   >
                     <div className="flex items-center gap-3 mb-2">
                       <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
@@ -1327,7 +1327,7 @@ const KnowledgeBase: React.FC = () => {
                     value={procTitle}
                     onChange={(e) => setProcTitle(e.target.value)}
                     placeholder="E.g., 'Virtuoso Hotel Booking Process'"
-                    className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                    className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-xl"
                     required
                   />
                 </div>
@@ -1336,7 +1336,7 @@ const KnowledgeBase: React.FC = () => {
                   <select
                     value={procSubcategory}
                     onChange={(e) => setProcSubcategory(e.target.value)}
-                    className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                    className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-xl"
                   >
                     <option value="">Select a subcategory...</option>
                     <option value="Hotels">Hotels</option>
@@ -1353,7 +1353,7 @@ const KnowledgeBase: React.FC = () => {
                     value={procContent}
                     onChange={(e) => setProcContent(e.target.value)}
                     placeholder="Enter the procedure steps or details..."
-                    className="w-full p-3 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm resize-none h-32"
+                    className="w-full p-3 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-xl resize-none h-32"
                     required
                   />
                 </div>
@@ -1364,10 +1364,10 @@ const KnowledgeBase: React.FC = () => {
                     value={procTags}
                     onChange={(e) => setProcTags(e.target.value)}
                     placeholder="E.g., 'virtuoso, hotels, booking'"
-                    className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                    className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-xl"
                   />
                 </div>
-                <button type="submit" className="w-full bg-paragon text-white py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-sm">
+                <button type="submit" className="w-full bg-paragon text-white py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-xl">
                   Save Procedure
                 </button>
               </form>
@@ -1382,7 +1382,7 @@ const KnowledgeBase: React.FC = () => {
                     value={locTitle}
                     onChange={(e) => setLocTitle(e.target.value)}
                     placeholder="E.g., 'Monaco Grand Prix - VIP Guide'"
-                    className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                    className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-xl"
                     required
                   />
                 </div>
@@ -1393,7 +1393,7 @@ const KnowledgeBase: React.FC = () => {
                     value={locLocation}
                     onChange={(e) => setLocLocation(e.target.value)}
                     placeholder="E.g., 'Monaco' or 'Tokyo, Japan'"
-                    className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                    className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-xl"
                     required
                   />
                 </div>
@@ -1403,7 +1403,7 @@ const KnowledgeBase: React.FC = () => {
                     value={locContent}
                     onChange={(e) => setLocContent(e.target.value)}
                     placeholder="Enter destination details, tips, insider info..."
-                    className="w-full p-3 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm resize-none h-32"
+                    className="w-full p-3 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-xl resize-none h-32"
                     required
                   />
                 </div>
@@ -1414,10 +1414,10 @@ const KnowledgeBase: React.FC = () => {
                     value={locTags}
                     onChange={(e) => setLocTags(e.target.value)}
                     placeholder="E.g., 'monaco, f1, luxury, events'"
-                    className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                    className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-xl"
                   />
                 </div>
-                <button type="submit" className="w-full bg-paragon text-white py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-sm">
+                <button type="submit" className="w-full bg-paragon text-white py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-xl">
                   Save Location
                 </button>
               </form>
@@ -1433,7 +1433,7 @@ const KnowledgeBase: React.FC = () => {
                       value={contactName}
                       onChange={(e) => setContactName(e.target.value)}
                       placeholder="Full name"
-                      className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                      className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-xl"
                       required
                     />
                   </div>
@@ -1444,7 +1444,7 @@ const KnowledgeBase: React.FC = () => {
                       value={contactRole}
                       onChange={(e) => setContactRole(e.target.value)}
                       placeholder="E.g., Concierge"
-                      className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                      className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-xl"
                       required
                     />
                   </div>
@@ -1457,7 +1457,7 @@ const KnowledgeBase: React.FC = () => {
                       value={contactCompany}
                       onChange={(e) => setContactCompany(e.target.value)}
                       placeholder="E.g., Hotel de Crillon"
-                      className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                      className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-xl"
                       required
                     />
                   </div>
@@ -1468,7 +1468,7 @@ const KnowledgeBase: React.FC = () => {
                       value={contactLocation}
                       onChange={(e) => setContactLocation(e.target.value)}
                       placeholder="E.g., Paris, France"
-                      className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                      className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-xl"
                       required
                     />
                   </div>
@@ -1480,7 +1480,7 @@ const KnowledgeBase: React.FC = () => {
                       <select
                         value={contactCountryCode}
                         onChange={(e) => setContactCountryCode(e.target.value)}
-                        className="w-28 p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                        className="w-28 p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-xl"
                       >
                         {COUNTRY_CODES.map(cc => (
                           <option key={`${cc.code}-${cc.country}`} value={cc.code}>{cc.flag} {cc.code}</option>
@@ -1491,7 +1491,7 @@ const KnowledgeBase: React.FC = () => {
                         value={contactPhone}
                         onChange={(e) => setContactPhone(formatPhoneNumber(e.target.value, contactCountryCode))}
                         placeholder={contactCountryCode === '+1' ? '(555) 123-4567' : '555 123 4567'}
-                        className="flex-1 p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                        className="flex-1 p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-xl"
                       />
                     </div>
                   </div>
@@ -1502,7 +1502,7 @@ const KnowledgeBase: React.FC = () => {
                       value={contactEmail}
                       onChange={(e) => setContactEmail(e.target.value)}
                       placeholder="email@example.com"
-                      className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                      className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-xl"
                     />
                   </div>
                 </div>
@@ -1512,10 +1512,10 @@ const KnowledgeBase: React.FC = () => {
                     value={contactNotes}
                     onChange={(e) => setContactNotes(e.target.value)}
                     placeholder="Any helpful notes about this contact..."
-                    className="w-full p-3 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm resize-none h-24"
+                    className="w-full p-3 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-xl resize-none h-24"
                   />
                 </div>
-                <button type="submit" className="w-full bg-paragon text-white py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-sm">
+                <button type="submit" className="w-full bg-paragon text-white py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-xl">
                   Save Contact
                 </button>
               </form>
@@ -1533,7 +1533,7 @@ const KnowledgeBase: React.FC = () => {
                     value={noteTitle}
                     onChange={(e) => setNoteTitle(e.target.value)}
                     placeholder="E.g., 'Aman Tokyo Cherry Blossom Tip'"
-                    className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                    className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-xl"
                     required
                   />
                 </div>
@@ -1543,7 +1543,7 @@ const KnowledgeBase: React.FC = () => {
                     value={noteContent}
                     onChange={(e) => setNoteContent(e.target.value)}
                     placeholder="Enter your note, tip, or quick capture..."
-                    className="w-full p-3 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm resize-none h-32"
+                    className="w-full p-3 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-xl resize-none h-32"
                     required
                   />
                 </div>
@@ -1554,10 +1554,10 @@ const KnowledgeBase: React.FC = () => {
                     value={noteTags}
                     onChange={(e) => setNoteTags(e.target.value)}
                     placeholder="E.g., 'tip, tokyo, important'"
-                    className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                    className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-xl"
                   />
                 </div>
-                <button type="submit" className="w-full bg-paragon-gold text-slate-900 py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-gold/90 transition-colors rounded-sm">
+                <button type="submit" className="w-full bg-paragon-gold text-slate-900 py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-gold/90 transition-colors rounded-xl">
                   Save Note
                 </button>
               </form>
@@ -1574,7 +1574,7 @@ const KnowledgeBase: React.FC = () => {
         >
           <div
             ref={editModalRef}
-            className="bg-white w-full max-w-lg max-h-[70vh] md:max-h-[80vh] flex flex-col rounded-sm shadow-2xl animate-zoomIn overflow-hidden"
+            className="bg-white w-full max-w-lg max-h-[70vh] md:max-h-[80vh] flex flex-col rounded-xl shadow-2xl animate-zoomIn overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-3 sm:p-4 border-b border-slate-200 flex justify-between items-center">
@@ -1594,7 +1594,7 @@ const KnowledgeBase: React.FC = () => {
                       type="text"
                       value={editContactName}
                       onChange={(e) => setEditContactName(e.target.value)}
-                      className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                      className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-xl"
                       required
                     />
                   </div>
@@ -1604,7 +1604,7 @@ const KnowledgeBase: React.FC = () => {
                       type="text"
                       value={editContactRole}
                       onChange={(e) => setEditContactRole(e.target.value)}
-                      className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                      className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-xl"
                       required
                     />
                   </div>
@@ -1616,7 +1616,7 @@ const KnowledgeBase: React.FC = () => {
                       type="text"
                       value={editContactCompany}
                       onChange={(e) => setEditContactCompany(e.target.value)}
-                      className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                      className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-xl"
                       required
                     />
                   </div>
@@ -1626,7 +1626,7 @@ const KnowledgeBase: React.FC = () => {
                       type="text"
                       value={editContactLocation}
                       onChange={(e) => setEditContactLocation(e.target.value)}
-                      className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                      className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-xl"
                       required
                     />
                   </div>
@@ -1638,7 +1638,7 @@ const KnowledgeBase: React.FC = () => {
                       <select
                         value={editContactCountryCode}
                         onChange={(e) => setEditContactCountryCode(e.target.value)}
-                        className="w-28 p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                        className="w-28 p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-xl"
                       >
                         {COUNTRY_CODES.map(cc => (
                           <option key={`${cc.code}-${cc.country}`} value={cc.code}>{cc.flag} {cc.code}</option>
@@ -1649,7 +1649,7 @@ const KnowledgeBase: React.FC = () => {
                         value={editContactPhone}
                         onChange={(e) => setEditContactPhone(formatPhoneNumber(e.target.value, editContactCountryCode))}
                         placeholder={editContactCountryCode === '+1' ? '(555) 123-4567' : '555 123 4567'}
-                        className="flex-1 p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                        className="flex-1 p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-xl"
                       />
                     </div>
                   </div>
@@ -1659,7 +1659,7 @@ const KnowledgeBase: React.FC = () => {
                       type="email"
                       value={editContactEmail}
                       onChange={(e) => setEditContactEmail(e.target.value)}
-                      className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                      className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-xl"
                     />
                   </div>
                 </div>
@@ -1668,20 +1668,20 @@ const KnowledgeBase: React.FC = () => {
                   <textarea
                     value={editContactNotes}
                     onChange={(e) => setEditContactNotes(e.target.value)}
-                    className="w-full p-3 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm resize-none h-24"
+                    className="w-full p-3 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-xl resize-none h-24"
                   />
                 </div>
                 <div className="flex gap-3">
                   <button
                     type="button"
                     onClick={() => setEditingEntry(null)}
-                    className="flex-1 py-3 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-sm"
+                    className="flex-1 py-3 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-xl"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 py-3 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-sm"
+                    className="flex-1 py-3 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-xl"
                   >
                     Save Changes
                   </button>
@@ -1696,7 +1696,7 @@ const KnowledgeBase: React.FC = () => {
                     type="text"
                     value={editTitle}
                     onChange={(e) => setEditTitle(e.target.value)}
-                    className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                    className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-xl"
                     required
                   />
                 </div>
@@ -1706,7 +1706,7 @@ const KnowledgeBase: React.FC = () => {
                     <select
                       value={editSubcategory}
                       onChange={(e) => setEditSubcategory(e.target.value)}
-                      className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                      className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-xl"
                     >
                       <option value="">Select subcategory</option>
                       <option value="Hotels">Hotels</option>
@@ -1725,7 +1725,7 @@ const KnowledgeBase: React.FC = () => {
                       value={editLocation}
                       onChange={(e) => setEditLocation(e.target.value)}
                       placeholder="E.g., 'Monaco'"
-                      className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                      className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-xl"
                     />
                   </div>
                 )}
@@ -1734,7 +1734,7 @@ const KnowledgeBase: React.FC = () => {
                   <textarea
                     value={editContent}
                     onChange={(e) => setEditContent(e.target.value)}
-                    className="w-full p-3 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm resize-none h-32"
+                    className="w-full p-3 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-xl resize-none h-32"
                     required
                   />
                 </div>
@@ -1744,20 +1744,20 @@ const KnowledgeBase: React.FC = () => {
                     type="text"
                     value={editTags}
                     onChange={(e) => setEditTags(e.target.value)}
-                    className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+                    className="w-full p-2 bg-white border border-slate-300 text-sm outline-none focus:ring-2 focus:ring-paragon rounded-xl"
                   />
                 </div>
                 <div className="flex gap-3">
                   <button
                     type="button"
                     onClick={() => setEditingEntry(null)}
-                    className="flex-1 py-3 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-sm"
+                    className="flex-1 py-3 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-xl"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 py-3 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-sm"
+                    className="flex-1 py-3 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-xl"
                   >
                     Save Changes
                   </button>
@@ -1775,7 +1775,7 @@ const KnowledgeBase: React.FC = () => {
           onClick={() => setDeleteConfirm(null)}
         >
           <div
-            className="bg-white rounded-sm shadow-2xl w-full max-w-sm mx-4"
+            className="bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-6">
@@ -1798,13 +1798,13 @@ const KnowledgeBase: React.FC = () => {
               <div className="flex gap-3">
                 <button
                   onClick={() => setDeleteConfirm(null)}
-                  className="flex-1 py-2.5 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-sm"
+                  className="flex-1 py-2.5 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-xl"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleDeleteEntry}
-                  className="flex-1 py-2.5 bg-red-600 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-red-700 transition-colors rounded-sm"
+                  className="flex-1 py-2.5 bg-red-600 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-red-700 transition-colors rounded-xl"
                 >
                   Delete
                 </button>
@@ -1826,19 +1826,19 @@ const KnowledgeBaseOriginal: React.FC = () => {
       <SectionHeader title="Knowledge & Experience Library" subtitle="The master directory of hotels, vendors, and destination intel." />
 
       <div className="grid grid-cols-3 gap-8">
-        <div className="bg-white border border-slate-200 p-6 rounded-sm shadow-sm hover:shadow-md transition-shadow">
+        <div className="bg-white border border-slate-200 p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow">
           <h3 className="font-cinzel text-sm font-bold border-b border-slate-100 pb-2 mb-4">HOTEL MASTER</h3>
           <p className="text-[10px] text-slate-500 mb-4">12,402 properties verified. Includes insider notes, preferred contacts, and commission history.</p>
           <button className="text-[10px] font-bold text-paragon tracking-widest hover:underline uppercase">Browse Registry</button>
         </div>
 
-        <div className="bg-white border border-slate-200 p-6 rounded-sm shadow-sm hover:shadow-md transition-shadow">
+        <div className="bg-white border border-slate-200 p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow">
           <h3 className="font-cinzel text-sm font-bold border-b border-slate-100 pb-2 mb-4">VENDORS & SUPPLIERS</h3>
           <p className="text-[10px] text-slate-500 mb-4">Driver networks, yacht charters, and VIP meet-and-greet operators globally.</p>
           <button className="text-[10px] font-bold text-paragon tracking-widest hover:underline uppercase">View Directory</button>
         </div>
 
-        <div className="bg-white border border-slate-200 p-6 rounded-sm shadow-sm hover:shadow-md transition-shadow">
+        <div className="bg-white border border-slate-200 p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow">
           <h3 className="font-cinzel text-sm font-bold border-b border-slate-100 pb-2 mb-4">DESTINATION GUIDES</h3>
           <p className="text-[10px] text-slate-500 mb-4">Curated experiences, restaurants, and timing duration for perfect itinerary building.</p>
           <button className="text-[10px] font-bold text-paragon tracking-widest hover:underline uppercase">Explore Intel</button>

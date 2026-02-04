@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { SectionHeader, ConfirmModal, Badge, CountrySelect } from './Shared';
-import { Customer, LoyaltyProgram, PipelineTrip, ConvertedFlight, ConvertedHotel, ConvertedLogistics, BookingRequest, Passport } from '../types';
+import { Customer, LoyaltyProgram, PipelineTrip, ConvertedFlight, ConvertedHotel, ConvertedLogistics, BookingRequest, Passport, CustomMarkups, MarkupType } from '../types';
 import { GoogleUser } from './Login';
 import { API_URL } from '../config';
 
@@ -320,6 +320,17 @@ const CustomerFormModal: React.FC<{
   const [loyaltyPrograms, setLoyaltyPrograms] = useState<LoyaltyProgram[]>(customer?.loyaltyPrograms || []);
   const [agentId, setAgentId] = useState(customer?.agentId || defaultAgentId);
 
+  // Custom markups state - null means use global default
+  const [hasCustomMarkups, setHasCustomMarkups] = useState(!!customer?.customMarkups);
+  const [flightMarkupAmount, setFlightMarkupAmount] = useState<string>(customer?.customMarkups?.flight?.amount?.toString() || '');
+  const [flightMarkupType, setFlightMarkupType] = useState<MarkupType>(customer?.customMarkups?.flight?.type || 'FLAT');
+  const [hotelMarkupAmount, setHotelMarkupAmount] = useState<string>(customer?.customMarkups?.hotel?.amount?.toString() || '');
+  const [hotelMarkupType, setHotelMarkupType] = useState<MarkupType>(customer?.customMarkups?.hotel?.type || 'FLAT');
+  const [logisticsMarkupAmount, setLogisticsMarkupAmount] = useState<string>(customer?.customMarkups?.logistics?.amount?.toString() || '');
+  const [logisticsMarkupType, setLogisticsMarkupType] = useState<MarkupType>(customer?.customMarkups?.logistics?.type || 'FLAT');
+  const [conciergeMarkupAmount, setConciergeMarkupAmount] = useState<string>(customer?.customMarkups?.conciergePerDay?.amount?.toString() || '');
+  const [conciergeMarkupType, setConciergeMarkupType] = useState<MarkupType>(customer?.customMarkups?.conciergePerDay?.type || 'FLAT');
+
   const addLoyaltyProgram = () => {
     setLoyaltyPrograms([...loyaltyPrograms, { program: '', number: '', status: '' }]);
   };
@@ -352,6 +363,18 @@ const CustomerFormModal: React.FC<{
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const now = new Date().toISOString();
+
+    // Build custom markups object if enabled
+    let customMarkups: CustomMarkups | null = null;
+    if (hasCustomMarkups) {
+      customMarkups = {
+        flight: flightMarkupAmount ? { amount: parseFloat(flightMarkupAmount), type: flightMarkupType } : { amount: null, type: null },
+        hotel: hotelMarkupAmount ? { amount: parseFloat(hotelMarkupAmount), type: hotelMarkupType } : { amount: null, type: null },
+        logistics: logisticsMarkupAmount ? { amount: parseFloat(logisticsMarkupAmount), type: logisticsMarkupType } : { amount: null, type: null },
+        conciergePerDay: conciergeMarkupAmount ? { amount: parseFloat(conciergeMarkupAmount), type: conciergeMarkupType } : { amount: null, type: null },
+      };
+    }
+
     const newCustomer: Customer = {
       id: customer?.id || `cust-${Date.now()}`,
       legalFirstName,
@@ -361,8 +384,8 @@ const CustomerFormModal: React.FC<{
       dateOfBirth: dateOfBirth || undefined,
       email: email || undefined,
       phone: phone ? `${countryCode} ${phone}` : undefined,
-      primaryCustomerId: primaryCustomerId || undefined,
-      agentId: agentId || undefined,
+      primaryCustomerId: primaryCustomerId || null, // Send null to clear the relationship
+      agentId, // Always send agentId explicitly (empty string if not assigned)
       passports: passports.filter(p => p.number || p.country),
       loyaltyPrograms: loyaltyPrograms.filter(lp => lp.program && lp.number),
       preferences: {
@@ -372,6 +395,7 @@ const CustomerFormModal: React.FC<{
         specialRequests: specialRequests || undefined,
       },
       notes: notes || undefined,
+      customMarkups,
       createdAt: customer?.createdAt || now,
       updatedAt: now,
     };
@@ -384,7 +408,7 @@ const CustomerFormModal: React.FC<{
       onClick={onClose}
     >
       <div
-        className="bg-white w-full max-w-2xl max-h-[70vh] md:max-h-[85vh] flex flex-col rounded-sm shadow-2xl animate-zoomIn overflow-hidden"
+        className="bg-white w-full max-w-2xl max-h-[70vh] md:max-h-[85vh] flex flex-col rounded-xl shadow-2xl animate-zoomIn overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-4 sm:p-6 border-b border-slate-200 flex justify-between items-center flex-shrink-0">
@@ -405,7 +429,7 @@ const CustomerFormModal: React.FC<{
                   type="text"
                   value={legalFirstName}
                   onChange={(e) => setLegalFirstName(e.target.value)}
-                  className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon"
+                  className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon"
                   required
                 />
               </div>
@@ -416,7 +440,7 @@ const CustomerFormModal: React.FC<{
                   value={legalMiddleName}
                   onChange={(e) => setLegalMiddleName(e.target.value)}
                   placeholder="Optional"
-                  className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon"
+                  className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon"
                 />
               </div>
               <div>
@@ -425,7 +449,7 @@ const CustomerFormModal: React.FC<{
                   type="text"
                   value={legalLastName}
                   onChange={(e) => setLegalLastName(e.target.value)}
-                  className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon"
+                  className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon"
                   required
                 />
               </div>
@@ -436,7 +460,7 @@ const CustomerFormModal: React.FC<{
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
                   placeholder={`${legalFirstName} ${legalLastName}`.trim() || 'How you refer to them'}
-                  className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon"
+                  className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon"
                 />
               </div>
               <div>
@@ -448,7 +472,7 @@ const CustomerFormModal: React.FC<{
                   type="date"
                   value={dateOfBirth}
                   onChange={(e) => setDateOfBirth(e.target.value)}
-                  className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon"
+                  className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon"
                 />
               </div>
               <div>
@@ -460,7 +484,7 @@ const CustomerFormModal: React.FC<{
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon"
+                  className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon"
                 />
               </div>
               <div>
@@ -472,7 +496,7 @@ const CustomerFormModal: React.FC<{
                   <select
                     value={countryCode}
                     onChange={(e) => setCountryCode(e.target.value)}
-                    className="w-28 p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon bg-white"
+                    className="w-28 p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon bg-white"
                   >
                     {COUNTRY_CODES.map(cc => (
                       <option key={`${cc.code}-${cc.country}`} value={cc.code}>{cc.flag} {cc.code}</option>
@@ -483,7 +507,7 @@ const CustomerFormModal: React.FC<{
                     value={phone}
                     onChange={(e) => setPhone(formatPhoneNumber(e.target.value, countryCode))}
                     placeholder={countryCode === '+1' ? '(555) 123-4567' : '555 123 4567'}
-                    className="flex-1 p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon"
+                    className="flex-1 p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon"
                   />
                 </div>
               </div>
@@ -499,7 +523,7 @@ const CustomerFormModal: React.FC<{
                 <select
                   value={primaryCustomerId}
                   onChange={(e) => setPrimaryCustomerId(e.target.value)}
-                  className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon bg-white"
+                  className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon bg-white"
                 >
                   <option value="">-- None (This is a primary customer) --</option>
                   {primaryCustomers
@@ -516,7 +540,7 @@ const CustomerFormModal: React.FC<{
                   <select
                     value={agentId}
                     onChange={(e) => setAgentId(e.target.value)}
-                    className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon bg-white"
+                    className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon bg-white"
                   >
                     <option value="">— No agent assigned —</option>
                     {agents.map(agent => (
@@ -620,7 +644,7 @@ const CustomerFormModal: React.FC<{
                         value={lp.program}
                         onChange={(e) => updateLoyaltyProgram(idx, 'program', e.target.value)}
                         placeholder="e.g., United MileagePlus"
-                        className="w-full p-2 border border-slate-200 rounded-sm text-xs outline-none focus:ring-2 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-paragon"
                       />
                     </div>
                     <div>
@@ -629,7 +653,7 @@ const CustomerFormModal: React.FC<{
                         type="text"
                         value={lp.number}
                         onChange={(e) => updateLoyaltyProgram(idx, 'number', e.target.value)}
-                        className="w-full p-2 border border-slate-200 rounded-sm text-xs outline-none focus:ring-2 focus:ring-paragon font-mono"
+                        className="w-full p-2 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-paragon font-mono"
                       />
                     </div>
                     <div>
@@ -639,7 +663,7 @@ const CustomerFormModal: React.FC<{
                         value={lp.status || ''}
                         onChange={(e) => updateLoyaltyProgram(idx, 'status', e.target.value)}
                         placeholder="e.g., Gold, 1K"
-                        className="w-full p-2 border border-slate-200 rounded-sm text-xs outline-none focus:ring-2 focus:ring-paragon"
+                        className="w-full p-2 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-paragon"
                       />
                     </div>
                     <button
@@ -666,7 +690,7 @@ const CustomerFormModal: React.FC<{
                 <select
                   value={seatPreference}
                   onChange={(e) => setSeatPreference(e.target.value as any)}
-                  className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon bg-white"
+                  className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon bg-white"
                 >
                   <option value="">No preference</option>
                   <option value="aisle">Aisle</option>
@@ -681,7 +705,7 @@ const CustomerFormModal: React.FC<{
                   value={dietaryRestrictions}
                   onChange={(e) => setDietaryRestrictions(e.target.value)}
                   placeholder="e.g., Kosher, Vegetarian (comma-separated)"
-                  className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon"
+                  className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon"
                 />
               </div>
               <div className="sm:col-span-2">
@@ -691,7 +715,7 @@ const CustomerFormModal: React.FC<{
                   value={hotelPreferences}
                   onChange={(e) => setHotelPreferences(e.target.value)}
                   placeholder="e.g., High floor, king bed, quiet room"
-                  className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon"
+                  className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon"
                 />
               </div>
               <div className="sm:col-span-2">
@@ -701,7 +725,7 @@ const CustomerFormModal: React.FC<{
                   value={specialRequests}
                   onChange={(e) => setSpecialRequests(e.target.value)}
                   placeholder="e.g., Always arrange ground transportation"
-                  className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon"
+                  className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon"
                 />
               </div>
             </div>
@@ -718,8 +742,117 @@ const CustomerFormModal: React.FC<{
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Any important information about this customer..."
               rows={3}
-              className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon resize-none"
+              className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon resize-none"
             />
+          </div>
+
+          {/* Custom Markups */}
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Custom Markups</h3>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <span className="text-[10px] text-slate-500">Use custom markups</span>
+                <input
+                  type="checkbox"
+                  checked={hasCustomMarkups}
+                  onChange={(e) => setHasCustomMarkups(e.target.checked)}
+                  className="w-4 h-4 rounded border-slate-300 text-paragon focus:ring-paragon"
+                />
+              </label>
+            </div>
+            {hasCustomMarkups && (
+              <div className="space-y-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
+                <p className="text-[10px] text-slate-500 mb-3">Override global markup defaults for this customer. Leave blank to use global default.</p>
+
+                {/* Flight Markup */}
+                <div className="flex items-center gap-3">
+                  <label className="w-24 text-[10px] font-medium text-slate-600">Flight</label>
+                  <input
+                    type="number"
+                    value={flightMarkupAmount}
+                    onChange={(e) => setFlightMarkupAmount(e.target.value)}
+                    placeholder="Amount"
+                    step="0.01"
+                    min="0"
+                    className="flex-1 p-2 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon"
+                  />
+                  <select
+                    value={flightMarkupType}
+                    onChange={(e) => setFlightMarkupType(e.target.value as MarkupType)}
+                    className="w-20 p-2 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon bg-white"
+                  >
+                    <option value="FLAT">$</option>
+                    <option value="PERCENT">%</option>
+                  </select>
+                </div>
+
+                {/* Hotel Markup */}
+                <div className="flex items-center gap-3">
+                  <label className="w-24 text-[10px] font-medium text-slate-600">Hotel</label>
+                  <input
+                    type="number"
+                    value={hotelMarkupAmount}
+                    onChange={(e) => setHotelMarkupAmount(e.target.value)}
+                    placeholder="Amount"
+                    step="0.01"
+                    min="0"
+                    className="flex-1 p-2 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon"
+                  />
+                  <select
+                    value={hotelMarkupType}
+                    onChange={(e) => setHotelMarkupType(e.target.value as MarkupType)}
+                    className="w-20 p-2 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon bg-white"
+                  >
+                    <option value="FLAT">$</option>
+                    <option value="PERCENT">%</option>
+                  </select>
+                </div>
+
+                {/* Logistics Markup */}
+                <div className="flex items-center gap-3">
+                  <label className="w-24 text-[10px] font-medium text-slate-600">Logistics</label>
+                  <input
+                    type="number"
+                    value={logisticsMarkupAmount}
+                    onChange={(e) => setLogisticsMarkupAmount(e.target.value)}
+                    placeholder="Amount"
+                    step="0.01"
+                    min="0"
+                    className="flex-1 p-2 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon"
+                  />
+                  <select
+                    value={logisticsMarkupType}
+                    onChange={(e) => setLogisticsMarkupType(e.target.value as MarkupType)}
+                    className="w-20 p-2 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon bg-white"
+                  >
+                    <option value="FLAT">$</option>
+                    <option value="PERCENT">%</option>
+                  </select>
+                </div>
+
+                {/* Concierge Markup */}
+                <div className="flex items-center gap-3">
+                  <label className="w-24 text-[10px] font-medium text-slate-600">Concierge/Day</label>
+                  <input
+                    type="number"
+                    value={conciergeMarkupAmount}
+                    onChange={(e) => setConciergeMarkupAmount(e.target.value)}
+                    placeholder="Amount"
+                    step="0.01"
+                    min="0"
+                    className="flex-1 p-2 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon"
+                  />
+                  <select
+                    value={conciergeMarkupType}
+                    onChange={(e) => setConciergeMarkupType(e.target.value as MarkupType)}
+                    className="w-20 p-2 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon bg-white"
+                  >
+                    <option value="FLAT">$</option>
+                    <option value="PERCENT">%</option>
+                  </select>
+                </div>
+              </div>
+            )}
           </div>
         </form>
 
@@ -728,7 +861,7 @@ const CustomerFormModal: React.FC<{
             <button
               type="button"
               onClick={() => onDelete(customer!.id)}
-              className="py-2.5 px-4 bg-red-50 text-red-600 text-[10px] font-bold uppercase tracking-widest hover:bg-red-100 transition-colors rounded-sm"
+              className="py-2.5 px-4 bg-red-50 text-red-600 text-[10px] font-bold uppercase tracking-widest hover:bg-red-100 transition-colors rounded-xl"
             >
               Delete
             </button>
@@ -736,14 +869,14 @@ const CustomerFormModal: React.FC<{
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 py-2.5 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-sm"
+            className="flex-1 py-2.5 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-xl"
           >
             Cancel
           </button>
           <button
             type="submit"
             onClick={handleSubmit}
-            className="flex-1 py-2.5 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-sm"
+            className="flex-1 py-2.5 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-xl"
           >
             {isEditing ? 'Save Changes' : 'Add Customer'}
           </button>
@@ -781,7 +914,7 @@ const CustomerDetailModal: React.FC<{
       onClick={onClose}
     >
       <div
-        className="bg-white w-full max-w-3xl max-h-[70vh] md:max-h-[80vh] flex flex-col rounded-sm shadow-2xl animate-zoomIn overflow-hidden"
+        className="bg-white w-full max-w-3xl max-h-[70vh] md:max-h-[80vh] flex flex-col rounded-xl shadow-2xl animate-zoomIn overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-4 sm:p-6 border-b border-slate-200 flex justify-between items-start bg-gradient-to-r from-slate-50 to-white">
@@ -1035,7 +1168,7 @@ const CustomerDetailModal: React.FC<{
                         const bookings = getTripBookings(trip.id);
                         const bookingCount = bookings.flights.length + bookings.hotels.length + bookings.logistics.length;
                         return (
-                          <div key={trip.id} className="bg-emerald-50 border border-emerald-200 rounded-sm p-3">
+                          <div key={trip.id} className="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
                             <div className="flex justify-between items-start mb-2">
                               <div>
                                 <p className="text-sm font-semibold text-slate-800">{trip.name}</p>
@@ -1097,7 +1230,7 @@ const CustomerDetailModal: React.FC<{
                           bookings.hotels.reduce((sum, h) => sum + (h.profitLoss || 0), 0) +
                           bookings.logistics.reduce((sum, l) => sum + (l.profitLoss || 0), 0);
                         return (
-                          <div key={trip.id} className="bg-slate-50 border border-slate-200 rounded-sm p-3">
+                          <div key={trip.id} className="bg-slate-50 border border-slate-200 rounded-xl p-3">
                             <div className="flex justify-between items-start mb-2">
                               <div>
                                 <p className="text-sm font-semibold text-slate-700">{trip.name}</p>
@@ -1140,13 +1273,13 @@ const CustomerDetailModal: React.FC<{
         <div className="p-4 sm:p-6 border-t border-slate-200 flex gap-3">
           <button
             onClick={onClose}
-            className="flex-1 py-2.5 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-sm"
+            className="flex-1 py-2.5 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-xl"
           >
             Close
           </button>
           <button
             onClick={() => { onClose(); onEdit(customer); }}
-            className="flex-1 py-2.5 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-sm"
+            className="flex-1 py-2.5 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-xl"
           >
             Edit Customer
           </button>
@@ -1357,7 +1490,7 @@ const ClientDatabase: React.FC<ClientDatabaseProps> = ({
       />
 
       {/* Security Banner */}
-      <div className="mb-6 bg-emerald-50 border border-emerald-200 rounded-sm p-3 flex items-center gap-3">
+      <div className="mb-6 bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center gap-3">
         <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
           <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -1371,27 +1504,27 @@ const ClientDatabase: React.FC<ClientDatabaseProps> = ({
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
-        <div className="bg-white border border-slate-200 p-3 sm:p-4 rounded-sm">
+        <div className="bg-white border border-slate-200 p-3 sm:p-4 rounded-xl">
           <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Total</p>
           <p className="text-xl sm:text-2xl font-bold text-slate-900">{totalCustomers}</p>
           <p className="text-[9px] text-slate-400 mt-0.5">All records</p>
         </div>
-        <div className="bg-white border border-slate-200 p-3 sm:p-4 rounded-sm">
+        <div className="bg-white border border-slate-200 p-3 sm:p-4 rounded-xl">
           <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Primary</p>
           <p className="text-xl sm:text-2xl font-bold text-paragon">{primaryCount}</p>
           <p className="text-[9px] text-slate-400 mt-0.5">Account holders</p>
         </div>
-        <div className="bg-white border border-slate-200 p-3 sm:p-4 rounded-sm">
+        <div className="bg-white border border-slate-200 p-3 sm:p-4 rounded-xl">
           <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Sub</p>
           <p className="text-xl sm:text-2xl font-bold text-slate-600">{subCount}</p>
           <p className="text-[9px] text-slate-400 mt-0.5">Associated travelers</p>
         </div>
-        <div className="bg-white border border-slate-200 p-3 sm:p-4 rounded-sm">
+        <div className="bg-white border border-slate-200 p-3 sm:p-4 rounded-xl">
           <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Loyalty</p>
           <p className="text-xl sm:text-2xl font-bold text-amber-600">{withLoyalty}</p>
           <p className="text-[9px] text-slate-400 mt-0.5">With programs</p>
         </div>
-        <div className="bg-white border border-slate-200 p-3 sm:p-4 rounded-sm">
+        <div className="bg-white border border-slate-200 p-3 sm:p-4 rounded-xl">
           <p className="text-[9px] uppercase text-slate-400 font-bold tracking-wider">Passport</p>
           <p className="text-xl sm:text-2xl font-bold text-emerald-600">{withPassport}</p>
           <p className="text-[9px] text-slate-400 mt-0.5">On file</p>
@@ -1409,7 +1542,7 @@ const ClientDatabase: React.FC<ClientDatabaseProps> = ({
             placeholder="Search by name, email, or phone..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon focus:border-transparent"
+            className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon focus:border-transparent"
           />
         </div>
 
@@ -1418,7 +1551,7 @@ const ClientDatabase: React.FC<ClientDatabaseProps> = ({
           <select
             value={filterType}
             onChange={(e) => setFilterType(e.target.value as any)}
-            className="px-3 py-2.5 border border-slate-200 rounded-sm text-xs outline-none focus:ring-2 focus:ring-paragon bg-white"
+            className="px-3 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-paragon bg-white"
           >
             <option value="all">All Customers</option>
             <option value="primary">Primary Only</option>
@@ -1433,7 +1566,7 @@ const ClientDatabase: React.FC<ClientDatabaseProps> = ({
               setSortBy(by as any);
               setSortOrder(order as any);
             }}
-            className="px-3 py-2.5 border border-slate-200 rounded-sm text-xs outline-none focus:ring-2 focus:ring-paragon bg-white"
+            className="px-3 py-2.5 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-paragon bg-white"
           >
             <option value="name-asc">Name A-Z</option>
             <option value="name-desc">Name Z-A</option>
@@ -1444,7 +1577,7 @@ const ClientDatabase: React.FC<ClientDatabaseProps> = ({
 
           <button
             onClick={() => setShowAddModal(true)}
-            className="px-4 py-2.5 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest rounded-sm hover:bg-paragon-dark transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+            className="px-4 py-2.5 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest rounded-xl hover:bg-paragon-dark transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -1469,7 +1602,7 @@ const ClientDatabase: React.FC<ClientDatabaseProps> = ({
           <p className="text-sm">Loading customers...</p>
         </div>
       ) : filteredCustomers.length === 0 ? (
-        <div className="text-center py-12 text-slate-400 bg-white rounded-sm border border-slate-200">
+        <div className="text-center py-12 text-slate-400 bg-white rounded-xl border border-slate-200">
           <svg className="w-12 h-12 mx-auto mb-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
           </svg>
@@ -1484,7 +1617,7 @@ const ClientDatabase: React.FC<ClientDatabaseProps> = ({
           )}
         </div>
       ) : (
-        <div className="bg-white border border-slate-200 rounded-sm overflow-hidden">
+        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
           {/* Desktop Table Header */}
           <div className="hidden lg:grid lg:grid-cols-12 gap-4 px-4 py-3 bg-slate-50 border-b border-slate-200 text-[9px] uppercase font-bold tracking-widest text-slate-500">
             <div className="col-span-3">Name</div>
@@ -1635,6 +1768,7 @@ const ClientDatabase: React.FC<ClientDatabaseProps> = ({
         <CustomerFormModal
           primaryCustomers={primaryCustomers}
           agents={agents}
+          defaultAgentId={googleUser?.googleId || ''}
           onSave={handleSaveCustomer}
           onClose={() => setShowAddModal(false)}
         />
@@ -1646,6 +1780,7 @@ const ClientDatabase: React.FC<ClientDatabaseProps> = ({
           customer={editingCustomer}
           primaryCustomers={primaryCustomers}
           agents={agents}
+          defaultAgentId={googleUser?.googleId || ''}
           onSave={handleSaveCustomer}
           onDelete={(id) => setDeleteConfirm({ id, name: editingCustomer.displayName })}
           onClose={() => setEditingCustomer(null)}

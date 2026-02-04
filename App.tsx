@@ -10,8 +10,10 @@ import KnowledgeBase from './components/KnowledgeBase';
 import ClientPortal from './components/ClientPortal';
 import Home from './components/Home';
 import Settings from './components/Settings';
+import SabreTool from './components/SabreTool';
 import NotificationCenter from './components/NotificationCenter';
 import Login, { GoogleUser } from './components/Login';
+import AIChatWidget from './components/AIChatWidget';
 import { MOCK_USERS } from './constants';
 import { User, BookingRequest, Comment, Notification, Announcement, ConvertedFlight, ConvertedHotel, ConvertedLogistics, PipelineTrip } from './types';
 import { API_URL } from './config';
@@ -201,7 +203,16 @@ const App: React.FC = () => {
   }, [googleUser?.googleId]);
 
   const [currentUser] = useState<User>(MOCK_USERS[0]); // Fallback user data
-  const [activeTab, setActiveTab] = useState('home');
+  const [activeTab, setActiveTab] = useState(() => {
+    // Restore tab from localStorage on initial load
+    const savedTab = localStorage.getItem('paragon_active_tab');
+    return savedTab || 'home';
+  });
+
+  // Save activeTab to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('paragon_active_tab', activeTab);
+  }, [activeTab]);
   const [requests, setRequests] = useState<BookingRequest[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
@@ -375,6 +386,7 @@ const App: React.FC = () => {
   const [pipelineTrips, setPipelineTrips] = useState<PipelineTrip[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showAIChat, setShowAIChat] = useState(false);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const [userStatus, setUserStatus] = useState<'AVAILABLE' | 'BUSY' | 'AWAY' | 'OFFLINE'>(
     (googleUser?.status as 'AVAILABLE' | 'BUSY' | 'AWAY' | 'OFFLINE') || 'AVAILABLE'
@@ -1050,6 +1062,7 @@ const App: React.FC = () => {
       case 'clientdb': return <ClientDatabase googleUser={googleUser} pipelineTrips={pipelineTrips} convertedFlights={convertedFlights} convertedHotels={convertedHotels} convertedLogistics={convertedLogistics} requests={requests} />;
       case 'accounting': return <Accounting />;
       case 'knowledge': return <KnowledgeBase />;
+      case 'sabre': return <SabreTool googleUser={googleUser} />;
       case 'portal': return <ClientPortal />;
       case 'settings': return <Settings currentUserRole={googleUser?.role as any} />;
       default: return <Home currentUser={currentUser} announcements={announcements} comments={comments} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onAddAnnouncement={handleAddAnnouncement} onEditAnnouncement={handleEditAnnouncement} onDeleteAnnouncement={handleDeleteAnnouncement} onPinAnnouncement={handlePinAnnouncement} onArchiveAnnouncement={handleArchiveAnnouncement} onPinComment={handlePinComment} onAddRequest={handleAddRequest} onDeleteRequest={handleDeleteRequest} requests={requests} googleUser={googleUser} />;
@@ -1157,7 +1170,7 @@ const App: React.FC = () => {
                 </button>
 
                 {showProfileDropdown && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white border border-slate-200 rounded-sm shadow-lg z-50 animate-slideUp">
+                  <div className="absolute right-0 mt-2 w-48 bg-white border border-slate-200 rounded-xl shadow-lg z-50 animate-slideUp">
                     <div className="px-4 py-2 border-b border-slate-100">
                       <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</div>
                     </div>
@@ -1249,7 +1262,7 @@ const App: React.FC = () => {
           onClick={() => setShowLogoutConfirm(false)}
         >
           <div
-            className="bg-white rounded-sm shadow-2xl w-full max-w-xs mx-4 p-6 animate-zoomIn"
+            className="bg-white rounded-xl shadow-2xl w-full max-w-xs mx-4 p-6 animate-zoomIn"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-sm font-bold text-slate-900 mb-2">Sign Out</h3>
@@ -1257,7 +1270,7 @@ const App: React.FC = () => {
             <div className="flex gap-3">
               <button
                 onClick={() => setShowLogoutConfirm(false)}
-                className="flex-1 py-2 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-sm"
+                className="flex-1 py-2 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-xl"
               >
                 Cancel
               </button>
@@ -1266,7 +1279,7 @@ const App: React.FC = () => {
                   setShowLogoutConfirm(false);
                   handleLogout();
                 }}
-                className="flex-1 py-2 bg-red-600 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-red-700 transition-colors rounded-sm"
+                className="flex-1 py-2 bg-red-600 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-red-700 transition-colors rounded-xl"
               >
                 Log Out
               </button>
@@ -1278,7 +1291,7 @@ const App: React.FC = () => {
       {/* Inactivity Timeout Warning Modal */}
       {showTimeoutWarning && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-fadeIn">
-          <div className="bg-white rounded-sm shadow-2xl w-full max-w-sm mx-4 p-6 animate-zoomIn">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4 p-6 animate-zoomIn">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
                 <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1290,19 +1303,26 @@ const App: React.FC = () => {
                 <p className="text-xs text-slate-500">You will be logged out due to inactivity</p>
               </div>
             </div>
-            <div className="bg-slate-100 rounded-sm p-4 mb-4 text-center">
+            <div className="bg-slate-100 rounded-xl p-4 mb-4 text-center">
               <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">Time Remaining</p>
               <p className="text-3xl font-bold text-slate-900 font-mono">{timeoutCountdown}s</p>
             </div>
             <button
               onClick={resetInactivityTimer}
-              className="w-full py-3 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-sm"
+              className="w-full py-3 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-xl"
             >
               Stay Logged In
             </button>
           </div>
         </div>
       )}
+
+      {/* AI Chat Widget */}
+      <AIChatWidget
+        isOpen={showAIChat}
+        onToggle={() => setShowAIChat(!showAIChat)}
+        user={googleUser ? { name: googleUser.name, email: googleUser.email, picture: googleUser.picture } : null}
+      />
     </Layout>
   );
 };

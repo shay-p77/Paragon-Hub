@@ -292,7 +292,7 @@ export const CountrySelect: React.FC<{
     <div className={`relative ${className}`} ref={dropdownRef}>
       <div
         onClick={() => { setIsOpen(true); setTimeout(() => inputRef.current?.focus(), 0); }}
-        className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus-within:ring-2 focus-within:ring-paragon bg-white cursor-pointer flex items-center justify-between"
+        className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus-within:ring-2 focus-within:ring-paragon bg-white cursor-pointer flex items-center justify-between"
       >
         {isOpen ? (
           <input
@@ -315,7 +315,7 @@ export const CountrySelect: React.FC<{
       </div>
 
       {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-sm shadow-lg max-h-48 overflow-y-auto">
+        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
           {filteredCountries.length > 0 ? (
             filteredCountries.map(country => (
               <button
@@ -349,7 +349,7 @@ export const DataTable: React.FC<{
   headers: string[];
   children: React.ReactNode;
 }> = ({ headers, children }) => (
-  <div className="overflow-x-auto border border-slate-200 rounded-sm shadow-sm bg-white -mx-4 sm:mx-0">
+  <div className="overflow-x-auto border border-slate-200 rounded-xl shadow-sm bg-white -mx-4 sm:mx-0">
     <table className="w-full text-left text-[10px] sm:text-[11px] uppercase tracking-tight min-w-[600px]">
       <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold">
         <tr>
@@ -394,7 +394,7 @@ export const ConfirmModal: React.FC<{
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-sm shadow-xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
+      <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
         <div className="flex items-start gap-4">
           <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${variant === 'danger' ? 'bg-red-100' : 'bg-amber-100'}`}>
             <svg className={`w-5 h-5 ${variant === 'danger' ? 'text-red-600' : 'text-amber-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -409,13 +409,13 @@ export const ConfirmModal: React.FC<{
         <div className="flex gap-3 mt-6">
           <button
             onClick={onClose}
-            className="flex-1 bg-slate-100 text-slate-700 text-[10px] py-2.5 px-4 font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-sm"
+            className="flex-1 bg-slate-100 text-slate-700 text-[10px] py-2.5 px-4 font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-xl"
           >
             {cancelText}
           </button>
           <button
             onClick={() => { onConfirm(); onClose(); }}
-            className={`flex-1 text-white text-[10px] py-2.5 px-4 font-bold uppercase tracking-widest transition-colors rounded-sm ${
+            className={`flex-1 text-white text-[10px] py-2.5 px-4 font-bold uppercase tracking-widest transition-colors rounded-xl ${
               variant === 'danger' ? 'bg-red-600 hover:bg-red-700' : 'bg-amber-600 hover:bg-amber-700'
             }`}
           >
@@ -499,11 +499,11 @@ export const ClientAutocomplete: React.FC<{
         onFocus={() => setIsOpen(true)}
         placeholder={placeholder}
         required={required}
-        className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+        className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon rounded-xl"
       />
 
       {isOpen && (filteredCustomers.length > 0 || showAddNew) && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-sm shadow-lg max-h-48 overflow-y-auto">
+        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
           {filteredCustomers.slice(0, 5).map(customer => (
             <button
               key={customer.id}
@@ -649,7 +649,7 @@ export const QuickAddCustomerModal: React.FC<{
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4" onClick={handleClose}>
-      <div className="bg-white rounded-sm shadow-xl max-w-md w-full" onClick={e => e.stopPropagation()}>
+      <div className="bg-white rounded-xl shadow-xl max-w-md w-full" onClick={e => e.stopPropagation()}>
         <div className="p-4 border-b border-slate-200 flex justify-between items-center">
           <div>
             <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Add New Customer</h3>
@@ -667,7 +667,7 @@ export const QuickAddCustomerModal: React.FC<{
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
                 placeholder="Legal first name"
-                className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
                 autoFocus
               />
             </div>
@@ -678,7 +678,7 @@ export const QuickAddCustomerModal: React.FC<{
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
                 placeholder="Legal last name"
-                className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
               />
             </div>
           </div>
@@ -689,7 +689,7 @@ export const QuickAddCustomerModal: React.FC<{
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               placeholder="How you refer to them (e.g., nickname)"
-              className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+              className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
             />
           </div>
           <div>
@@ -699,7 +699,7 @@ export const QuickAddCustomerModal: React.FC<{
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="email@example.com"
-              className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+              className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
             />
           </div>
           <div>
@@ -711,7 +711,7 @@ export const QuickAddCustomerModal: React.FC<{
                   setCountryCode(e.target.value);
                   setPhone(formatPhoneNumber(phone.replace(/\D/g, ''), e.target.value));
                 }}
-                className="w-24 p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon bg-white"
+                className="w-24 p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon bg-white"
               >
                 {COUNTRY_CODES.map((cc, idx) => (
                   <option key={`${cc.code}-${idx}`} value={cc.code}>
@@ -724,7 +724,7 @@ export const QuickAddCustomerModal: React.FC<{
                 value={phone}
                 onChange={(e) => handlePhoneChange(e.target.value)}
                 placeholder={countryCode === '+1' ? '(555) 000-0000' : '000 000 0000'}
-                className="flex-1 p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                className="flex-1 p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
               />
             </div>
           </div>
@@ -734,7 +734,7 @@ export const QuickAddCustomerModal: React.FC<{
               <select
                 value={agentId}
                 onChange={(e) => setAgentId(e.target.value)}
-                className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon bg-white"
+                className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon bg-white"
               >
                 <option value="">No agent assigned</option>
                 {agents.map(agent => (
@@ -748,14 +748,14 @@ export const QuickAddCustomerModal: React.FC<{
         <div className="p-4 border-t border-slate-200 flex gap-3">
           <button
             onClick={handleClose}
-            className="flex-1 bg-slate-100 text-slate-700 text-[10px] py-2.5 px-4 font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-sm"
+            className="flex-1 bg-slate-100 text-slate-700 text-[10px] py-2.5 px-4 font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-xl"
           >
             Cancel
           </button>
           <button
             onClick={handleSubmit}
             disabled={!firstName.trim() || !lastName.trim() || saving}
-            className="flex-1 bg-paragon text-white text-[10px] py-2.5 px-4 font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 bg-paragon text-white text-[10px] py-2.5 px-4 font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving ? 'Saving...' : 'Add Customer'}
           </button>
@@ -850,11 +850,11 @@ export const VendorAutocomplete: React.FC<{
         onFocus={() => setIsOpen(true)}
         placeholder={placeholder}
         required={required}
-        className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon rounded-sm"
+        className="w-full p-2 bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-paragon rounded-xl"
       />
 
       {isOpen && (filteredVendors.length > 0 || showAddNew) && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-sm shadow-lg max-h-48 overflow-y-auto">
+        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
           {filteredVendors.slice(0, 5).map(vendor => (
             <button
               key={vendor.id}
@@ -977,7 +977,7 @@ export const QuickAddVendorModal: React.FC<{
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4" onClick={handleClose}>
-      <div className="bg-white rounded-sm shadow-xl max-w-md w-full" onClick={e => e.stopPropagation()}>
+      <div className="bg-white rounded-xl shadow-xl max-w-md w-full" onClick={e => e.stopPropagation()}>
         <div className="p-4 border-b border-slate-200 flex justify-between items-center">
           <div>
             <h3 className="font-bold text-slate-900">Quick Add {getTypeLabel()} Vendor</h3>
@@ -994,7 +994,7 @@ export const QuickAddVendorModal: React.FC<{
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g., JOY Travel"
-              className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+              className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
               autoFocus
             />
           </div>
@@ -1006,7 +1006,7 @@ export const QuickAddVendorModal: React.FC<{
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 placeholder="e.g., IH6K"
-                className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
               />
             </div>
             <div>
@@ -1024,7 +1024,7 @@ export const QuickAddVendorModal: React.FC<{
                   setCommissionPercent(value);
                 }}
                 placeholder="0"
-                className="w-full p-2 border border-slate-200 text-xs rounded-sm focus:outline-none focus:ring-1 focus:ring-paragon"
+                className="w-full p-2 border border-slate-200 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-paragon"
               />
             </div>
           </div>
@@ -1033,14 +1033,14 @@ export const QuickAddVendorModal: React.FC<{
         <div className="p-4 border-t border-slate-200 flex gap-3">
           <button
             onClick={handleClose}
-            className="flex-1 bg-slate-100 text-slate-700 text-[10px] py-2.5 px-4 font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-sm"
+            className="flex-1 bg-slate-100 text-slate-700 text-[10px] py-2.5 px-4 font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-xl"
           >
             Cancel
           </button>
           <button
             onClick={handleSubmit}
             disabled={!name.trim() || saving}
-            className="flex-1 bg-paragon text-white text-[10px] py-2.5 px-4 font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 bg-paragon text-white text-[10px] py-2.5 px-4 font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving ? 'Saving...' : 'Add Vendor'}
           </button>

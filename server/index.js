@@ -19,6 +19,7 @@ const customerRoutes = require('./routes/customers');
 const notificationRoutes = require('./routes/notifications');
 const pipelineRoutes = require('./routes/pipeline');
 const vendorRoutes = require('./routes/vendors');
+const settingsRoutes = require('./routes/settings');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -107,6 +108,7 @@ app.use('/api/customers', customerRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/pipeline', pipelineRoutes);
 app.use('/api/vendors', vendorRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // Root route
 app.get('/', (req, res) => {

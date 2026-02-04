@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { SectionHeader } from './Shared';
 import { API_URL } from '../config';
-import { UserRole, Vendor, VendorType, CollectionMethod, PaymentFrequency, AuditLog } from '../types';
+import { UserRole, Vendor, VendorType, CollectionMethod, PaymentFrequency, AuditLog, MarkupType, SystemMarkups } from '../types';
 
 interface TeamMember {
   _id: string;
@@ -44,7 +44,7 @@ const InviteUserModal: React.FC<{
       onClick={onClose}
     >
       <div
-        className="bg-white w-full max-w-md rounded-sm shadow-2xl animate-zoomIn"
+        className="bg-white w-full max-w-md rounded-xl shadow-2xl animate-zoomIn"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-6 border-b border-slate-200 flex justify-between items-center">
@@ -60,7 +60,7 @@ const InviteUserModal: React.FC<{
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="employee@company.com"
-              className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon"
+              className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon"
               required
             />
           </div>
@@ -72,7 +72,7 @@ const InviteUserModal: React.FC<{
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="John Smith"
-              className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon"
+              className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon"
               required
             />
           </div>
@@ -82,7 +82,7 @@ const InviteUserModal: React.FC<{
             <select
               value={role}
               onChange={(e) => setRole(e.target.value as UserRole)}
-              className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon bg-white"
+              className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon bg-white"
             >
               <option value="ADMIN">Admin - Full access</option>
               <option value="OPERATIONS">Operations - Ops, Command Center, CRM, Clients, KB</option>
@@ -95,13 +95,13 @@ const InviteUserModal: React.FC<{
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-2.5 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-sm"
+              className="flex-1 py-2.5 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-xl"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="flex-1 py-2.5 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-sm"
+              className="flex-1 py-2.5 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-xl"
             >
               Send Invite
             </button>
@@ -133,7 +133,7 @@ const EditUserModal: React.FC<{
       onClick={onClose}
     >
       <div
-        className="bg-white w-full max-w-md rounded-sm shadow-2xl animate-zoomIn"
+        className="bg-white w-full max-w-md rounded-xl shadow-2xl animate-zoomIn"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-6 border-b border-slate-200 flex justify-between items-center">
@@ -148,7 +148,7 @@ const EditUserModal: React.FC<{
               type="email"
               value={user.email}
               disabled
-              className="w-full p-2.5 border border-slate-200 rounded-sm text-sm bg-slate-50 text-slate-500"
+              className="w-full p-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50 text-slate-500"
             />
           </div>
 
@@ -158,7 +158,7 @@ const EditUserModal: React.FC<{
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon"
+              className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon"
             />
           </div>
 
@@ -167,7 +167,7 @@ const EditUserModal: React.FC<{
             <select
               value={role}
               onChange={(e) => setRole(e.target.value as UserRole)}
-              className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon bg-white"
+              className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon bg-white"
             >
               <option value="ADMIN">Admin - Full access</option>
               <option value="OPERATIONS">Operations - Ops, Command Center, CRM, Clients, KB</option>
@@ -193,13 +193,13 @@ const EditUserModal: React.FC<{
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-2.5 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-sm"
+              className="flex-1 py-2.5 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-xl"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="flex-1 py-2.5 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-sm"
+              className="flex-1 py-2.5 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-xl"
             >
               Save Changes
             </button>
@@ -265,7 +265,7 @@ const VendorModal: React.FC<{
       onClick={onClose}
     >
       <div
-        className="bg-white w-full max-w-2xl rounded-sm shadow-2xl animate-zoomIn max-h-[90vh] overflow-y-auto"
+        className="bg-white w-full max-w-2xl rounded-xl shadow-2xl animate-zoomIn max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-6 border-b border-slate-200 flex justify-between items-center sticky top-0 bg-white">
@@ -285,7 +285,7 @@ const VendorModal: React.FC<{
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g., JOY Travel"
-                className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon"
+                className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon"
                 required
               />
             </div>
@@ -296,7 +296,7 @@ const VendorModal: React.FC<{
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 placeholder="e.g., IH6K"
-                className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon"
+                className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon"
               />
             </div>
           </div>
@@ -320,7 +320,7 @@ const VendorModal: React.FC<{
                     setCommissionPercent(value);
                   }}
                   placeholder="0"
-                  className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon"
+                  className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon"
                 />
               </div>
               <div>
@@ -328,7 +328,7 @@ const VendorModal: React.FC<{
                 <select
                   value={collectionMethod}
                   onChange={(e) => setCollectionMethod(e.target.value as CollectionMethod)}
-                  className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon bg-white"
+                  className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon bg-white"
                 >
                   <option value="AUTOMATIC">Automatic</option>
                   <option value="EMAIL">Email Required</option>
@@ -343,7 +343,7 @@ const VendorModal: React.FC<{
                 <select
                   value={paymentFrequency}
                   onChange={(e) => setPaymentFrequency(e.target.value as PaymentFrequency)}
-                  className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon bg-white"
+                  className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon bg-white"
                 >
                   <option value="MONTHLY">Monthly</option>
                   <option value="WEEKLY">Weekly</option>
@@ -367,7 +367,7 @@ const VendorModal: React.FC<{
                     value={collectionEmail}
                     onChange={(e) => setCollectionEmail(e.target.value)}
                     placeholder="claims@vendor.com"
-                    className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon"
+                    className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon"
                   />
                 </div>
               )}
@@ -379,7 +379,7 @@ const VendorModal: React.FC<{
                     value={collectionFormUrl}
                     onChange={(e) => setCollectionFormUrl(e.target.value)}
                     placeholder="https://..."
-                    className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon"
+                    className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon"
                   />
                 </div>
               )}
@@ -393,7 +393,7 @@ const VendorModal: React.FC<{
               onChange={(e) => setCollectionNotes(e.target.value)}
               placeholder="Additional instructions for claiming commission..."
               rows={2}
-              className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon resize-none"
+              className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon resize-none"
             />
           </div>
 
@@ -407,7 +407,7 @@ const VendorModal: React.FC<{
                   type="text"
                   value={contactName}
                   onChange={(e) => setContactName(e.target.value)}
-                  className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon"
+                  className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon"
                 />
               </div>
               <div>
@@ -416,7 +416,7 @@ const VendorModal: React.FC<{
                   type="email"
                   value={contactEmail}
                   onChange={(e) => setContactEmail(e.target.value)}
-                  className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon"
+                  className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon"
                 />
               </div>
               <div>
@@ -425,7 +425,7 @@ const VendorModal: React.FC<{
                   type="tel"
                   value={contactPhone}
                   onChange={(e) => setContactPhone(e.target.value)}
-                  className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon"
+                  className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon"
                 />
               </div>
             </div>
@@ -438,7 +438,7 @@ const VendorModal: React.FC<{
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
-              className="w-full p-2.5 border border-slate-200 rounded-sm text-sm outline-none focus:ring-2 focus:ring-paragon resize-none"
+              className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon resize-none"
             />
           </div>
 
@@ -446,13 +446,13 @@ const VendorModal: React.FC<{
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-2.5 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-sm"
+              className="flex-1 py-2.5 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-xl"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="flex-1 py-2.5 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-sm"
+              className="flex-1 py-2.5 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-xl"
             >
               {vendor ? 'Save Changes' : 'Add Vendor'}
             </button>
@@ -466,7 +466,7 @@ const VendorModal: React.FC<{
 const Settings: React.FC<SettingsProps> = ({ currentUserRole = 'ADMIN' }) => {
   const isAdmin = currentUserRole === 'ADMIN';
 
-  const [activeSection, setActiveSection] = useState<'users' | 'vendors' | 'activity'>('users');
+  const [activeSection, setActiveSection] = useState<'users' | 'vendors' | 'markups' | 'activity'>('users');
   const [vendorSubTab, setVendorSubTab] = useState<VendorType>('FLIGHT');
   const [users, setUsers] = useState<TeamMember[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
@@ -482,10 +482,21 @@ const Settings: React.FC<SettingsProps> = ({ currentUserRole = 'ADMIN' }) => {
   const [expandedVendorId, setExpandedVendorId] = useState<string | null>(null);
   const [deleteVendorConfirm, setDeleteVendorConfirm] = useState<{ id: string; name: string } | null>(null);
 
+  // Markup settings state
+  const [markups, setMarkups] = useState<SystemMarkups>({
+    flight: { amount: 0, type: 'FLAT' },
+    hotel: { amount: 0, type: 'FLAT' },
+    logistics: { amount: 0, type: 'FLAT' },
+    conciergePerDay: { amount: 0, type: 'FLAT' },
+  });
+  const [markupsLoading, setMarkupsLoading] = useState(false);
+  const [markupsSaving, setMarkupsSaving] = useState(false);
+
   // Build sections based on role
   const sections = [
     { id: 'users', label: 'User Access' },
     ...(isAdmin ? [{ id: 'vendors', label: 'Vendors' }] : []),
+    ...(isAdmin ? [{ id: 'markups', label: 'Markups' }] : []),
     ...(isAdmin ? [{ id: 'activity', label: 'Activity Log' }] : []),
   ];
 
@@ -505,6 +516,13 @@ const Settings: React.FC<SettingsProps> = ({ currentUserRole = 'ADMIN' }) => {
   useEffect(() => {
     if (activeSection === 'activity') {
       fetchAuditLogs();
+    }
+  }, [activeSection]);
+
+  // Fetch markups when markups tab is active
+  useEffect(() => {
+    if (activeSection === 'markups') {
+      fetchMarkups();
     }
   }, [activeSection]);
 
@@ -552,6 +570,54 @@ const Settings: React.FC<SettingsProps> = ({ currentUserRole = 'ADMIN' }) => {
     } finally {
       setLogsLoading(false);
     }
+  };
+
+  const fetchMarkups = async () => {
+    setMarkupsLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/settings`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.markups) {
+          setMarkups(data.markups);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch markups:', error);
+    } finally {
+      setMarkupsLoading(false);
+    }
+  };
+
+  const handleSaveMarkups = async () => {
+    setMarkupsSaving(true);
+    try {
+      const res = await fetch(`${API_URL}/api/settings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ markups }),
+      });
+      if (res.ok) {
+        alert('Markup settings saved successfully!');
+      } else {
+        alert('Failed to save markup settings');
+      }
+    } catch (error) {
+      console.error('Failed to save markups:', error);
+      alert('Failed to save markup settings');
+    } finally {
+      setMarkupsSaving(false);
+    }
+  };
+
+  const updateMarkup = (type: keyof SystemMarkups, field: 'amount' | 'type', value: number | MarkupType) => {
+    setMarkups(prev => ({
+      ...prev,
+      [type]: {
+        ...prev[type],
+        [field]: value,
+      },
+    }));
   };
 
   const handleInvite = async (email: string, name: string, role: UserRole) => {
@@ -779,7 +845,7 @@ const Settings: React.FC<SettingsProps> = ({ currentUserRole = 'ADMIN' }) => {
           <button
             key={section.id}
             onClick={() => setActiveSection(section.id as any)}
-            className={`px-4 py-2 text-[10px] font-bold uppercase tracking-widest rounded-sm transition-colors ${
+            className={`px-4 py-2 text-[10px] font-bold uppercase tracking-widest rounded-xl transition-colors ${
               activeSection === section.id
                 ? 'bg-paragon text-white'
                 : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
@@ -793,7 +859,7 @@ const Settings: React.FC<SettingsProps> = ({ currentUserRole = 'ADMIN' }) => {
       {/* User Access Section */}
       {activeSection === 'users' && (
         <div>
-          <div className="bg-white border border-slate-200 rounded-sm">
+          <div className="bg-white border border-slate-200 rounded-xl">
             <div className="p-4 sm:p-6 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
               <div>
                 <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Team Members</h3>
@@ -801,7 +867,7 @@ const Settings: React.FC<SettingsProps> = ({ currentUserRole = 'ADMIN' }) => {
               </div>
               <button
                 onClick={() => setShowInviteModal(true)}
-                className="px-4 py-2 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest rounded-sm hover:bg-paragon-dark transition-colors flex items-center gap-2"
+                className="px-4 py-2 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest rounded-xl hover:bg-paragon-dark transition-colors flex items-center gap-2"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -913,7 +979,7 @@ const Settings: React.FC<SettingsProps> = ({ currentUserRole = 'ADMIN' }) => {
       {/* Vendors Section */}
       {activeSection === 'vendors' && isAdmin && (
         <div>
-          <div className="bg-white border border-slate-200 rounded-sm">
+          <div className="bg-white border border-slate-200 rounded-xl">
             {/* Vendor Sub-tabs */}
             <div className="p-4 border-b border-slate-200 flex items-center justify-between">
               <div className="flex gap-2">
@@ -921,7 +987,7 @@ const Settings: React.FC<SettingsProps> = ({ currentUserRole = 'ADMIN' }) => {
                   <button
                     key={type}
                     onClick={() => setVendorSubTab(type)}
-                    className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-sm transition-colors ${
+                    className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-xl transition-colors ${
                       vendorSubTab === type
                         ? 'bg-slate-800 text-white'
                         : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
@@ -933,7 +999,7 @@ const Settings: React.FC<SettingsProps> = ({ currentUserRole = 'ADMIN' }) => {
               </div>
               <button
                 onClick={() => { setEditingVendor(null); setShowVendorModal(true); }}
-                className="px-3 py-1.5 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest rounded-sm hover:bg-paragon-dark transition-colors"
+                className="px-3 py-1.5 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest rounded-xl hover:bg-paragon-dark transition-colors"
               >
                 + Add Vendor
               </button>
@@ -1093,10 +1159,202 @@ const Settings: React.FC<SettingsProps> = ({ currentUserRole = 'ADMIN' }) => {
         </div>
       )}
 
+      {/* Markup Settings Section */}
+      {activeSection === 'markups' && isAdmin && (
+        <div>
+          <div className="bg-white border border-slate-200 rounded-xl">
+            <div className="p-4 sm:p-6 border-b border-slate-200">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Default Markups</h3>
+                  <p className="text-xs text-slate-500 mt-1">Set default markups for bookings. Customers can have custom overrides in their profile.</p>
+                </div>
+                <button
+                  onClick={handleSaveMarkups}
+                  disabled={markupsSaving}
+                  className="px-4 py-2 bg-paragon text-white text-[10px] font-bold uppercase tracking-widest rounded-xl hover:bg-paragon-dark transition-colors disabled:opacity-50"
+                >
+                  {markupsSaving ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </div>
+
+            {markupsLoading ? (
+              <div className="p-12 text-center text-slate-400">
+                <div className="animate-spin w-8 h-8 border-2 border-paragon border-t-transparent rounded-full mx-auto mb-3"></div>
+                <p className="text-sm">Loading markup settings...</p>
+              </div>
+            ) : (
+              <div className="p-6 space-y-6">
+                {/* Flight Markup */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end pb-6 border-b border-slate-100">
+                  <div className="sm:col-span-1">
+                    <h4 className="font-semibold text-sm text-slate-800">Flight Markup</h4>
+                    <p className="text-xs text-slate-500 mt-1">Applied to all flight bookings</p>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Amount</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
+                        {markups.flight.type === 'FLAT' ? '$' : ''}
+                      </span>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={markups.flight.amount}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/[^0-9.]/g, '');
+                          updateMarkup('flight', 'amount', parseFloat(val) || 0);
+                        }}
+                        className={`w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon ${markups.flight.type === 'FLAT' ? 'pl-7' : ''}`}
+                      />
+                      {markups.flight.type === 'PERCENT' && (
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">%</span>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Type</label>
+                    <select
+                      value={markups.flight.type}
+                      onChange={(e) => updateMarkup('flight', 'type', e.target.value as MarkupType)}
+                      className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon bg-white"
+                    >
+                      <option value="FLAT">Flat ($)</option>
+                      <option value="PERCENT">Percentage (%)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Hotel Markup */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end pb-6 border-b border-slate-100">
+                  <div className="sm:col-span-1">
+                    <h4 className="font-semibold text-sm text-slate-800">Hotel Markup</h4>
+                    <p className="text-xs text-slate-500 mt-1">Applied to all hotel bookings</p>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Amount</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
+                        {markups.hotel.type === 'FLAT' ? '$' : ''}
+                      </span>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={markups.hotel.amount}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/[^0-9.]/g, '');
+                          updateMarkup('hotel', 'amount', parseFloat(val) || 0);
+                        }}
+                        className={`w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon ${markups.hotel.type === 'FLAT' ? 'pl-7' : ''}`}
+                      />
+                      {markups.hotel.type === 'PERCENT' && (
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">%</span>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Type</label>
+                    <select
+                      value={markups.hotel.type}
+                      onChange={(e) => updateMarkup('hotel', 'type', e.target.value as MarkupType)}
+                      className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon bg-white"
+                    >
+                      <option value="FLAT">Flat ($)</option>
+                      <option value="PERCENT">Percentage (%)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Logistics Markup */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end pb-6 border-b border-slate-100">
+                  <div className="sm:col-span-1">
+                    <h4 className="font-semibold text-sm text-slate-800">Logistics Markup</h4>
+                    <p className="text-xs text-slate-500 mt-1">Applied to all logistics bookings</p>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Amount</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
+                        {markups.logistics.type === 'FLAT' ? '$' : ''}
+                      </span>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={markups.logistics.amount}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/[^0-9.]/g, '');
+                          updateMarkup('logistics', 'amount', parseFloat(val) || 0);
+                        }}
+                        className={`w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon ${markups.logistics.type === 'FLAT' ? 'pl-7' : ''}`}
+                      />
+                      {markups.logistics.type === 'PERCENT' && (
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">%</span>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Type</label>
+                    <select
+                      value={markups.logistics.type}
+                      onChange={(e) => updateMarkup('logistics', 'type', e.target.value as MarkupType)}
+                      className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon bg-white"
+                    >
+                      <option value="FLAT">Flat ($)</option>
+                      <option value="PERCENT">Percentage (%)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Concierge Per Day Markup */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+                  <div className="sm:col-span-1">
+                    <h4 className="font-semibold text-sm text-slate-800">Concierge Fee Per Day</h4>
+                    <p className="text-xs text-slate-500 mt-1">Daily service fee for concierge trips</p>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Amount</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
+                        {markups.conciergePerDay.type === 'FLAT' ? '$' : ''}
+                      </span>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={markups.conciergePerDay.amount}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/[^0-9.]/g, '');
+                          updateMarkup('conciergePerDay', 'amount', parseFloat(val) || 0);
+                        }}
+                        className={`w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon ${markups.conciergePerDay.type === 'FLAT' ? 'pl-7' : ''}`}
+                      />
+                      {markups.conciergePerDay.type === 'PERCENT' && (
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">%</span>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Type</label>
+                    <select
+                      value={markups.conciergePerDay.type}
+                      onChange={(e) => updateMarkup('conciergePerDay', 'type', e.target.value as MarkupType)}
+                      className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-paragon bg-white"
+                    >
+                      <option value="FLAT">Flat ($)</option>
+                      <option value="PERCENT">Percentage (%)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Activity Log Section */}
       {activeSection === 'activity' && isAdmin && (
         <div>
-          <div className="bg-white border border-slate-200 rounded-sm">
+          <div className="bg-white border border-slate-200 rounded-xl">
             <div className="p-4 sm:p-6 border-b border-slate-200">
               <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Recent Activity</h3>
               <p className="text-xs text-slate-500 mt-1">System-wide user activity log</p>
@@ -1178,7 +1436,7 @@ const Settings: React.FC<SettingsProps> = ({ currentUserRole = 'ADMIN' }) => {
           onClick={() => setDeleteVendorConfirm(null)}
         >
           <div
-            className="bg-white w-full max-w-sm rounded-sm shadow-2xl animate-zoomIn"
+            className="bg-white w-full max-w-sm rounded-xl shadow-2xl animate-zoomIn"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-6">
@@ -1194,13 +1452,13 @@ const Settings: React.FC<SettingsProps> = ({ currentUserRole = 'ADMIN' }) => {
               <div className="flex gap-3">
                 <button
                   onClick={() => setDeleteVendorConfirm(null)}
-                  className="flex-1 py-2.5 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-sm"
+                  className="flex-1 py-2.5 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors rounded-xl"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={() => handleDeleteVendor(deleteVendorConfirm.id)}
-                  className="flex-1 py-2.5 bg-red-600 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-red-700 transition-colors rounded-sm"
+                  className="flex-1 py-2.5 bg-red-600 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-red-700 transition-colors rounded-xl"
                 >
                   Delete
                 </button>

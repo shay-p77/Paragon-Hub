@@ -41,6 +41,7 @@ function formatCustomer(c) {
     } : null,
     notes: decrypt(c.notes) || '',
     agentId: c.agentId || '',
+    customMarkups: c.customMarkups || null,
     createdAt: c.createdAt ? c.createdAt.toISOString() : new Date().toISOString(),
     updatedAt: c.updatedAt ? c.updatedAt.toISOString() : new Date().toISOString(),
   };
@@ -117,6 +118,7 @@ router.post('/', async (req, res) => {
       notes,
       createdBy,
       agentId,
+      customMarkups,
     } = req.body;
 
     if (!legalFirstName || !legalLastName) {
@@ -140,6 +142,7 @@ router.post('/', async (req, res) => {
       notes: notes || '',
       createdBy: createdBy || '',
       agentId: agentId || '',
+      customMarkups: customMarkups || undefined,
     });
 
     await customer.save();
@@ -172,6 +175,7 @@ router.post('/', async (req, res) => {
       preferences: preferences || {},
       notes: notes || '',
       agentId: agentId || '',
+      customMarkups: customMarkups || null,
       createdAt: customer.createdAt.toISOString(),
       updatedAt: customer.updatedAt.toISOString(),
     });
@@ -201,6 +205,7 @@ router.put('/:id', async (req, res) => {
       preferences,
       notes,
       agentId,
+      customMarkups,
     } = req.body;
 
     // Find and update - need to handle encryption manually for updates
@@ -226,6 +231,7 @@ router.put('/:id', async (req, res) => {
     if (preferences !== undefined) customer.preferences = preferences;
     if (notes !== undefined) customer.notes = notes;
     if (agentId !== undefined) customer.agentId = agentId;
+    if (customMarkups !== undefined) customer.customMarkups = customMarkups;
 
     await customer.save();
 
@@ -273,6 +279,7 @@ router.put('/:id', async (req, res) => {
       preferences: preferences ?? customer.preferences,
       notes: notes ?? '',
       agentId: customer.agentId || '',
+      customMarkups: customer.customMarkups || null,
       createdAt: customer.createdAt.toISOString(),
       updatedAt: customer.updatedAt.toISOString(),
     });
