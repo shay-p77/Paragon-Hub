@@ -1096,7 +1096,7 @@ const Operations: React.FC<OperationsProps> = ({
         </div>
         <button
           onClick={() => setShowDispatchModal(true)}
-          className="bg-paragon text-white text-[9px] sm:text-[10px] px-4 py-2 font-bold tracking-widest hover:bg-paragon-dark transition-colors"
+          className="bg-paragon text-white text-[9px] sm:text-[10px] px-4 py-2 rounded-lg font-bold tracking-widest hover:bg-paragon-dark transition-colors"
         >
           + NEW BOOKING
         </button>
@@ -1107,7 +1107,7 @@ const Operations: React.FC<OperationsProps> = ({
         <div className="space-y-6 sm:space-y-8">
           {/* Requests Queue - Main Feature */}
           <div className="bg-white border border-slate-200 rounded-xl shadow-sm">
-            <div className="bg-slate-900 p-3 sm:p-4 flex items-center justify-between">
+            <div className="bg-slate-900 p-3 sm:p-4 rounded-t-xl flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></div>
                 <h2 className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-paragon-gold">Open Requests Queue</h2>

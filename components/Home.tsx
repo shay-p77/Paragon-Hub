@@ -1303,7 +1303,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
            <div className="bg-white border border-slate-200 p-4 sm:p-6 rounded-xl shadow-sm h-[350px] sm:h-[400px] flex flex-col">
               <div className="flex justify-between items-center mb-4 flex-shrink-0">
                 <SectionHeader title="Bulletin Board" />
-                <button onClick={() => setShowCreateModal(true)} className="text-[10px] font-bold text-paragon hover:underline uppercase tracking-widest">+ Post</button>
+                <button onClick={() => setShowCreateModal(true)} className="text-[10px] font-bold text-white bg-paragon hover:bg-paragon-dark px-3 py-1.5 rounded-lg uppercase tracking-widest transition-colors">+ Post</button>
               </div>
               <div className="space-y-4 flex-1 overflow-y-auto pr-2">
                 {announcements.length === 0 ? (
@@ -1322,7 +1322,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                   const isOwnPost = googleUser ? a.author === googleUser.name : a.author === currentUser.name;
 
                   return (
-                   <div key={a.id} className={`border-l-2 ${a.isPinned ? 'border-amber-500 bg-amber-50' : a.priority === 'HIGH' ? 'border-red-500 bg-red-50' : 'border-paragon bg-slate-50'} rounded-r-sm group`}>
+                   <div key={a.id} className={`border-l-4 border rounded-lg ${a.isPinned ? 'border-l-amber-500 border-amber-200 bg-amber-50' : a.priority === 'HIGH' ? 'border-l-red-500 border-red-200 bg-red-50' : 'border-l-paragon border-slate-300 bg-slate-50'} group shadow-sm`}>
                       <div className="p-4">
                         <div className="flex justify-between items-start mb-1">
                           <div className="flex items-center gap-1.5">
@@ -1530,7 +1530,7 @@ const Home: React.FC<HomeProps> = ({ currentUser, announcements, comments = [], 
                                   onChange={(e) => setCommentText(e.target.value)}
                                   className="flex-1 p-1.5 text-[10px] border border-slate-200 outline-none focus:ring-1 focus:ring-paragon rounded-xl"
                                 />
-                                <button type="submit" className="px-2 py-1.5 bg-paragon text-white text-[9px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors">
+                                <button type="submit" className="px-3 py-1.5 bg-paragon text-white text-[9px] font-bold uppercase tracking-widest hover:bg-paragon-dark transition-colors rounded-lg">
                                   Post
                                 </button>
                               </div>
